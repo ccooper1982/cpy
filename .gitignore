@@ -1,0 +1,7 @@
+.cache/*
+build/
+
+subprojects/*
+!subprojects/tree-sitter.wrap
+
+grammar/src
