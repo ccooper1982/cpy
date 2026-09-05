@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -28,7 +29,17 @@ std::string_view from_source_file (const Source& src, TSNode& node)
 }
 
 
-std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node)
+void create_issue (const TSNode& node, Issues& issues)
+{
+  const auto start = ts_node_start_point(node);
+  const auto start_byte = ts_node_start_byte(node);
+  const auto end_byte = ts_node_end_byte(node);
+
+  issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte);
+}
+
+
+std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node, Issues& issues)
 {
   auto ast_node = std::make_unique<Function>();
 
@@ -55,15 +66,10 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node)
     for (uint32_t p = 0; p < param_count; ++p)
     {
         TSNode parameter = ts_node_named_child(parameters, p);
+        TSNode param_name_node = ts_node_child_by_field_name(parameter, "name", 4);
+        TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
 
-        TSNode param_name_node = ts_node_child_by_field_name(parameter,"name",4);
-        TSNode param_type_node = ts_node_child_by_field_name(parameter,"type",4);
-
-        FunctionParam param;
-        param.type = from_source_file(src, param_type_node);
-        param.name = from_source_file(src, param_name_node);
-
-        ast_node->params.emplace_back(std::move(param));
+        ast_node->params.emplace_back(from_source_file(src, param_type_node), from_source_file(src, param_name_node));
     }
   }
 
@@ -71,17 +77,20 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node)
 }
 
 
-std::tuple<std::unique_ptr<SourceFile>, Issues> parse_source_file(const Source& src, TSNode& ts_root)
+std::unique_ptr<SourceFile> parse_source_file(const Source& src, TSNode& ts_root, Issues& issues)
 {
-  auto process_node = [&src](TSNode& node, const std::string_view expect_type = "") -> std::unique_ptr<AstNode>
+  auto process_node = [&](TSNode& node) -> std::unique_ptr<AstNode>
   {
+    if (ts_node_is_error(node))
+    {
+      create_issue(node, issues);
+      return std::make_unique<Error>();
+    }
+
     const std::string_view type = ts_node_type(node) ;
 
-    if (!expect_type.empty() && type != expect_type)
-      throw std::runtime_error{std::format("Unexpected node type {} != {}", type, expect_type)};
-
     if (type == "function_def") {
-      return parse_function(src, node);
+      return parse_function(src, node, issues);
     }
     else {
       throw std::runtime_error{std::format("Uknown node type {}", type)};
@@ -98,9 +107,7 @@ std::tuple<std::unique_ptr<SourceFile>, Issues> parse_source_file(const Source& 
     sf_node->nodes.push_back(process_node(child));
   }
 
-  Issues issues{sf_node->src_path};
-
-  return {std::move(sf_node), issues};
+  return sf_node;
 }
 
 
@@ -120,7 +127,17 @@ int main (int argc, char ** argv)
 
   ts_parser_set_language(parser, tree_sitter_cpy());
 
-  const std::string_view source_code = "fn main(a: int) -> int {}";
+  const std::string_view source_code = R"(
+    fn 12main(a: int) -> int
+    {
+
+    }
+
+    fn hello(a: int) -> int
+    {
+
+    }
+  )";
 
   Source src { .src = source_code };
 
@@ -132,7 +149,8 @@ int main (int argc, char ** argv)
     throw std::runtime_error{"Root is not a source_file"};
   }
 
-  auto [ast_root, issues] = parse_source_file(src, root);
+  Issues issues{""}; // TODO file path
+  auto ast_root = parse_source_file(src, root, issues);
 
   if (!does_function_exist(*ast_root, "main"))
     issues.add_error("No entry function 'main' found");
@@ -142,7 +160,7 @@ int main (int argc, char ** argv)
 
   ast_root->dump(std::cout);
 
-  issues.dump(std::cout);
+  issues.dump(std::cout, src.src);
 
   return issues.have_errors() ? 1 : 0;
 }

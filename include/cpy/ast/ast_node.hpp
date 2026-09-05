@@ -12,6 +12,7 @@
 enum class NodeType
 {
   None,
+  Error,
   SourceFile,
   Function,
   FunctionParam
@@ -27,14 +28,29 @@ struct AstNode
   virtual void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const = 0;
 };
 
+struct Error : public AstNode
+{
+  NodeType node_type() const override { return NodeType::Error; }
+  bool is_node_type(const NodeType t) const override { return node_type() == t; }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "ERROR\n";
+  }
+};
+
 struct FunctionParam : public AstNode
 {
   std::string type;
   std::string name;
 
+  FunctionParam(const std::string_view type, std::string_view name) : type(type), name(name)
+  {
+
+  }
+
 
   NodeType node_type() const override { return NodeType::FunctionParam; }
-
   bool is_node_type(const NodeType t) const override { return node_type() == t; }
 
   void dump (std::ostream& os, const uint8_t tab = 0) const override
@@ -47,7 +63,7 @@ struct Function : public AstNode
 {
   std::string name;
   std::vector<FunctionParam> params;
-  std::string return_type;
+  std::string return_type{"void"};
 
   // FunctionBody body;
   // std::vector<std::unique_ptr<AstNode>> nodes;
@@ -57,10 +73,7 @@ struct Function : public AstNode
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    if (return_type.empty())
-      os << name << ":" << '\n';
-    else
-      os << name << " -> " << return_type << ':' << '\n';
+    os << name << " -> " << return_type << ':' << '\n';
 
     for(const auto& p : params)
       p.dump(os, tab);
