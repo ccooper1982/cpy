@@ -18,12 +18,10 @@ cpy_sources = files(
   'grammar/src/parser.c',
 )
 
-grammar_include = include_directories(
-  'grammar/src',
-)
+include_dirs = include_directories('grammar/src','include')
 
 executable('cpy', cpy_sources,
-  include_directories: grammar_include,
+  include_directories: include_dirs,
   dependencies: [tree_sitter], install: false
 )
 

@@ -1,162 +1,23 @@
+#include <algorithm>
 #include <cstdint>
-#include <filesystem>
 #include <iostream>
-#include <memory>
-#include <ranges>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
 
+#include <cpy/ast/ast_node.hpp>
+#include <cpy/issues.hpp>
 #include <tree_sitter/api.h>
-
-
-namespace fs = std::filesystem;
-namespace rg = std::ranges;
-namespace vw = std::views;
 
 
 extern "C" const TSLanguage *tree_sitter_cpy();
 
-struct Issue
-{
-  Issue(const std::string_view m) : msg(m)
-  {
-  }
-
-  std::string msg;
-  // line
-};
-
-class Issues
-{
-  static constexpr std::string_view ColorRed   = "\033[31m";
-  static constexpr std::string_view ColorReset = "\033[0m";
-
-public:
-  Issues (const fs::path src) : src_path(src) {}
-
-  void add_error(const std::string_view msg)
-  {
-    m_errors.emplace_back(msg);
-  }
-
-  bool have_errors() const { return !m_errors.empty(); }
-
-  void dump() const
-  {
-    if (m_errors.empty())
-      return;
-
-    std::cout << ColorRed << src_path << " : ERRORS " << ColorReset << '\n';
-
-    for (const auto& err : m_errors)
-      std::cout << "-> " << err.msg << '\n';
-  }
-
-private:
-  fs::path src_path;
-  std::vector<Issue> m_errors;
-};
-
-enum class NodeType
-{
-  None,
-  SourceFile,
-  Function,
-  FunctionParam
-};
-
-
-struct AstNode
-{
-  virtual NodeType node_type() const = 0;
-
-  virtual ~AstNode() = default;
-  virtual void dump ([[maybe_unused]] const uint8_t tab = 0) const = 0;
-};
-
-struct FunctionParam : public AstNode
-{
-  std::string type;
-  std::string name;
-
-  FunctionParam()
-  {
-
-  }
-
-  NodeType node_type() const override
-  {
-    return NodeType::FunctionParam;
-  }
-
-
-  void dump (const uint8_t tab = 0) const override
-  {
-    std::cout << std::string(tab*2, ' ') << name << ":" << type << '\n';
-  }
-};
-
-struct FunctionParams //: public AstNode
-{
-  std::vector<FunctionParam> params;
-
-  void dump ([[maybe_unused]] const uint8_t tab = 0) const// override
-  {
-    for(const auto& p : params)
-      p.dump(tab);
-  }
-};
-
-struct Function : public AstNode
-{
-  std::string name;
-  FunctionParams params;
-  std::string return_type;
-
-  // FunctionBody body;
-  // std::vector<std::unique_ptr<AstNode>> nodes;
-
-  NodeType node_type() const override
-  {
-    return NodeType::Function;
-  }
-
-  void dump ([[maybe_unused]] const uint8_t tab = 0) const override
-  {
-    if (return_type.empty())
-      std::cout << name << ":" << '\n';
-    else
-      std::cout << name << " -> " << return_type << ':' << '\n';
-
-    params.dump(1);
-  }
-};
-
-struct SourceFile : public AstNode
-{
-  std::vector<std::unique_ptr<AstNode>> nodes;
-  fs::path src_path;
-
-  NodeType node_type() const override
-  {
-    return NodeType::SourceFile;
-  }
-
-  void dump ([[maybe_unused]] const uint8_t tab = 0) const override
-  {
-    std::cout << (src_path.empty() ? "Compiled source" : src_path.string()) << '\n';
-
-    for (const auto& n : nodes)
-      n->dump();
-  }
-};
 
 
 struct Source
 {
   std::string_view src;
-  // std::string file_name;
+  // fs::path path;
 };
 
 
@@ -175,6 +36,7 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node)
   TSNode name_node = ts_node_child_by_field_name(ts_node, "name", 4);
   ast_node->name = from_source_file(src, name_node);
 
+  // return type
   TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
   if (!ts_node_is_null(return_type)) {
     auto type_node = ts_node_child_by_field_name(return_type, "type", 4);
@@ -188,8 +50,7 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node)
   {
     uint32_t param_count = ts_node_named_child_count(parameters);
 
-    FunctionParams params;
-    params.params.reserve(param_count);
+    ast_node->params.reserve(param_count);
 
     for (uint32_t p = 0; p < param_count; ++p)
     {
@@ -202,10 +63,8 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node)
         param.type = from_source_file(src, param_type_node);
         param.name = from_source_file(src, param_name_node);
 
-        params.params.emplace_back(std::move(param));
+        ast_node->params.emplace_back(std::move(param));
     }
-
-    ast_node->params = std::move(params);
   }
 
   return ast_node;
@@ -224,9 +83,6 @@ std::tuple<std::unique_ptr<SourceFile>, Issues> parse_source_file(const Source& 
     if (type == "function_def") {
       return parse_function(src, node);
     }
-    // else if (type == "source_file") {
-    //   return parse_source_file(src, node);
-    // }
     else {
       throw std::runtime_error{std::format("Uknown node type {}", type)};
     }
@@ -250,12 +106,11 @@ std::tuple<std::unique_ptr<SourceFile>, Issues> parse_source_file(const Source& 
 
 bool does_function_exist(const SourceFile& src, const std::string_view name)
 {
-  auto funcs = [](const std::unique_ptr<AstNode>& node){ return node->node_type() == NodeType::Function; };
-
-  for (const auto& f : src.nodes | vw::filter(funcs))
-    if (dynamic_cast<Function*>(f.get())->name == name)
-      return true;
-  return false;
+  return rg::find_if(src.nodes, [&](const auto& node)
+         {
+           return node->is_node_type(NodeType::Function) &&
+                  dynamic_cast<const Function&>(*node).name == name;
+         }) != src.nodes.cend();
 }
 
 
@@ -265,7 +120,7 @@ int main (int argc, char ** argv)
 
   ts_parser_set_language(parser, tree_sitter_cpy());
 
-  const std::string_view source_code = "fn foo(a: int) -> int {}";
+  const std::string_view source_code = "fn main(a: int) -> int {}";
 
   Source src { .src = source_code };
 
@@ -285,9 +140,9 @@ int main (int argc, char ** argv)
   ts_tree_delete(tree);
   ts_parser_delete(parser);
 
-  ast_root->dump();
+  ast_root->dump(std::cout);
 
-  issues.dump();
+  issues.dump(std::cout);
 
   return issues.have_errors() ? 1 : 0;
 }
