@@ -24,8 +24,8 @@ struct Source
 
 std::string_view from_source_file (const Source& src, TSNode& node)
 {
-  return src.src.substr(  ts_node_start_byte(node),
-                          ts_node_end_byte(node) - ts_node_start_byte(node));
+  const auto start = ts_node_start_byte(node);
+  return src.src.substr(start, ts_node_end_byte(node) - start);
 }
 
 
