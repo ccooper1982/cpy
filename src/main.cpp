@@ -4,7 +4,9 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 #include <vector>
+
 
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/issues.hpp>
@@ -22,7 +24,7 @@ struct Source
 };
 
 
-std::string_view from_source_file (const Source& src, TSNode& node)
+std::string_view from_source_file (const Source& src, const TSNode& node)
 {
   const auto start = ts_node_start_byte(node);
   return src.src.substr(start, ts_node_end_byte(node) - start);
@@ -38,6 +40,19 @@ void create_issue (const TSNode& node, Issues& issues)
   issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte);
 }
 
+std::optional<VarType> create_type (const Source& src, const TSNode& node, Issues& issues)
+{
+  if (const auto name = from_source_file(src, node); name == "int") {
+    return VarType{BuiltInType::Int};
+  }
+  else if (name == "str") {
+    return VarType{BuiltInType::String};
+  }
+  else {
+    create_issue(node,issues);
+    return std::nullopt;
+  }
+}
 
 std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node, Issues& issues)
 {
@@ -51,7 +66,8 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node, Iss
   TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
   if (!ts_node_is_null(return_type)) {
     auto type_node = ts_node_child_by_field_name(return_type, "type", 4);
-    ast_node->return_type = from_source_file(src, type_node);
+    if (const auto type = create_type(src, type_node, issues); type)
+      ast_node->return_type = *type;
   }
 
   // params
@@ -69,7 +85,8 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node, Iss
         TSNode param_name_node = ts_node_child_by_field_name(parameter, "name", 4);
         TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
 
-        ast_node->params.emplace_back(from_source_file(src, param_type_node), from_source_file(src, param_name_node));
+        if (const auto type = create_type(src, param_type_node, issues) ; type)
+          ast_node->params.emplace_back(*type, from_source_file(src, param_name_node));
     }
   }
 
@@ -111,12 +128,22 @@ std::unique_ptr<SourceFile> parse_source_file(const Source& src, TSNode& ts_root
 }
 
 
-bool does_function_exist(const SourceFile& src, const std::string_view name)
+bool does_function_exist(const SourceFile& src, const std::string_view name, const VarType return_type, const std::vector<FunctionParam>& params)
 {
-  return rg::find_if(src.nodes, [&](const auto& node)
-         {
-           return node->is_node_type(NodeType::Function) &&
-                  dynamic_cast<const Function&>(*node).name == name;
+  return rg::find_if(src.nodes, [&](const auto& node) {
+          if (!node->is_node_type(NodeType::Function))
+            return false;
+
+          const auto func = dynamic_cast<const Function&>(*node);
+
+          if (func.return_type != return_type || func.name != name)
+            return false;
+
+          return rg::equal(
+                  func.params,
+                  params,
+                  [](const VarType& a, const VarType& b){ return a == b; },
+                  &FunctionParam::type, &FunctionParam::type);
          }) != src.nodes.cend();
 }
 
@@ -128,12 +155,12 @@ int main (int argc, char ** argv)
   ts_parser_set_language(parser, tree_sitter_cpy());
 
   const std::string_view source_code = R"(
-    fn 12main(a: int) -> int
+    fn main(a: str) -> int
     {
 
     }
 
-    fn hello(a: int) -> int
+    fn hello(a: int) -> str
     {
 
     }
@@ -152,8 +179,8 @@ int main (int argc, char ** argv)
   Issues issues{""}; // TODO file path
   auto ast_root = parse_source_file(src, root, issues);
 
-  if (!does_function_exist(*ast_root, "main"))
-    issues.add_error("No entry function 'main' found");
+  if (!does_function_exist(*ast_root, "main", BuiltInType::Int,  {FunctionParam{BuiltInType::String}}))
+    issues.add_error("No entry function 'fn main (str:) -> int' found");
 
   ts_tree_delete(tree);
   ts_parser_delete(parser);

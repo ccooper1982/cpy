@@ -4,7 +4,6 @@
 #include <optional>
 #include <ostream>
 #include <string_view>
-#include <tuple>
 #include <vector>
 
 #include <cpy/common.hpp>

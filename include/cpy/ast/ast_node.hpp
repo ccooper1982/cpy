@@ -4,7 +4,9 @@
 #include <iostream>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <cpy/common.hpp>
@@ -18,6 +20,71 @@ enum class NodeType
   FunctionParam
 };
 
+enum class BuiltInType
+{
+  Int,
+  Float,
+  Bool,
+  String,
+  Void,
+};
+
+struct UserType
+{
+  std::string name; // TODO or std::string_view
+};
+
+struct VarType
+{
+  std::variant<BuiltInType, UserType> type;
+
+  VarType(const BuiltInType t) : type (t) {}
+
+  std::string_view to_string() const
+  {
+    if (std::holds_alternative<BuiltInType>(type)) {
+      switch (const auto t = std::get<BuiltInType>(type) ; t) {
+        using enum BuiltInType;
+
+        case Int:
+          return "int";
+        case Float:
+          return "float";
+        case Bool:
+          return "bool";
+        case String:
+          return "str";
+        case Void:
+          return "void";
+        default:
+          return "Unknown";
+      }
+    }
+    else {
+      throw std::runtime_error{"UserType not implemented"};
+    }
+  }
+};
+
+inline bool operator==(const UserType& a, const UserType& b)
+{
+  throw std::runtime_error{"Comparing unsupported UserType"};
+  // return a.name == b.name;
+}
+
+inline bool operator==(const VarType& a, const VarType& b)
+{
+  return a.type == b.type;
+  // if (a.type.index() != b.type.index())
+  //   return false;
+
+  // if (a.type.index() == 0) {
+  //   return std::get<0>(a.type) == std::get<0>(b.type);
+  // }
+  // else {
+  //   throw std::runtime_error{"Comparing unsupported UserType"};
+  // }
+}
 
 struct AstNode
 {
@@ -41,12 +108,15 @@ struct Error : public AstNode
 
 struct FunctionParam : public AstNode
 {
-  std::string type;
+  VarType type;
   std::string name;
 
-  FunctionParam(const std::string_view type, std::string_view name) : type(type), name(name)
+  FunctionParam(const VarType type) : type(type)
   {
+  }
 
+  FunctionParam(const VarType type, std::string_view name) : type(type), name(name)
+  {
   }
 
 
@@ -55,7 +125,7 @@ struct FunctionParam : public AstNode
 
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
-    os << std::string(tab*2, ' ') << name << ":" << type << '\n';
+    os << std::string(tab*2, ' ') << name << ":" << type.to_string() << '\n';
   }
 };
 
@@ -63,7 +133,7 @@ struct Function : public AstNode
 {
   std::string name;
   std::vector<FunctionParam> params;
-  std::string return_type{"void"};
+  VarType return_type{BuiltInType::Void};
 
   // FunctionBody body;
   // std::vector<std::unique_ptr<AstNode>> nodes;
@@ -73,7 +143,7 @@ struct Function : public AstNode
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << name << " -> " << return_type << ':' << '\n';
+    os << name << " -> " << return_type.to_string() << ':' << '\n';
 
     for(const auto& p : params)
       p.dump(os, tab);
