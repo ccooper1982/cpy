@@ -128,7 +128,7 @@ std::unique_ptr<SourceFile> parse_source_file(const Source& src, TSNode& ts_root
 }
 
 
-bool does_function_exist(const SourceFile& src, const std::string_view name, const VarType return_type, const std::vector<FunctionParam>& params)
+bool does_function_exist(const SourceFile& src, const std::string_view name, const VarType return_type, const std::vector<FunctionParam>& params, const bool check_param_names = false)
 {
   return rg::find_if(src.nodes, [&](const auto& node) {
           if (!node->is_node_type(NodeType::Function))
@@ -139,13 +139,36 @@ bool does_function_exist(const SourceFile& src, const std::string_view name, con
           if (func.return_type != return_type || func.name != name)
             return false;
 
-          return rg::equal(
-                  func.params,
-                  params,
-                  [](const VarType& a, const VarType& b){ return a == b; },
-                  &FunctionParam::type, &FunctionParam::type);
+          return check_param_names ? rg::equal(func.params, params, FunctionParamCmp{})
+                                   : rg::equal(func.params, params, FunctionParamCmpIgnoreName{});
          }) != src.nodes.cend();
 }
+
+std::uint16_t count_function_definitions (const SourceFile& src, const std::string_view name)
+{
+  return rg::count_if(src.nodes, [&](const auto& node) {
+            if (!node->is_node_type(NodeType::Function))
+              return false;
+            return dynamic_cast<const Function&>(*node).name == name;
+         });
+}
+
+bool have_entry_point(const SourceFile& src)
+{
+  return does_function_exist(src, "main", BuiltInType::Int,  {FunctionParam{BuiltInType::String}}) &&
+         count_function_definitions(src, "main") == 1U;
+}
+
+// bool is_overload(const Function& f1, const Function& f2)
+// {
+//   // TODO params with default value
+//   if (f1.name != f2.name)
+//     return false;
+
+//   for (std::size_t i = 0 ; i < f1.params.size() ; ++i) {
+
+//   }
+// }
 
 
 int main (int argc, char ** argv)
@@ -179,8 +202,8 @@ int main (int argc, char ** argv)
   Issues issues{""}; // TODO file path
   auto ast_root = parse_source_file(src, root, issues);
 
-  if (!does_function_exist(*ast_root, "main", BuiltInType::Int,  {FunctionParam{BuiltInType::String}}))
-    issues.add_error("No entry function 'fn main (str:) -> int' found");
+  if (!have_entry_point(*ast_root))
+    issues.add_error("No entry function 'fn main (str:) -> int' found, or multiple definitions");
 
   ts_tree_delete(tree);
   ts_parser_delete(parser);

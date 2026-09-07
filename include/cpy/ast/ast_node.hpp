@@ -129,6 +129,27 @@ struct FunctionParam : public AstNode
   }
 };
 
+template<bool CheckName = true>
+struct FunctionParamComparer
+{
+  bool operator()(const FunctionParam& a, const FunctionParam& b) const
+  {
+    if constexpr (CheckName)
+      return a.type == b.type && a.name == b.name;
+    else
+      return a.type == b.type;
+  }
+};
+
+using FunctionParamCmp = FunctionParamComparer<true>;
+using FunctionParamCmpIgnoreName = FunctionParamComparer<false>;
+
+inline bool operator==(const FunctionParam& a, const FunctionParam& b)
+{
+  return FunctionParamCmp{}(a, b);
+}
+
+
 struct Function : public AstNode
 {
   std::string name;
