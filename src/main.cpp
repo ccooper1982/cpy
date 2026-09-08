@@ -54,9 +54,9 @@ std::optional<VarType> create_type (const Source& src, const TSNode& node, Issue
   }
 }
 
-std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node, Issues& issues)
+std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, Issues& issues)
 {
-  auto ast_node = std::make_unique<Function>();
+  auto ast_node = std::make_unique<FunctionDef>();
 
   // name
   TSNode name_node = ts_node_child_by_field_name(ts_node, "name", 4);
@@ -87,6 +87,31 @@ std::unique_ptr<Function> parse_function(const Source& src, TSNode& ts_node, Iss
 
         if (const auto type = create_type(src, param_type_node, issues) ; type)
           ast_node->params.emplace_back(*type, from_source_file(src, param_name_node));
+    }
+  }
+
+  // body
+  auto body = ts_node_child_by_field_name(ts_node, "body", 4);
+  if (!ts_node_is_null(body))
+  {
+    const auto statement_count = ts_node_named_child_count(body);
+    ast_node->body.nodes.reserve(std::min<uint32_t>(statement_count, 30));
+
+    for (uint32_t s = 0; s < statement_count; ++s)
+    {
+      const auto statement = ts_node_named_child(body, s);
+      const auto func_call = ts_node_child_by_field_name(statement, "func_call", 9);
+
+      if (!ts_node_is_null(func_call))
+      {
+        TSNode name_node = ts_node_child_by_field_name(func_call, "func_name", 9);
+        // TSNode args_node = ts_node_child_by_field_name(func_call, "args", 4);
+
+        const auto func_name =  from_source_file(src, name_node);
+
+        auto func = std::make_unique<FunctionCall>(func_name);
+        ast_node->body.nodes.push_back(std::move(func));
+      }
     }
   }
 
@@ -131,10 +156,10 @@ std::unique_ptr<SourceFile> parse_source_file(const Source& src, TSNode& ts_root
 bool does_function_exist(const SourceFile& src, const std::string_view name, const VarType return_type, const std::vector<FunctionParam>& params, const bool check_param_names = false)
 {
   return rg::find_if(src.nodes, [&](const auto& node) {
-          if (!node->is_node_type(NodeType::Function))
+          if (!node->is_node_type(NodeType::FunctionDef))
             return false;
 
-          const auto func = dynamic_cast<const Function&>(*node);
+          const auto& func = dynamic_cast<const FunctionDef&>(*node);
 
           if (func.return_type != return_type || func.name != name)
             return false;
@@ -147,9 +172,9 @@ bool does_function_exist(const SourceFile& src, const std::string_view name, con
 std::uint16_t count_function_definitions (const SourceFile& src, const std::string_view name)
 {
   return rg::count_if(src.nodes, [&](const auto& node) {
-            if (!node->is_node_type(NodeType::Function))
+            if (!node->is_node_type(NodeType::FunctionDef))
               return false;
-            return dynamic_cast<const Function&>(*node).name == name;
+            return dynamic_cast<const FunctionDef&>(*node).name == name;
          });
 }
 
@@ -159,17 +184,6 @@ bool have_entry_point(const SourceFile& src)
          count_function_definitions(src, "main") == 1U;
 }
 
-// bool is_overload(const Function& f1, const Function& f2)
-// {
-//   // TODO params with default value
-//   if (f1.name != f2.name)
-//     return false;
-
-//   for (std::size_t i = 0 ; i < f1.params.size() ; ++i) {
-
-//   }
-// }
-
 
 int main (int argc, char ** argv)
 {
@@ -178,14 +192,14 @@ int main (int argc, char ** argv)
   ts_parser_set_language(parser, tree_sitter_cpy());
 
   const std::string_view source_code = R"(
-    fn main(a: str) -> int
+    fn hello(a: int) -> str
     {
 
     }
 
-    fn hello(a: int) -> str
+    fn main(a: str) -> int
     {
-
+      hello();
     }
   )";
 

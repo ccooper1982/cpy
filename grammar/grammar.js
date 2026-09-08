@@ -19,8 +19,36 @@ export default grammar({
     parameter: ($) =>
       seq(field("name", $.identifier), ":", field("type", $.type)),
     return_type: ($) => seq("->", field("type", $.type)),
-    function_body: ($) => seq("{", "}"),
     type: ($) => $.identifier,
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
+    integer: ($) => /[0-9]+/,
+
+    function_body: ($) => seq(
+      "{",
+      repeat($.statement),
+      "}",
+    ),
+
+    statement: ($) => choice(
+      field("func_call", $.function_call),
+      ";"
+    ),
+
+    function_call: ($) => seq(
+      field("func_name", $.identifier),
+      "(",
+      optional(field("args", $.arguments)),
+      ")"
+    ),
+
+    arguments: ($) => seq(
+      $.expression,
+      repeat(seq(",", $.expression)),
+    ),
+
+    expression: ($) => choice(
+      $.identifier,
+      $.integer,
+    )
   },
 });

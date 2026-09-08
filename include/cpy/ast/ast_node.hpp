@@ -16,8 +16,10 @@ enum class NodeType
   None,
   Error,
   SourceFile,
-  Function,
-  FunctionParam
+  FunctionDef,
+  FunctionParam,
+  FunctionBody,
+  FunctionCall
 };
 
 enum class BuiltInType
@@ -149,25 +151,78 @@ inline bool operator==(const FunctionParam& a, const FunctionParam& b)
   return FunctionParamCmp{}(a, b);
 }
 
-
-struct Function : public AstNode
+// TODO will have to be an AstNode to handle args
+//      that are function calls
+struct FunctionArg
 {
-  std::string name;
-  std::vector<FunctionParam> params;
-  VarType return_type{BuiltInType::Void};
+  std::string_view value; // TODO
 
-  // FunctionBody body;
-  // std::vector<std::unique_ptr<AstNode>> nodes;
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
+  {
+    os << value;
+  }
+};
 
-  NodeType node_type() const override { return NodeType::Function; }
+struct FunctionCall : public AstNode
+{
+  std::string_view name;
+  std::vector<FunctionArg> args;
+
+  FunctionCall(const std::string_view name) : name(name)
+  {
+
+  }
+
+  NodeType node_type() const override { return NodeType::FunctionCall; }
   bool is_node_type(const NodeType t) const override { return node_type() == t; }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << name << " -> " << return_type.to_string() << ':' << '\n';
+    os << name << '(';
+    for (std::size_t i = 0; i < args.size() ; ++i)
+    {
+      os << args[i].value;
+      if (i+1 < args.size())
+        os << ',';
+    }
+    os << ')' << '\n';
+  }
+};
 
-    for(const auto& p : params)
+struct FunctionBody : public AstNode
+{
+  std::vector<std::unique_ptr<AstNode>> nodes;
+
+  NodeType node_type() const override { return NodeType::FunctionBody; }
+  bool is_node_type(const NodeType t) const override { return node_type() == t; }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    for (const auto& n : nodes)
+      n->dump(os);
+  }
+};
+
+struct FunctionDef : public AstNode
+{
+  std::string name;
+  std::vector<FunctionParam> params;
+  VarType return_type{BuiltInType::Void};
+  FunctionBody body;
+
+  NodeType node_type() const override { return NodeType::FunctionDef; }
+  bool is_node_type(const NodeType t) const override { return node_type() == t; }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << name << ": \n -> " << return_type.to_string() << '\n';
+
+    for(const auto& p : params) {
+      os << "  > " ;
       p.dump(os, tab);
+    }
+
+    body.dump(os, tab);
   }
 };
 
