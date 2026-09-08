@@ -1,0 +1,22 @@
+[
+  {
+    "label": "Compile",
+    "tags": ["build"],
+    "command": "meson",
+    "hide": "on_success",
+    "args": ["compile", "-C", "build"],
+  },
+  // {
+  //   "label": "Compile && Restart",
+  //   "command": "meson compile -C build; sudo ./start_dev.sh",
+  //   "hide": "on_success",
+  //   "tags": ["build"],
+  //   "args": ["compile", "-C", "build"],
+  // },
+
+  // {
+  //   "label": "Tests",
+  //   "tags": ["Run"],
+  //   "command": "meson compile -C build; $ZED_WORKTREE_ROOT/build/tester",
+  // },
+]

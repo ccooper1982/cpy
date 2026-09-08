@@ -104,12 +104,23 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
 
       if (!ts_node_is_null(func_call))
       {
-        TSNode name_node = ts_node_child_by_field_name(func_call, "func_name", 9);
-        // TSNode args_node = ts_node_child_by_field_name(func_call, "args", 4);
+        auto name_node = ts_node_child_by_field_name(func_call, "func_name", 9);
+        auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
+
+        if (ts_node_is_null(name_node))
+          continue;
+
+        std::vector<FunctionArg> args;
+        if (!ts_node_is_null(args_node)) {
+          const auto n_args = ts_node_named_child_count(args_node);
+          std::cout << "n_args: " << n_args << "\n";
+          for (uint32_t arg = 0 ; arg < n_args ; ++arg) {
+            args.emplace_back(from_source_file(src, ts_node_named_child(args_node, arg)));
+          }
+        }
 
         const auto func_name =  from_source_file(src, name_node);
-
-        auto func = std::make_unique<FunctionCall>(func_name);
+        auto func = std::make_unique<FunctionCall>(func_name, std::move(args));
         ast_node->body.nodes.push_back(std::move(func));
       }
     }
@@ -200,6 +211,9 @@ int main (int argc, char ** argv)
     fn main(a: str) -> int
     {
       hello();
+      hello(3);
+      hello("world");
+      hello(3, "world");
     }
   )";
 

@@ -22,6 +22,7 @@ export default grammar({
     type: ($) => $.identifier,
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
     integer: ($) => /[0-9]+/,
+    literal_string: ($) => /"([^"\\]|\\.)*"/,
 
     function_body: ($) => seq(
       "{",
@@ -49,6 +50,7 @@ export default grammar({
     expression: ($) => choice(
       $.identifier,
       $.integer,
+      $.literal_string
     )
   },
 });

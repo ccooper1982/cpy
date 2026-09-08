@@ -1,0 +1,9 @@
+{
+  "base_keymap": "VSCode",
+  "debugger": { "dock": "left" },
+  "git_panel": {
+    "status_style": "icon",
+    "collapse_untracked_diff": true,
+  },
+  "languages": { "C++": { "tab_size": 2 } },
+}

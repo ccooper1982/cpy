@@ -157,6 +157,9 @@ struct FunctionArg
 {
   std::string_view value; // TODO
 
+  FunctionArg (const std::string_view v) : value(v)
+  {}
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
   {
     os << value;
@@ -168,7 +171,9 @@ struct FunctionCall : public AstNode
   std::string_view name;
   std::vector<FunctionArg> args;
 
-  FunctionCall(const std::string_view name) : name(name)
+  FunctionCall(const std::string_view name, std::vector<FunctionArg> args = {})
+    : name(name)
+    , args(std::move(args))
   {
 
   }
