@@ -31,13 +31,23 @@ std::string_view from_source_file (const Source& src, const TSNode& node)
 }
 
 
-void create_issue (const TSNode& node, Issues& issues)
+void create_issue (Issues& issues, const TSNode& node)
 {
   const auto start = ts_node_start_point(node);
   const auto start_byte = ts_node_start_byte(node);
   const auto end_byte = ts_node_end_byte(node);
 
   issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte);
+}
+
+void create_issue (Issues& issues, const std::string_view m, const uint32_t from, const uint32_t to)
+{
+  issues.add_error(m, from, to);
+}
+
+void create_issue (Issues& issues, const AstNode& node, const std::string_view m)
+{
+  issues.add_error(m, node.source);
 }
 
 std::optional<VarType> create_type (const Source& src, const TSNode& node, Issues& issues)
@@ -49,14 +59,26 @@ std::optional<VarType> create_type (const Source& src, const TSNode& node, Issue
     return VarType{BuiltInType::String};
   }
   else {
-    create_issue(node,issues);
+    create_issue(issues, node);
     return std::nullopt;
   }
 }
 
+void set_source_region (const TSNode& ts_node, AstNode& ast_node)
+{
+  ast_node.source = SourceRegion{ts_node_start_byte(ts_node), ts_node_end_byte(ts_node)};
+}
+
+void set_source_region (AstNode& ast_node, const uint32_t from, const uint32_t to)
+{
+  ast_node.source = SourceRegion{from, to};
+}
+
+
 std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, Issues& issues)
 {
   auto ast_node = std::make_unique<FunctionDef>();
+  set_source_region(ts_node, *ast_node);
 
   // name
   TSNode name_node = ts_node_child_by_field_name(ts_node, "name", 4);
@@ -75,7 +97,7 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
 
   if (!ts_node_is_null(parameters))
   {
-    uint32_t param_count = ts_node_named_child_count(parameters);
+    const uint32_t param_count = ts_node_named_child_count(parameters);
 
     ast_node->params.reserve(param_count);
 
@@ -86,7 +108,10 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
         TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
 
         if (const auto type = create_type(src, param_type_node, issues) ; type)
-          ast_node->params.emplace_back(*type, from_source_file(src, param_name_node));
+        {
+          auto& func_node = ast_node->params.emplace_back(*type, from_source_file(src, param_name_node));
+          set_source_region(param_name_node, func_node);
+        }
     }
   }
 
@@ -104,8 +129,10 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
 
       if (!ts_node_is_null(func_call))
       {
-        auto name_node = ts_node_child_by_field_name(func_call, "func_name", 9);
-        auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
+        const auto name_node = ts_node_child_by_field_name(func_call, "func_name", 9);
+        const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
+        const auto byte_start = ts_node_start_byte(func_call);
+        const auto byte_end = ts_node_end_byte(func_call);
 
         if (ts_node_is_null(name_node))
           continue;
@@ -113,15 +140,16 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
         std::vector<FunctionArg> args;
         if (!ts_node_is_null(args_node)) {
           const auto n_args = ts_node_named_child_count(args_node);
-          std::cout << "n_args: " << n_args << "\n";
           for (uint32_t arg = 0 ; arg < n_args ; ++arg) {
             args.emplace_back(from_source_file(src, ts_node_named_child(args_node, arg)));
           }
         }
 
         const auto func_name =  from_source_file(src, name_node);
-        auto func = std::make_unique<FunctionCall>(func_name, std::move(args));
-        ast_node->body.nodes.push_back(std::move(func));
+        auto func_call_node = std::make_unique<FunctionCall>(func_name, std::move(args));
+        set_source_region(*func_call_node, byte_start, byte_end);
+
+        ast_node->body.nodes.push_back(std::move(func_call_node));
       }
     }
   }
@@ -136,7 +164,7 @@ std::unique_ptr<SourceFile> parse_source_file(const Source& src, TSNode& ts_root
   {
     if (ts_node_is_error(node))
     {
-      create_issue(node, issues);
+      create_issue(issues, node);
       return std::make_unique<Error>();
     }
 
@@ -195,6 +223,42 @@ bool have_entry_point(const SourceFile& src)
          count_function_definitions(src, "main") == 1U;
 }
 
+// semantics
+
+bool does_function_call_exist(const SourceFile& root, const FunctionCall& call)
+{
+  auto filter = [name = call.name](const std::unique_ptr<AstNode>& n)
+  {
+    return n->is_node_type(NodeType::FunctionDef) &&
+           name == dynamic_cast<FunctionDef&>(*n).name;
+  };
+
+  for (const auto& func_def_node : root.nodes | vw::filter(filter))
+  {
+    const auto& def = dynamic_cast<FunctionDef&>(*func_def_node);
+    return call.args.size() == def.params.size();
+  }
+  return false;
+}
+
+void semantic_checks(const Source& src, const SourceFile& root, Issues& issues)
+{
+  auto by_node_type = [](const NodeType nt)
+  {
+    return [nt](const std::unique_ptr<AstNode>& n){ return n->is_node_type(nt); };
+  };
+
+  for (const auto& func_def_node : root.nodes | vw::filter(by_node_type(NodeType::FunctionDef)))
+  {
+    for (const auto& func_call_node : dynamic_cast<FunctionDef&>(*func_def_node).body.nodes | vw::filter(by_node_type(NodeType::FunctionCall)))
+    {
+      const auto& func_call = dynamic_cast<FunctionCall&>(*func_call_node);
+      if (!does_function_call_exist(root, func_call)) {
+        create_issue(issues, func_call, "Function does not exist");
+      }
+    }
+  }
+}
 
 int main (int argc, char ** argv)
 {
@@ -237,6 +301,8 @@ int main (int argc, char ** argv)
   ts_parser_delete(parser);
 
   ast_root->dump(std::cout);
+
+  semantic_checks(src, *ast_root, issues);
 
   issues.dump(std::cout, src.src);
 

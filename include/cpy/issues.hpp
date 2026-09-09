@@ -8,14 +8,7 @@
 
 #include <cpy/common.hpp>
 
-struct SourceRegion
-{
-  SourceRegion(const uint32_t from, const uint32_t to) : start(from), end(to)
-  {
-  }
 
-  uint32_t start, end;
-};
 
 struct Issue
 {
@@ -23,9 +16,14 @@ struct Issue
   {
   }
 
-  Issue(const std::string_view m, const uint32_t from, const uint32_t to)
+  Issue(const std::string_view m, const std::optional<SourceRegion>& src)
     : msg(m)
-    , src(SourceRegion{from,to})
+    , src(src)
+  {
+  }
+
+  Issue(const std::string_view m, const uint32_t from, const uint32_t to)
+    : Issue(m, SourceRegion{from,to})
   {
   }
 
@@ -44,6 +42,11 @@ public:
   void add_error(const std::string_view msg)
   {
     m_errors.emplace_back(msg);
+  }
+
+  void add_error(const std::string_view msg, const SourceRegion& sr)
+  {
+    m_errors.emplace_back(msg, sr);
   }
 
   void add_error(const std::string_view msg, const uint32_t from, const uint32_t to)

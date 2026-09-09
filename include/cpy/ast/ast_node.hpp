@@ -90,6 +90,8 @@ inline bool operator==(const VarType& a, const VarType& b)
 
 struct AstNode
 {
+  SourceRegion source;
+
   virtual NodeType node_type() const = 0;
   virtual bool is_node_type(const NodeType t) const = 0;
 
@@ -241,7 +243,7 @@ struct SourceFile : public AstNode
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << (src_path.empty() ? "Compiled source" : src_path.string()) << '\n';
+    os << (src_path.empty() ? "" : src_path.string()) << '\n';
 
     for (const auto& n : nodes)
       n->dump(os);
