@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -26,7 +27,7 @@ enum class NodeType
 enum class BuiltInType
 {
   Int,
-  Float,
+  Decimal,
   Bool,
   String,
   Void,
@@ -39,20 +40,32 @@ struct UserType
 
 struct VarType
 {
-  std::variant<BuiltInType, UserType> type;
+  VarType(const BuiltInType t) : type (t)
+  {
+  }
 
-  VarType(const BuiltInType t) : type (t) {}
+  const auto& value() const { return type; }
+
+  template<typename T>
+  const std::optional<T> value_as() const
+  {
+    if (const auto param_type = std::get_if<T>(&type); param_type)
+      return *param_type;
+    return std::nullopt;
+  }
 
   std::string_view to_string() const
   {
-    if (std::holds_alternative<BuiltInType>(type)) {
-      switch (const auto t = std::get<BuiltInType>(type) ; t) {
+    if (std::holds_alternative<BuiltInType>(type))
+    {
+      switch (const auto t = std::get<BuiltInType>(type) ; t)
+      {
         using enum BuiltInType;
 
         case Int:
           return "int";
-        case Float:
-          return "float";
+        case Decimal:
+          return "dec";
         case Bool:
           return "bool";
         case String:
@@ -67,33 +80,42 @@ struct VarType
       throw std::runtime_error{"UserType not implemented"};
     }
   }
+
+private:
+  std::variant<BuiltInType, UserType> type;
 };
 
 inline bool operator==(const UserType& a, const UserType& b)
 {
   throw std::runtime_error{"Comparing unsupported UserType"};
-  // return a.name == b.name;
 }
 
 inline bool operator==(const VarType& a, const VarType& b)
 {
-  return a.type == b.type;
+  return a.value() == b.value();
 }
 
 // Expressions
 struct IntegerLiteral
 {
-  IntegerLiteral(const uint64_t i) : i(i) {}
-  uint64_t i;
+  IntegerLiteral(const int64_t val) : v(val) {}
+  int64_t v;
 };
 struct StringLiteral
 {
-  StringLiteral(const std::string_view s) : s(s) {}
-  std::string_view s;
+  StringLiteral(const std::string_view val) : v(val) {}
+  std::string_view v;
+};
+struct DecimalLiteral
+{
+  explicit DecimalLiteral(const double val) : v(val) {}
+  double v;
 };
 
-using Expression = std::variant<IntegerLiteral, StringLiteral>;
+using Expression = std::variant<IntegerLiteral, StringLiteral, DecimalLiteral>;
 
+
+// AST nodes
 
 struct AstNode
 {
@@ -162,10 +184,6 @@ inline bool operator==(const FunctionParam& a, const FunctionParam& b)
 
 struct FunctionArg
 {
-  // helper type for the visitor
-  template<class... Ts>
-  struct overloads : Ts... { using Ts::operator()...; };
-
   Expression value;
 
   FunctionArg (const StringLiteral& v) : value(v)
@@ -176,12 +194,18 @@ struct FunctionArg
   {
   }
 
+  FunctionArg (const DecimalLiteral& v) : value(v)
+  {
+    std::cout << "FunctionArg(DecimalLiteral)\n";
+  }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
   {
     const auto visitor = overloads
     {
-        [&](const IntegerLiteral& v){ os << "int = " << v.i; },
-        [&](const StringLiteral& v){ os << "str = " << v.s; }
+        [&](const IntegerLiteral& v){ os << "int = " << v.v; },
+        [&](const StringLiteral& v){ os << "str = " << v.v; },
+        [&](const DecimalLiteral& v){ os << "dec = " << v.v; }
     };
 
     std::visit(visitor, value);
@@ -197,7 +221,6 @@ struct FunctionCall : public AstNode
     : name(name)
     , args(std::move(args))
   {
-
   }
 
   NodeType node_type() const override { return NodeType::FunctionCall; }
@@ -208,7 +231,6 @@ struct FunctionCall : public AstNode
     os << name << '(';
     for (std::size_t i = 0; i < args.size() ; ++i)
     {
-      // os << args[i].value;
       args[i].dump(os, tab);
       if (i+1 < args.size())
         os << ',';
@@ -270,3 +292,37 @@ struct SourceFile : public AstNode
       n->dump(os);
   }
 };
+
+
+// useful
+inline bool is_compatible(const FunctionParam& def_param, const FunctionArg& call_arg)
+{
+  if (const auto param_type = def_param.type.value_as<BuiltInType>() ; !param_type)
+    throw std::runtime_error("Function has unsupported UserType parameter");
+  else
+  {
+    switch (*param_type)
+    {
+      using enum BuiltInType;
+      case Int:
+        if (std::holds_alternative<IntegerLiteral>(call_arg.value))
+          return true;
+        break;
+
+      case String:
+        if (std::holds_alternative<StringLiteral>(call_arg.value))
+          return true;
+        break;
+
+      case Decimal:
+        if (std::holds_alternative<DecimalLiteral>(call_arg.value))
+          return true;
+        break;
+
+      default:
+        throw std::runtime_error("Function has unsupported BuiltInType parameter");
+        break;
+    }
+    return false;
+  }
+}

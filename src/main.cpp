@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cstdint>
-#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -11,6 +10,7 @@
 
 
 #include <cpy/ast/ast_node.hpp>
+#include <cpy/common.hpp>
 #include <cpy/issues.hpp>
 #include <tree_sitter/api.h>
 
@@ -76,8 +76,42 @@ void set_source_region (AstNode& ast_node, const uint32_t from, const uint32_t t
   ast_node.source = SourceRegion{from, to};
 }
 
+std::vector<FunctionArg> parse_function_args(const Source& src, const TSNode& args_node)
+{
+  std::vector<FunctionArg> args;
+  if (!ts_node_is_null(args_node)) {
+    const auto n_args = ts_node_named_child_count(args_node);
+    for (uint32_t arg = 0 ; arg < n_args ; ++arg)
+    {
+      const auto expr_node = ts_node_named_child(args_node, arg);
+      if (const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0)); !expr_type.empty())
+      {
+        const std::string_view value = from_source_file(src, ts_node_named_child(expr_node, 0));
 
-std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, Issues& issues)
+        if (expr_type == "integer")
+        {
+          int64_t i{};
+          std::from_chars(value.data(), value.data()+value.size(), i);
+          args.emplace_back(i);
+        }
+        else if (expr_type == "literal_string")
+        {
+          args.emplace_back(value);
+        }
+        else if (expr_type == "decimal")
+        {
+          double i{};
+          std::from_chars(value.data(), value.data()+value.size(), i);
+          args.emplace_back(DecimalLiteral{i});
+        }
+      }
+    }
+  }
+  return args;
+}
+
+
+std::unique_ptr<FunctionDef> parse_function(const Source& src, const TSNode& ts_node, Issues& issues)
 {
   auto ast_node = std::make_unique<FunctionDef>();
   set_source_region(ts_node, *ast_node);
@@ -131,7 +165,7 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
 
       if (!ts_node_is_null(func_call))
       {
-        const auto name_node = ts_node_child_by_field_name(func_call, "func_name", 9);
+        const auto name_node = ts_node_child_by_field_name(func_call, "name", 4);
         const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
         const auto byte_start = ts_node_start_byte(func_call);
         const auto byte_end = ts_node_end_byte(func_call);
@@ -139,31 +173,10 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
         if (ts_node_is_null(name_node))
           continue;
 
-        std::vector<FunctionArg> args;
-        if (!ts_node_is_null(args_node)) {
-          const auto n_args = ts_node_named_child_count(args_node);
-          for (uint32_t arg = 0 ; arg < n_args ; ++arg)
-          {
-            const auto expr_node = ts_node_named_child(args_node, arg);
-            if (const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0)); !expr_type.empty())
-            {
-              const std::string_view value = from_source_file(src, ts_node_named_child(expr_node, 0));
+        const auto func_name = from_source_file(src, name_node);
 
-              if (expr_type == "integer")
-              {
-                uint64_t i{};
-                std::from_chars(value.data(), value.data()+value.size(), i);
-                args.emplace_back(i);
-              }
-              else if (expr_type == "literal_string")
-              {
-                args.emplace_back(value);
-              }
-            }
-          }
-        }
+        auto args = parse_function_args(src, args_node);
 
-        const auto func_name =  from_source_file(src, name_node);
         auto func_call_node = std::make_unique<FunctionCall>(func_name, std::move(args));
         set_source_region(*func_call_node, byte_start, byte_end);
 
@@ -258,35 +271,45 @@ bool does_function_call_exist(const SourceFile& root, const FunctionCall& call)
     if (def.name != call.name || def.params.size() != call.args.size())
       continue;
 
+    uint16_t correct_args{};
     for (uint8_t arg = 0 ; arg < call.args.size() ; ++arg)
     {
-      // TODO type.type yuck
-      const auto& arg_type = def.params[arg].type.type;
-      if (const auto param_type = std::get_if<BuiltInType>(&arg_type); param_type)
-      {
-        switch (*param_type)
-        {
-          using enum BuiltInType;
-          case Int:
-              if (std::holds_alternative<IntegerLiteral>(call.args[arg].value))
-                ++candidates;
-            break;
+      if (is_compatible(def.params[arg], call.args[arg]))
+        ++correct_args;
 
-          case String:
-            if (std::holds_alternative<StringLiteral>(call.args[arg].value))
-              ++candidates;
-            break;
+      // if (const auto param_type = def.params[arg].type.value_as<BuiltInType>() ; param_type)
+      // {
+      //   switch (*param_type)
+      //   {
+      //     using enum BuiltInType;
+      //     case Int:
+      //         if (std::holds_alternative<IntegerLiteral>(call.args[arg].value))
+      //           ++correct_args;
+      //       break;
 
-          default:
-            throw std::runtime_error("Function has unsupported parameter BuiltIntType");
-            break;
-        }
-      }
-      else
-      {
-        throw std::runtime_error("Function has unsupported parameter (not BuiltIntType");
-      }
+      //     case String:
+      //       if (std::holds_alternative<StringLiteral>(call.args[arg].value))
+      //         ++correct_args;
+      //       break;
+
+      //     case Decimal:
+      //       if (std::holds_alternative<DecimalLiteral>(call.args[arg].value))
+      //         ++correct_args;
+      //       break;
+
+      //     default:
+      //       throw std::runtime_error("Function has unsupported BuiltInType parameter");
+      //       break;
+      //   }
+      // }
+      // else
+      // {
+      //   throw std::runtime_error("Function has unsupported UserType parameter");
+      // }
     }
+
+    if (correct_args == call.args.size())
+      ++candidates;
   }
   return candidates > 0;
 }
@@ -322,12 +345,20 @@ int main (int argc, char ** argv)
 
     }
 
+    fn hello(a: str) -> str
+    {
+
+    }
+
     fn main(a: str) -> int
     {
-      hello();
-      hello(3);
-      hello("world");
-      hello(3, "world");
+      hello(3.14);
+      hello("asda");
+      hello(3, "asda");
+      hello("asda", 3);
+      hello(3.14, "asda");
+      hello("asda", 3.14);
+      hello(4);
     }
   )";
 

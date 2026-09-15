@@ -22,6 +22,7 @@ export default grammar({
     type: ($) => $.identifier,
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
     integer: ($) => /[0-9]+/,
+    decimal: ($) => /[0-9]+\.[0-9]+/,
     literal_string: ($) => /"([^"\\]|\\.)*"/,
 
     function_body: ($) => seq(
@@ -36,7 +37,7 @@ export default grammar({
     ),
 
     function_call: ($) => seq(
-      field("func_name", $.identifier),
+      field("name", $.identifier),
       "(",
       optional(field("args", $.arguments)),
       ")"
@@ -48,20 +49,11 @@ export default grammar({
     ),
 
     expression: ($) => choice(
+      $.decimal,
       $.integer,
       $.literal_string,
       $.function_call,
       $.identifier,
     )
-    // arguments: ($) => seq(
-    //   $.expression,
-    //   repeat(seq(",", $.expression)),
-    // ),
-
-    // expression: ($) => choice(
-    //   $.identifier,
-    //   $.integer,
-    //   $.literal_string
-    // )
   },
 });
