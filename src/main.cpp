@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 
@@ -148,13 +149,16 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
             {
               const std::string_view value = from_source_file(src, ts_node_named_child(expr_node, 0));
 
-              if (expr_type == "integer") {
+              if (expr_type == "integer")
+              {
                 uint64_t i{};
                 std::from_chars(value.data(), value.data()+value.size(), i);
                 args.emplace_back(i);
               }
               else if (expr_type == "literal_string")
+              {
                 args.emplace_back(value);
+              }
             }
           }
         }
@@ -241,18 +245,50 @@ bool have_entry_point(const SourceFile& src)
 
 bool does_function_call_exist(const SourceFile& root, const FunctionCall& call)
 {
-  auto filter = [name = call.name](const std::unique_ptr<AstNode>& n)
+  auto only_func_defs = [](const std::unique_ptr<AstNode>& n)
   {
-    return n->is_node_type(NodeType::FunctionDef) &&
-           name == dynamic_cast<FunctionDef&>(*n).name;
+    return n->is_node_type(NodeType::FunctionDef);
   };
 
-  for (const auto& func_def_node : root.nodes | vw::filter(filter))
+  uint16_t candidates{};
+
+  for (const auto& func_def_node : root.nodes | vw::filter(only_func_defs))
   {
     const auto& def = dynamic_cast<FunctionDef&>(*func_def_node);
-    return call.args.size() == def.params.size();
+    if (def.name != call.name || def.params.size() != call.args.size())
+      continue;
+
+    for (uint8_t arg = 0 ; arg < call.args.size() ; ++arg)
+    {
+      // TODO type.type yuck
+      const auto& arg_type = def.params[arg].type.type;
+      if (const auto param_type = std::get_if<BuiltInType>(&arg_type); param_type)
+      {
+        switch (*param_type)
+        {
+          using enum BuiltInType;
+          case Int:
+              if (std::holds_alternative<IntegerLiteral>(call.args[arg].value))
+                ++candidates;
+            break;
+
+          case String:
+            if (std::holds_alternative<StringLiteral>(call.args[arg].value))
+              ++candidates;
+            break;
+
+          default:
+            throw std::runtime_error("Function has unsupported parameter BuiltIntType");
+            break;
+        }
+      }
+      else
+      {
+        throw std::runtime_error("Function has unsupported parameter (not BuiltIntType");
+      }
+    }
   }
-  return false;
+  return candidates > 0;
 }
 
 void semantic_checks(const Source& src, const SourceFile& root, Issues& issues)
