@@ -6,6 +6,7 @@
 #include <ostream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -77,16 +78,22 @@ inline bool operator==(const UserType& a, const UserType& b)
 inline bool operator==(const VarType& a, const VarType& b)
 {
   return a.type == b.type;
-  // if (a.type.index() != b.type.index())
-  //   return false;
-
-  // if (a.type.index() == 0) {
-  //   return std::get<0>(a.type) == std::get<0>(b.type);
-  // }
-  // else {
-  //   throw std::runtime_error{"Comparing unsupported UserType"};
-  // }
 }
+
+// Expressions
+struct IntegerLiteral
+{
+  IntegerLiteral(const uint64_t i) : i(i) {}
+  uint64_t i;
+};
+struct StringLiteral
+{
+  StringLiteral(const std::string_view s) : s(s) {}
+  std::string_view s;
+};
+
+using Expression = std::variant<IntegerLiteral, StringLiteral>;
+
 
 struct AstNode
 {
@@ -153,18 +160,31 @@ inline bool operator==(const FunctionParam& a, const FunctionParam& b)
   return FunctionParamCmp{}(a, b);
 }
 
-// TODO will have to be an AstNode to handle args
-//      that are function calls
 struct FunctionArg
 {
-  std::string_view value; // TODO
+  // helper type for the visitor
+  template<class... Ts>
+  struct overloads : Ts... { using Ts::operator()...; };
 
-  FunctionArg (const std::string_view v) : value(v)
-  {}
+  Expression value;
+
+  FunctionArg (const StringLiteral& v) : value(v)
+  {
+  }
+
+  FunctionArg (const IntegerLiteral& v) : value(v)
+  {
+  }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
   {
-    os << value;
+    const auto visitor = overloads
+    {
+        [&](const IntegerLiteral& v){ os << "int = " << v.i; },
+        [&](const StringLiteral& v){ os << "str = " << v.s; }
+    };
+
+    std::visit(visitor, value);
   }
 };
 
@@ -188,7 +208,8 @@ struct FunctionCall : public AstNode
     os << name << '(';
     for (std::size_t i = 0; i < args.size() ; ++i)
     {
-      os << args[i].value;
+      // os << args[i].value;
+      args[i].dump(os, tab);
       if (i+1 < args.size())
         os << ',';
     }

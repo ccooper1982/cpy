@@ -48,9 +48,20 @@ export default grammar({
     ),
 
     expression: ($) => choice(
-      $.identifier,
       $.integer,
-      $.literal_string
+      $.literal_string,
+      $.function_call,
+      $.identifier,
     )
+    // arguments: ($) => seq(
+    //   $.expression,
+    //   repeat(seq(",", $.expression)),
+    // ),
+
+    // expression: ($) => choice(
+    //   $.identifier,
+    //   $.integer,
+    //   $.literal_string
+    // )
   },
 });

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -140,8 +141,21 @@ std::unique_ptr<FunctionDef> parse_function(const Source& src, TSNode& ts_node, 
         std::vector<FunctionArg> args;
         if (!ts_node_is_null(args_node)) {
           const auto n_args = ts_node_named_child_count(args_node);
-          for (uint32_t arg = 0 ; arg < n_args ; ++arg) {
-            args.emplace_back(from_source_file(src, ts_node_named_child(args_node, arg)));
+          for (uint32_t arg = 0 ; arg < n_args ; ++arg)
+          {
+            const auto expr_node = ts_node_named_child(args_node, arg);
+            if (const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0)); !expr_type.empty())
+            {
+              const std::string_view value = from_source_file(src, ts_node_named_child(expr_node, 0));
+
+              if (expr_type == "integer") {
+                uint64_t i{};
+                std::from_chars(value.data(), value.data()+value.size(), i);
+                args.emplace_back(i);
+              }
+              else if (expr_type == "literal_string")
+                args.emplace_back(value);
+            }
           }
         }
 
