@@ -22,9 +22,7 @@ extern "C" const TSLanguage *tree_sitter_cpy();
 struct Source
 {
   std::string_view src;
-  // fs::path path;
 };
-
 
 std::string_view from_source_file (const Source& src, const TSNode& node)
 {
@@ -274,38 +272,8 @@ bool does_function_call_exist(const SourceFile& root, const FunctionCall& call)
     uint16_t correct_args{};
     for (uint8_t arg = 0 ; arg < call.args.size() ; ++arg)
     {
-      if (is_compatible(def.params[arg], call.args[arg]))
+      if (param_arg_valid(def.params[arg], call.args[arg]))
         ++correct_args;
-
-      // if (const auto param_type = def.params[arg].type.value_as<BuiltInType>() ; param_type)
-      // {
-      //   switch (*param_type)
-      //   {
-      //     using enum BuiltInType;
-      //     case Int:
-      //         if (std::holds_alternative<IntegerLiteral>(call.args[arg].value))
-      //           ++correct_args;
-      //       break;
-
-      //     case String:
-      //       if (std::holds_alternative<StringLiteral>(call.args[arg].value))
-      //         ++correct_args;
-      //       break;
-
-      //     case Decimal:
-      //       if (std::holds_alternative<DecimalLiteral>(call.args[arg].value))
-      //         ++correct_args;
-      //       break;
-
-      //     default:
-      //       throw std::runtime_error("Function has unsupported BuiltInType parameter");
-      //       break;
-      //   }
-      // }
-      // else
-      // {
-      //   throw std::runtime_error("Function has unsupported UserType parameter");
-      // }
     }
 
     if (correct_args == call.args.size())
@@ -332,6 +300,7 @@ void semantic_checks(const Source& src, const SourceFile& root, Issues& issues)
     }
   }
 }
+
 
 int main (int argc, char ** argv)
 {
@@ -362,8 +331,6 @@ int main (int argc, char ** argv)
     }
   )";
 
-  Source src { .src = source_code };
-
   TSTree * tree = ts_parser_parse_string(parser, nullptr, source_code.data(), source_code.length());
 
   TSNode root = ts_tree_root_node(tree);
@@ -373,17 +340,19 @@ int main (int argc, char ** argv)
   }
 
   Issues issues{""}; // TODO file path
-  auto ast_root = parse_source_file(src, root, issues);
 
-  if (!have_entry_point(*ast_root))
+  Source src { .src = source_code };
+  std::unique_ptr<SourceFile> ast = parse_source_file(src, root, issues);
+
+  if (!have_entry_point(*ast))
     issues.add_error("No entry function 'fn main (str:) -> int' found, or multiple definitions");
 
   ts_tree_delete(tree);
   ts_parser_delete(parser);
 
-  ast_root->dump(std::cout);
+  ast->dump(std::cout);
 
-  semantic_checks(src, *ast_root, issues);
+  semantic_checks(src, *ast, issues);
 
   issues.dump(std::cout, src.src);
 

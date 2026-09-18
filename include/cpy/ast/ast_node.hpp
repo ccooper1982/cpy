@@ -295,7 +295,7 @@ struct SourceFile : public AstNode
 
 
 // useful
-inline bool is_compatible(const FunctionParam& def_param, const FunctionArg& call_arg)
+inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& call_arg)
 {
   if (const auto param_type = def_param.type.value_as<BuiltInType>() ; !param_type)
     throw std::runtime_error("Function has unsupported UserType parameter");
