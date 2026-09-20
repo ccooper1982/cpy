@@ -1,7 +1,7 @@
 # cpy
 C++ Pythony
 
-An alternative shell script.
+An alternative to shell script.
 
 # Build
 ```
@@ -13,17 +13,7 @@ meson compile -C build
 
 # Features
 - Statically typed
-- Type system has knowledge of procces, files, etc
-
-# Filters
-Similar to C++ `std::views`:
-
-```
-for (txt_file : files::list("dir1", ".txt") | files::filter((file: File){ return file.size() > 100; })) {
-    sout << txt_file << "\n";
-    files::delete(txt_file);
-}
-```
+- Type system has knowledge of procceses, files, etc
 
 # Modules
 - files
@@ -44,7 +34,21 @@ Module access with `<module_name>::<function>`, i.e. `files::exist("foo.txt")`
 - Execution
 - Exit code
 - stdout, stderr
-- redirection   
+- redirection
+
+Find all log entries starting "DEBUG" then print the line count (`lcount`) to standard out: 
+```
+result := grep("log.txt", "^\[DEBUG\]") | lcount()
+sout << result;
+```
+
+Find "DEBUG" entries, split on ' ', returning from second token onwards:
+```
+result := grep("log.txt", "^\[DEBUG\]") | split(' ', 2)
+sout << result;
+```
+
+Equivalent to: `grep '^\[DEBUG\]' abc.txt | cut -d' ' -f2-`
 
 ## Files
 - exists

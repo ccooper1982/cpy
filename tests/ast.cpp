@@ -97,6 +97,39 @@ TEST(Parser, FuncDef_2Arg)
   ASSERT_EQ(p2.type.value_as<BuiltInType>(), std::optional<BuiltInType>{BuiltInType::String});
 }
 
+TEST(Parser, FuncDef_1Arg_InvalidType)
+{
+  const std::string_view src = R"(
+    fn hello(a: foo) {}
+  )";
+
+  Parser parser;
+  const auto script = parser.parse(src);
+
+  ASSERT_EQ(script.ast->nodes.size(), 1);
+  ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
+
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
+
+  ASSERT_EQ(def.name, "hello");
+  ASSERT_EQ(def.params.size(), 1);
+  ASSERT_EQ(def.params[0].name, "a");
+
+  const FunctionParam& p1 = def.params[0];
+  ASSERT_FALSE(p1.valid);
+}
+
+TEST(Parser, SyntaxError)
+{
+  const std::string_view src = R"(
+    fn hello() {
+  )";
+
+  Parser parser;
+  const auto script = parser.parse(src);
+}
+
+
 TEST(Parser, Blah)
 {
   // auto by_node_type = [](const NodeType nt)
