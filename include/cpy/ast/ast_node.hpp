@@ -31,6 +31,7 @@ enum class BuiltInType
   Bool,
   String,
   Void,
+  Unknown
 };
 
 struct UserType
@@ -85,7 +86,7 @@ private:
   std::variant<BuiltInType, UserType> type;
 };
 
-inline bool operator==(const UserType& a, const UserType& b)
+inline bool operator==([[maybe_unused]] const UserType& a, [[maybe_unused]] const UserType& b)
 {
   throw std::runtime_error{"Comparing unsupported UserType"};
 }
@@ -143,6 +144,17 @@ struct FunctionParam : public AstNode
 {
   VarType type;
   std::string name;
+  bool valid{true};
+
+  FunctionParam() : type(BuiltInType::Unknown), valid(false)
+  {
+
+  }
+
+  FunctionParam (std::string_view name) : type(BuiltInType::Unknown), name(name), valid(false)
+  {
+
+  }
 
   FunctionParam(const VarType type) : type(type)
   {
@@ -317,6 +329,10 @@ inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& c
       case Decimal:
         if (std::holds_alternative<DecimalLiteral>(call_arg.value))
           return true;
+        break;
+
+      case Unknown:
+          return false;
         break;
 
       default:

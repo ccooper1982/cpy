@@ -2,7 +2,10 @@ export default grammar({
   name: "cpy",
 
   rules: {
-    source_file: ($) => repeat($.function_def),
+    source_file: ($) => repeat(choice(
+      $.function_def,
+      $.statement,
+    )),
 
     function_def: ($) =>
       seq(
@@ -31,16 +34,24 @@ export default grammar({
       "}",
     ),
 
-    statement: ($) => choice(
-      field("func_call", $.function_call),
-      ";"
-    ),
+    statement: ($) =>
+      seq(
+        choice(
+          field("func_call", $.function_call),
+        ),
+        ";",
+      ),
 
     function_call: ($) => seq(
-      field("name", $.identifier),
+      field("name", $.qualified_name),
       "(",
       optional(field("args", $.arguments)),
-      ")"
+      ")",
+    ),
+
+    qualified_name: ($) => seq(
+      optional(seq($.identifier, "::")),
+      $.identifier,
     ),
 
     arguments: ($) => seq(

@@ -8,13 +8,13 @@ project(
   ],
 )
 
-# cpp = meson.get_compiler('cpp')
-
-# Dependencies
 tree_sitter = dependency('tree-sitter')
+gtest = dependency('gtest')
+gtest_main = dependency('gtest_main')
 
 cpy_sources = files(
   'src/main.cpp',
+  'src/parser.cpp',
   'grammar/src/parser.c',
 )
 
@@ -22,12 +22,15 @@ include_dirs = include_directories('grammar/src','include')
 
 executable('cpy', cpy_sources,
   include_directories: include_dirs,
-  dependencies: [tree_sitter], install: false
+  dependencies: [tree_sitter],
+  install: false
 )
 
-# Tests
-# test(
-#   'cpy --version',
-#   cpy,
-#   args: ['--version'],
-# )
+cpy_tests = executable(
+  'cpy_tests',
+  files('tests/ast.cpp', 'src/parser.cpp', 'grammar/src/parser.c'),
+  include_directories: include_dirs,
+  dependencies: [tree_sitter, gtest, gtest_main],
+)
+
+test('cpy tests', cpy_tests)

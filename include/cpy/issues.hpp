@@ -37,6 +37,7 @@ class Issues
   static constexpr std::string_view ColorReset = "\033[0m";
 
 public:
+  Issues() = default;
   Issues (const fs::path src) : src_path(src) {}
 
   void add_error(const std::string_view msg)
