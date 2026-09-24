@@ -2,7 +2,7 @@
 
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
-#include <variant>
+
 
 TEST(Parser, ZeroNodes)
 {
@@ -61,9 +61,8 @@ TEST(Parser, FuncDef_1Arg)
   ASSERT_EQ(def.name, "hello");
   ASSERT_EQ(def.params.size(), 1);
   ASSERT_EQ(def.params[0].name, "a");
-  ASSERT_TRUE(std::get_if<BuiltInType>(&(def.params[0].type.value())) != nullptr);
-  ASSERT_TRUE(def.params[0].type.value_as<BuiltInType>().has_value());
-  ASSERT_EQ(def.params[0].type.value_as<BuiltInType>(), std::optional<BuiltInType>{BuiltInType::Int});
+  ASSERT_TRUE(def.params[0].type.is_type<BuiltInType>());
+  ASSERT_TRUE(def.params[0].type.is_type(BuiltInType::Int));
 }
 
 TEST(Parser, FuncDef_2Arg)
@@ -86,15 +85,13 @@ TEST(Parser, FuncDef_2Arg)
 
   const FunctionParam& p1 = def.params[0];
   ASSERT_EQ(p1.name, "a");
-  ASSERT_TRUE(std::get_if<BuiltInType>(&(p1.type.value())) != nullptr);
-  ASSERT_TRUE(p1.type.value_as<BuiltInType>().has_value());
-  ASSERT_EQ(p1.type.value_as<BuiltInType>(), std::optional<BuiltInType>{BuiltInType::Int});
+  ASSERT_TRUE(p1.type.is_type<BuiltInType>());
+  ASSERT_TRUE(p1.type.is_type(BuiltInType::Int));
 
   const FunctionParam& p2 = def.params[1];
   ASSERT_EQ(p2.name, "b");
-  ASSERT_TRUE(std::get_if<BuiltInType>(&(p2.type.value())) != nullptr);
-  ASSERT_TRUE(p2.type.value_as<BuiltInType>().has_value());
-  ASSERT_EQ(p2.type.value_as<BuiltInType>(), std::optional<BuiltInType>{BuiltInType::String});
+  ASSERT_TRUE(p2.type.is_type<BuiltInType>());
+  ASSERT_TRUE(p2.type.is_type(BuiltInType::String));
 }
 
 TEST(Parser, FuncDef_1Arg_InvalidType)
@@ -166,14 +163,41 @@ TEST(Parser, FuncCall_Args)
   ASSERT_TRUE(func_call_valid(def, call));
 }
 
-TEST(Parser, Blah)
+TEST(Parser, SyntaxError)
 {
-  // auto by_node_type = [](const NodeType nt)
-  // {
-  //   return [nt](const std::unique_ptr<AstNode>& n){ return n->is_node_type(nt); };
-  // };
+  {
+    Parser parser;
+    const std::string_view src = R"(
+      fn hello(a: int, b: str) {
+    )";
 
-  // for (const auto& func_call_node : script.ast->nodes | vw::filter(by_node_type(NodeType::FunctionCall))) {
-  //   ASSERT_EQ(dynamic_cast<FunctionDef&>(*func_call_node).name, "hello");
-  // }
+    const auto script = parser.parse(src);
+
+    ASSERT_EQ(script.ast->nodes.size(), 1);
+    ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
+  }
+
+  {
+    Parser parser;
+    const std::string_view src = R"(
+      fn hello(a: int, b: ) {}
+    )";
+
+    const auto script = parser.parse(src);
+
+    ASSERT_EQ(script.ast->nodes.size(), 1);
+    ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
+
+    const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
+    ASSERT_EQ(def.name, "hello");
+
+    ASSERT_EQ(def.params.size(), 2);
+    ASSERT_EQ(def.params[0].name, "a");
+    ASSERT_TRUE(def.params[0].type.is_type<BuiltInType>());
+    ASSERT_TRUE(def.params[0].type.is_type(BuiltInType::Int));
+
+    ASSERT_EQ(def.params[1].name, "b");
+    ASSERT_TRUE(def.params[1].type.is_type<BuiltInType>());
+    ASSERT_TRUE(def.params[1].type.is_type(BuiltInType::Unknown));
+  }
 }

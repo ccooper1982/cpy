@@ -55,9 +55,20 @@ struct VarType
     return std::nullopt;
   }
 
+  template<typename T>
+  bool is_type() const requires(std::is_same_v<T, BuiltInType>)
+  {
+    return std::holds_alternative<T>(type);
+  }
+
+  bool is_type(const BuiltInType t) const
+  {
+    return is_type<BuiltInType>() && *(value_as<BuiltInType>()) == t;
+  }
+
   std::string_view to_string() const
   {
-    if (std::holds_alternative<BuiltInType>(type))
+    if (is_type<BuiltInType>())
     {
       switch (const auto t = std::get<BuiltInType>(type) ; t)
       {
@@ -164,6 +175,11 @@ struct FunctionParam : public AstNode
   {
   }
 
+  template<typename T>
+  bool is_type() const
+  {
+    return std::holds_alternative<T>(type);
+  }
 
   NodeType node_type() const override { return NodeType::FunctionParam; }
   bool is_node_type(const NodeType t) const override { return node_type() == t; }
@@ -342,7 +358,6 @@ inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& c
 inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
 {
   if (def.params.size() != call.args.size() || def.name != call.name) {
-    std::cout << "name mismatch\n";
     return false;
   }
 
