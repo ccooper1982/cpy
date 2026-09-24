@@ -1,10 +1,25 @@
 #include <cpy/ast/ast_node.hpp>
-#include <cpy/common.hpp>
-#include <cpy/issues.hpp>
+#include <cpy/parser.hpp>
 
 
 int main ([[maybe_unused]] int argc, [[maybe_unused]] char ** argv)
 {
+  const std::string_view src = R"(
+
+    hello(4);
+    hello("hello");
+    files::exist("abc");
+
+    fn hello(a: int) {}
+    fn hello(a: arse) {}
+
+  )";
+
+  Parser parser;
+  const auto script = parser.parse(src);
+
+  script.issues.dump(std::cout, script.src);
+
   // TSParser * parser = ts_parser_new();
 
   // ts_parser_set_language(parser, tree_sitter_cpy());

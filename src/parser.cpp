@@ -339,6 +339,10 @@ Script Parser::parse(const std::string_view src)
   }
 
   Script script { .src = src };
+
   parse_source_file(script, root, script.issues);
+
+  semantic_checks(script, *script.ast, script.issues);
+
   return script;
 }

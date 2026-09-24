@@ -110,7 +110,6 @@ TEST(Parser, FuncDef_1Arg_InvalidType)
   ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
 
   const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
-
   ASSERT_EQ(def.name, "hello");
   ASSERT_EQ(def.params.size(), 1);
   ASSERT_EQ(def.params[0].name, "a");
@@ -119,16 +118,53 @@ TEST(Parser, FuncDef_1Arg_InvalidType)
   ASSERT_FALSE(p1.valid);
 }
 
-TEST(Parser, SyntaxError)
+TEST(Parser, FuncCall_NoArgs)
 {
   const std::string_view src = R"(
-    fn hello() {
+    fn hello() {}
+    hello();
   )";
 
   Parser parser;
   const auto script = parser.parse(src);
+
+  ASSERT_EQ(script.ast->nodes.size(), 2);
+  ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->nodes[1]->node_type(), NodeType::FunctionCall);
+
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->nodes[1]);
+  ASSERT_EQ(call.name, "hello");
+  ASSERT_TRUE(call.args.empty());
 }
 
+TEST(Parser, FuncCall_Args)
+{
+  const std::string_view src = R"(
+    fn hello(a: int, b: str) {}
+    hello(1, "2");
+  )";
+
+  Parser parser;
+  const auto script = parser.parse(src);
+
+  ASSERT_EQ(script.ast->nodes.size(), 2);
+  ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->nodes[1]->node_type(), NodeType::FunctionCall);
+
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->nodes[1]);
+  ASSERT_EQ(call.name, "hello");
+  ASSERT_EQ(call.args.size(), 2);
+  ASSERT_TRUE(call.args[0].is_type<IntegerLiteral>());
+  ASSERT_TRUE(call.args[1].is_type<StringLiteral>());
+
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
+  ASSERT_TRUE(param_arg_valid(def.params[0], call.args[0]));
+  ASSERT_TRUE(param_arg_valid(def.params[1], call.args[1]));
+  ASSERT_FALSE(param_arg_valid(def.params[0], call.args[1]));
+  ASSERT_FALSE(param_arg_valid(def.params[1], call.args[0]));
+
+  ASSERT_TRUE(func_call_valid(def, call));
+}
 
 TEST(Parser, Blah)
 {

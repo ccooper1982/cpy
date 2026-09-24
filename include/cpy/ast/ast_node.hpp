@@ -199,30 +199,33 @@ struct FunctionArg
   Expression value;
 
   FunctionArg (const StringLiteral& v) : value(v)
-  {
-  }
+  {}
 
   FunctionArg (const IntegerLiteral& v) : value(v)
-  {
-  }
+  {}
 
   FunctionArg (const DecimalLiteral& v) : value(v)
-  {
-    std::cout << "FunctionArg(DecimalLiteral)\n";
-  }
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
   {
     const auto visitor = overloads
     {
-        [&](const IntegerLiteral& v){ os << "int = " << v.v; },
-        [&](const StringLiteral& v){ os << "str = " << v.v; },
-        [&](const DecimalLiteral& v){ os << "dec = " << v.v; }
+      [&](const IntegerLiteral& v){ os << "int = " << v.v; },
+      [&](const StringLiteral& v){ os << "str = " << v.v; },
+      [&](const DecimalLiteral& v){ os << "dec = " << v.v; }
     };
 
     std::visit(visitor, value);
   }
+
+  template<typename T>
+  bool is_type() const
+  {
+    return std::holds_alternative<T>(value);
+  }
 };
+
 
 struct FunctionCall : public AstNode
 {
@@ -317,28 +320,37 @@ inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& c
     {
       using enum BuiltInType;
       case Int:
-        if (std::holds_alternative<IntegerLiteral>(call_arg.value))
-          return true;
-        break;
+        return call_arg.is_type<IntegerLiteral>();
 
       case String:
-        if (std::holds_alternative<StringLiteral>(call_arg.value))
-          return true;
-        break;
+        return call_arg.is_type<StringLiteral>();
 
       case Decimal:
-        if (std::holds_alternative<DecimalLiteral>(call_arg.value))
-          return true;
-        break;
+        return call_arg.is_type<DecimalLiteral>();
 
       case Unknown:
-          return false;
-        break;
+        return false;
 
       default:
         throw std::runtime_error("Function has unsupported BuiltInType parameter");
         break;
     }
+    return false; // appease clang
+  }
+}
+
+inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
+{
+  if (def.params.size() != call.args.size() || def.name != call.name) {
+    std::cout << "name mismatch\n";
     return false;
   }
+
+  size_t i{};
+  for (const auto& param : def.params)
+  {
+    if (!param_arg_valid(param, call.args[i++]))
+      return false;
+  }
+  return true;
 }
