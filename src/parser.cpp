@@ -1,3 +1,4 @@
+#include "cpy/ast/ast_node.hpp"
 #include <cpy/parser.hpp>
 #include <algorithm>
 #include <cstdint>
@@ -45,11 +46,18 @@ void create_issue (Issues& issues, const AstNode& node, const std::string_view m
 
 std::optional<VarType> create_type (const Script& src, const TSNode& node, Issues& issues)
 {
-  if (const auto name = from_source_file(src, node); name == "int") {
-    return VarType{BuiltInType::Int};
+  const auto name = from_source_file(src, node);
+  if ( name == "int") {
+    return BuiltInType::Int;
   }
   else if (name == "str") {
-    return VarType{BuiltInType::String};
+    return BuiltInType::String;
+  }
+  else if (name == "dec") {
+    return BuiltInType::Decimal;
+  }
+  else if (name == "bool") {
+    return BuiltInType::Bool;
   }
   else {
     create_issue_unknown_type(issues, node);
@@ -72,10 +80,12 @@ std::vector<FunctionArg> parse_function_args(const Script& src, const TSNode& ar
   std::vector<FunctionArg> args;
   if (!ts_node_is_null(args_node)) {
     const auto n_args = ts_node_named_child_count(args_node);
+
     for (uint32_t arg = 0 ; arg < n_args ; ++arg)
     {
       const auto expr_node = ts_node_named_child(args_node, arg);
-      if (const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0)); !expr_type.empty())
+      const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0));
+      if (!expr_type.empty())
       {
         const std::string_view value = from_source_file(src, ts_node_named_child(expr_node, 0));
 
@@ -83,17 +93,21 @@ std::vector<FunctionArg> parse_function_args(const Script& src, const TSNode& ar
         {
           int64_t i{};
           std::from_chars(value.data(), value.data()+value.size(), i);
-          args.emplace_back(i);
+          args.push_back(IntegerLiteral{i});
         }
         else if (expr_type == "literal_string")
         {
-          args.emplace_back(value);
+          args.push_back(StringLiteral{value});
         }
         else if (expr_type == "decimal")
         {
-          double i{};
-          std::from_chars(value.data(), value.data()+value.size(), i);
-          args.emplace_back(DecimalLiteral{i});
+          double d{};
+          std::from_chars(value.data(), value.data()+value.size(), d);
+          args.push_back(DecimalLiteral{d});
+        }
+        else if (expr_type == "boolean")
+        {
+          args.push_back(BooleanLiteral{value == "true"});
         }
       }
     }
@@ -150,10 +164,8 @@ std::unique_ptr<FunctionDef> parse_function(const Script& src, const TSNode& ts_
         TSNode param_name_node = ts_node_child_by_field_name(parameter, "name", 4);
         TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
 
-        const auto type = create_type(src, param_type_node, issues) ;
         FunctionParam param;
-
-        if (type) {
+        if (const auto type = create_type(src, param_type_node, issues) ; type) {
           param = ast_node->params.emplace_back(*type, from_source_file(src, param_name_node));
         }
         else {
@@ -278,25 +290,13 @@ bool does_function_call_exist(const SourceFile& root, const FunctionCall& call)
     return n->is_node_type(NodeType::FunctionDef);
   };
 
-  uint16_t candidates{};
-
   for (const auto& func_def_node : root.nodes | vw::filter(only_func_defs))
   {
     const auto& def = dynamic_cast<FunctionDef&>(*func_def_node);
-    if (def.name != call.name || def.params.size() != call.args.size())
-      continue;
-
-    uint16_t correct_args{};
-    for (uint8_t arg = 0 ; arg < call.args.size() ; ++arg)
-    {
-      if (param_arg_valid(def.params[arg], call.args[arg]))
-        ++correct_args;
-    }
-
-    if (correct_args == call.args.size())
-      ++candidates;
+    if (func_call_valid(def, call))
+      return true;
   }
-  return candidates > 0;
+  return false;
 }
 
 void semantic_checks(const Script& src, const SourceFile& root, Issues& issues)

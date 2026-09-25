@@ -26,6 +26,7 @@ export default grammar({
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
     integer: ($) => /[0-9]+/,
     decimal: ($) => /[0-9]+\.[0-9]+/,
+    boolean: ($) => choice("true","false",),
     literal_string: ($) => /"([^"\\]|\\.)*"/,
 
     function_body: ($) => seq(
@@ -63,6 +64,7 @@ export default grammar({
       $.decimal,
       $.integer,
       $.literal_string,
+      $.boolean,
       $.function_call,
       $.identifier,
     )

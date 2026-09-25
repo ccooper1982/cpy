@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <ios>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -110,12 +111,12 @@ inline bool operator==(const VarType& a, const VarType& b)
 // Expressions
 struct IntegerLiteral
 {
-  IntegerLiteral(const int64_t val) : v(val) {}
+  explicit IntegerLiteral(const int64_t val) : v(val) {}
   int64_t v;
 };
 struct StringLiteral
 {
-  StringLiteral(const std::string_view val) : v(val) {}
+  explicit StringLiteral(const std::string_view val) : v(val) {}
   std::string_view v;
 };
 struct DecimalLiteral
@@ -123,8 +124,13 @@ struct DecimalLiteral
   explicit DecimalLiteral(const double val) : v(val) {}
   double v;
 };
+struct BooleanLiteral
+{
+  explicit BooleanLiteral(const bool val) : v(val) {}
+  bool v;
+};
 
-using Expression = std::variant<IntegerLiteral, StringLiteral, DecimalLiteral>;
+using Expression = std::variant<IntegerLiteral, StringLiteral, DecimalLiteral, BooleanLiteral>;
 
 
 // AST nodes
@@ -223,13 +229,17 @@ struct FunctionArg
   FunctionArg (const DecimalLiteral& v) : value(v)
   {}
 
+  FunctionArg (const BooleanLiteral& v) : value(v)
+  {}
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
   {
     const auto visitor = overloads
     {
       [&](const IntegerLiteral& v){ os << "int = " << v.v; },
       [&](const StringLiteral& v){ os << "str = " << v.v; },
-      [&](const DecimalLiteral& v){ os << "dec = " << v.v; }
+      [&](const DecimalLiteral& v){ os << "dec = " << v.v; },
+      [&](const BooleanLiteral& v){ os << "bool = " << std::boolalpha << v.v; }
     };
 
     std::visit(visitor, value);
@@ -343,6 +353,9 @@ inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& c
 
       case Decimal:
         return call_arg.is_type<DecimalLiteral>();
+
+      case Bool:
+        return call_arg.is_type<BooleanLiteral>();
 
       case Unknown:
         return false;
