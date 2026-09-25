@@ -1,12 +1,5 @@
-fn hello(a: int) -> str
-{
+fn hello(a: int, b: str, c: dec, d: bool) {}
 
-}
+hello(1, "one", 1.1, true);
 
-fn main(a: str) -> int
-{
-    hello();
-    hello(3);
-    hello("world");
-    hello(3, "world");
-}
+foo();

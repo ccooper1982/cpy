@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <ios>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -31,6 +32,7 @@ enum class BuiltInType
   Bool,
   String,
   Void,
+  Unknown
 };
 
 struct UserType
@@ -54,9 +56,20 @@ struct VarType
     return std::nullopt;
   }
 
+  template<typename T>
+  bool is_type() const requires(std::is_same_v<T, BuiltInType>)
+  {
+    return std::holds_alternative<T>(type);
+  }
+
+  bool is_type(const BuiltInType t) const
+  {
+    return is_type<BuiltInType>() && *(value_as<BuiltInType>()) == t;
+  }
+
   std::string_view to_string() const
   {
-    if (std::holds_alternative<BuiltInType>(type))
+    if (is_type<BuiltInType>())
     {
       switch (const auto t = std::get<BuiltInType>(type) ; t)
       {
@@ -85,7 +98,7 @@ private:
   std::variant<BuiltInType, UserType> type;
 };
 
-inline bool operator==(const UserType& a, const UserType& b)
+inline bool operator==([[maybe_unused]] const UserType& a, [[maybe_unused]] const UserType& b)
 {
   throw std::runtime_error{"Comparing unsupported UserType"};
 }
@@ -98,12 +111,12 @@ inline bool operator==(const VarType& a, const VarType& b)
 // Expressions
 struct IntegerLiteral
 {
-  IntegerLiteral(const int64_t val) : v(val) {}
+  explicit IntegerLiteral(const int64_t val) : v(val) {}
   int64_t v;
 };
 struct StringLiteral
 {
-  StringLiteral(const std::string_view val) : v(val) {}
+  explicit StringLiteral(const std::string_view val) : v(val) {}
   std::string_view v;
 };
 struct DecimalLiteral
@@ -111,8 +124,13 @@ struct DecimalLiteral
   explicit DecimalLiteral(const double val) : v(val) {}
   double v;
 };
+struct BooleanLiteral
+{
+  explicit BooleanLiteral(const bool val) : v(val) {}
+  bool v;
+};
 
-using Expression = std::variant<IntegerLiteral, StringLiteral, DecimalLiteral>;
+using Expression = std::variant<IntegerLiteral, StringLiteral, DecimalLiteral, BooleanLiteral>;
 
 
 // AST nodes
@@ -143,6 +161,17 @@ struct FunctionParam : public AstNode
 {
   VarType type;
   std::string name;
+  bool valid{true};
+
+  FunctionParam() : type(BuiltInType::Unknown), valid(false)
+  {
+
+  }
+
+  FunctionParam (std::string_view name) : type(BuiltInType::Unknown), name(name), valid(false)
+  {
+
+  }
 
   FunctionParam(const VarType type) : type(type)
   {
@@ -152,6 +181,11 @@ struct FunctionParam : public AstNode
   {
   }
 
+  template<typename T>
+  bool is_type() const
+  {
+    return std::holds_alternative<T>(type);
+  }
 
   NodeType node_type() const override { return NodeType::FunctionParam; }
   bool is_node_type(const NodeType t) const override { return node_type() == t; }
@@ -187,30 +221,37 @@ struct FunctionArg
   Expression value;
 
   FunctionArg (const StringLiteral& v) : value(v)
-  {
-  }
+  {}
 
   FunctionArg (const IntegerLiteral& v) : value(v)
-  {
-  }
+  {}
 
   FunctionArg (const DecimalLiteral& v) : value(v)
-  {
-    std::cout << "FunctionArg(DecimalLiteral)\n";
-  }
+  {}
+
+  FunctionArg (const BooleanLiteral& v) : value(v)
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
   {
     const auto visitor = overloads
     {
-        [&](const IntegerLiteral& v){ os << "int = " << v.v; },
-        [&](const StringLiteral& v){ os << "str = " << v.v; },
-        [&](const DecimalLiteral& v){ os << "dec = " << v.v; }
+      [&](const IntegerLiteral& v){ os << "int = " << v.v; },
+      [&](const StringLiteral& v){ os << "str = " << v.v; },
+      [&](const DecimalLiteral& v){ os << "dec = " << v.v; },
+      [&](const BooleanLiteral& v){ os << "bool = " << std::boolalpha << v.v; }
     };
 
     std::visit(visitor, value);
   }
+
+  template<typename T>
+  bool is_type() const
+  {
+    return std::holds_alternative<T>(value);
+  }
 };
+
 
 struct FunctionCall : public AstNode
 {
@@ -305,24 +346,39 @@ inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& c
     {
       using enum BuiltInType;
       case Int:
-        if (std::holds_alternative<IntegerLiteral>(call_arg.value))
-          return true;
-        break;
+        return call_arg.is_type<IntegerLiteral>();
 
       case String:
-        if (std::holds_alternative<StringLiteral>(call_arg.value))
-          return true;
-        break;
+        return call_arg.is_type<StringLiteral>();
 
       case Decimal:
-        if (std::holds_alternative<DecimalLiteral>(call_arg.value))
-          return true;
-        break;
+        return call_arg.is_type<DecimalLiteral>();
+
+      case Bool:
+        return call_arg.is_type<BooleanLiteral>();
+
+      case Unknown:
+        return false;
 
       default:
         throw std::runtime_error("Function has unsupported BuiltInType parameter");
         break;
     }
+    return false; // appease clang
+  }
+}
+
+inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
+{
+  if (def.params.size() != call.args.size() || def.name != call.name) {
     return false;
   }
+
+  size_t i{};
+  for (const auto& param : def.params)
+  {
+    if (!param_arg_valid(param, call.args[i++]))
+      return false;
+  }
+  return true;
 }

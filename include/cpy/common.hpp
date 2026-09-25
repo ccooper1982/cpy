@@ -1,6 +1,9 @@
 #pragma once
-#include <ranges>
+
+#include <expected>
 #include <filesystem>
+#include <ranges>
+#include <string_view>
 
 namespace fs = std::filesystem;
 namespace rg = std::ranges;
@@ -21,3 +24,30 @@ struct SourceRegion
 
   uint32_t start{}, end{};
 };
+
+struct CpyError
+{
+  CpyError() = default;
+
+  CpyError(const std::string_view msg) : m_msg(msg)
+  {}
+
+  bool operator()() const
+  {
+    return !m_msg.empty();
+  }
+
+  const std::string& msg() const
+  {
+    return m_msg;
+  }
+
+private:
+  std::string m_msg;
+};
+
+template<typename Expected>
+std::expected<Expected, CpyError> make_error(const std::string_view msg)
+{
+  return std::unexpected(CpyError{msg});
+}

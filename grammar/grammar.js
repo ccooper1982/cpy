@@ -2,7 +2,10 @@ export default grammar({
   name: "cpy",
 
   rules: {
-    source_file: ($) => repeat($.function_def),
+    source_file: ($) => repeat(choice(
+      $.function_def,
+      $.statement,
+    )),
 
     function_def: ($) =>
       seq(
@@ -23,6 +26,7 @@ export default grammar({
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
     integer: ($) => /[0-9]+/,
     decimal: ($) => /[0-9]+\.[0-9]+/,
+    boolean: ($) => choice("true","false",),
     literal_string: ($) => /"([^"\\]|\\.)*"/,
 
     function_body: ($) => seq(
@@ -31,16 +35,24 @@ export default grammar({
       "}",
     ),
 
-    statement: ($) => choice(
-      field("func_call", $.function_call),
-      ";"
-    ),
+    statement: ($) =>
+      seq(
+        choice(
+          field("func_call", $.function_call),
+        ),
+        ";",
+      ),
 
     function_call: ($) => seq(
-      field("name", $.identifier),
+      field("name", $.qualified_name),
       "(",
       optional(field("args", $.arguments)),
-      ")"
+      ")",
+    ),
+
+    qualified_name: ($) => seq(
+      optional(seq($.identifier, "::")),
+      $.identifier,
     ),
 
     arguments: ($) => seq(
@@ -52,6 +64,7 @@ export default grammar({
       $.decimal,
       $.integer,
       $.literal_string,
+      $.boolean,
       $.function_call,
       $.identifier,
     )
