@@ -2,6 +2,8 @@
 #include <cpy/parser.hpp>
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <stdexcept>
 #include <string_view>
@@ -9,12 +11,13 @@
 #include <vector>
 
 
-std::string_view from_source_file (const Script& src, const TSNode& node)
+std::string_view from_source (const Script& script, const TSNode& node)
 {
   const auto start = ts_node_start_byte(node);
-  return src.src.substr(start, ts_node_end_byte(node) - start);
-}
+  const auto length = ts_node_end_byte(node) - start;
 
+  return std::string_view{script.src}.substr(start, length);
+}
 
 void create_issue_syntax_error (Issues& issues, const TSNode& node)
 {
@@ -46,7 +49,7 @@ void create_issue (Issues& issues, const AstNode& node, const std::string_view m
 
 std::optional<VarType> create_type (const Script& src, const TSNode& node, Issues& issues)
 {
-  const auto name = from_source_file(src, node);
+  const auto name = from_source(src, node);
   if ( name == "int") {
     return BuiltInType::Int;
   }
@@ -87,7 +90,7 @@ std::vector<FunctionArg> parse_function_args(const Script& src, const TSNode& ar
       const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0));
       if (!expr_type.empty())
       {
-        const std::string_view value = from_source_file(src, ts_node_named_child(expr_node, 0));
+        const std::string_view value = from_source(src, ts_node_named_child(expr_node, 0));
 
         if (expr_type == "integer")
         {
@@ -122,7 +125,7 @@ std::unique_ptr<FunctionCall> parse_function_call(const Script& src, const TSNod
   const auto byte_start = ts_node_start_byte(func_call);
   const auto byte_end = ts_node_end_byte(func_call);
 
-  const auto func_name = from_source_file(src, name_node);
+  const auto func_name = from_source(src, name_node);
 
   auto args = parse_function_args(src, args_node);
 
@@ -139,7 +142,7 @@ std::unique_ptr<FunctionDef> parse_function(const Script& src, const TSNode& ts_
 
   // name
   TSNode name_node = ts_node_child_by_field_name(ts_node, "name", 4);
-  ast_node->name = from_source_file(src, name_node);
+  ast_node->name = from_source(src, name_node);
 
   // return type
   TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
@@ -166,10 +169,10 @@ std::unique_ptr<FunctionDef> parse_function(const Script& src, const TSNode& ts_
 
         FunctionParam param;
         if (const auto type = create_type(src, param_type_node, issues) ; type) {
-          param = ast_node->params.emplace_back(*type, from_source_file(src, param_name_node));
+          param = ast_node->params.emplace_back(*type, from_source(src, param_name_node));
         }
         else {
-          param = ast_node->params.emplace_back(from_source_file(src, param_name_node));
+          param = ast_node->params.emplace_back(from_source(src, param_name_node));
         }
 
         set_source_region(param_name_node, param);
@@ -199,7 +202,7 @@ std::unique_ptr<FunctionDef> parse_function(const Script& src, const TSNode& ts_
 }
 
 
-void parse_source_file(Script& src, TSNode& ts_root, Issues& issues)
+void parse_script(Script& src, TSNode& ts_root, Issues& issues)
 {
   auto process_node = [&](const TSNode& node) -> std::unique_ptr<AstNode>
   {
@@ -324,13 +327,13 @@ Parser::~Parser()
     ts_parser_delete(m_parser);
 }
 
-Script Parser::parse(const std::string_view src)
+void Parser::parse(Script& script)
 {
   m_parser = ts_parser_new();
 
   ts_parser_set_language(m_parser, tree_sitter_cpy());
 
-  m_tree = ts_parser_parse_string(m_parser, nullptr, src.data(), src.length());
+  m_tree = ts_parser_parse_string(m_parser, nullptr, script.src.data(), script.src.length());
 
   TSNode root = ts_tree_root_node(m_tree);
 
@@ -338,11 +341,48 @@ Script Parser::parse(const std::string_view src)
     throw std::runtime_error{"Root is not a source_file"};
   }
 
-  Script script { .src = src };
-
-  parse_source_file(script, root, script.issues);
+  parse_script(script, root, script.issues);
 
   semantic_checks(script, *script.ast, script.issues);
+}
+
+std::expected<Script, CpyError> Parser::parse(const fs::path src_file)
+{
+  Script script {.file = src_file};
+
+  std::ifstream stream(src_file);
+  if (!stream) {
+    return make_error<Script>("Failed to open file");
+  }
+
+  script.src = {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
+
+  parse(script);
+
+  return script;
+}
+
+
+Script Parser::parse(const std::string_view src)
+{
+  Script script { .src = std::string(src.data(), src.size()) };
+  parse(script);
+
+  // m_parser = ts_parser_new();
+
+  // ts_parser_set_language(m_parser, tree_sitter_cpy());
+
+  // m_tree = ts_parser_parse_string(m_parser, nullptr, script.src.data(), script.src.length());
+
+  // TSNode root = ts_tree_root_node(m_tree);
+
+  // if (const std::string_view root_type = ts_node_type(root) ; root_type != "source_file") {
+  //   throw std::runtime_error{"Root is not a source_file"};
+  // }
+
+  // parse_script(script, root, script.issues);
+
+  // semantic_checks(script, *script.ast, script.issues);
 
   return script;
 }

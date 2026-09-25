@@ -1,11 +1,18 @@
 project(
   'cpy',
-  ['c','cpp'],
+  ['c', 'cpp'],
   version: '0.1.0',
   default_options: [
     'cpp_std=c++23',
     'warning_level=3',
   ],
+)
+
+add_project_arguments(
+  '-Wall',
+  '-Wextra',
+  '-Wreturn-local-addr',
+  language: 'cpp',
 )
 
 tree_sitter = dependency('tree-sitter')
@@ -28,9 +35,13 @@ executable('cpy', cpy_sources,
 
 cpy_tests = executable(
   'cpy_tests',
-  files('tests/ast.cpp', 'src/parser.cpp', 'grammar/src/parser.c'),
+  files('tests/ast.cpp', 'tests/parser.cpp',
+        'src/parser.cpp',
+        'grammar/src/parser.c'
+  ),
   include_directories: include_dirs,
   dependencies: [tree_sitter, gtest, gtest_main],
+
 )
 
-test('cpy tests', cpy_tests)
+test('cpy tests', cpy_tests, workdir: meson.project_source_root())

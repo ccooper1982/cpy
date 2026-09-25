@@ -2,12 +2,13 @@
 
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
+#include <string_view>
 
 
 TEST(Parser, ZeroNodes)
 {
   Parser parser;
-  const auto script = parser.parse("");
+  const auto script = parser.parse(std::string_view{});
 
   ASSERT_EQ(script.ast->nodes.size(), 0);
 }
