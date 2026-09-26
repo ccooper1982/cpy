@@ -254,7 +254,7 @@ public:
   }
 };
 
-template<bool CheckName = true>
+template<bool CheckName>
 struct FunctionParamComparer
 {
   bool operator()(const FunctionParam& a, const FunctionParam& b) const

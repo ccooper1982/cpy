@@ -41,7 +41,6 @@ cpy_tests = executable(
   ),
   include_directories: include_dirs,
   dependencies: [tree_sitter, gtest, gtest_main],
-
 )
 
 test('cpy tests', cpy_tests, workdir: meson.project_source_root())

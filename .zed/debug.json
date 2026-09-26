@@ -4,13 +4,25 @@
 // see: https://zed.dev/docs/debugger
 [
   {
-      "label": "Debug ",
+    "label": "cpy",
+    "build": {
+      "command": "meson",
+      "args": ["compile", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/cpy",
+    "request": "launch",
+    "adapter": "CodeLLDB"
+    },
+    {
+      "label": "Test",
       "build": {
         "command": "meson",
-        "args": ["compile", "-C", "build"],
+        "args": ["test", "-C", "build"],
         "cwd": "$ZED_WORKTREE_ROOT"
       },
-      "program": "$ZED_WORKTREE_ROOT/build/cpy",
+      "program": "$ZED_WORKTREE_ROOT/build/cpy_tests",
+      "args": ["--gtest_filter=Parser.File"],
       "request": "launch",
       "adapter": "CodeLLDB"
     }

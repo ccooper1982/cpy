@@ -221,6 +221,27 @@ TEST(Ast, FuncCall_AllPrimitives)
   ASSERT_TRUE(call.args[3]->is_expr_type(ExpressionType::Bool));
 }
 
+TEST(Ast, FuncCall_Module)
+{
+  const std::string_view src = R"(
+    hello();
+    foo::hello();
+  )";
+
+  Parser parser;
+  const auto script = parser.parse(src);
+
+  ASSERT_EQ(script.ast->nodes.size(), 2);
+  ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(script.ast->nodes[1]->node_type(), NodeType::FunctionCall);
+
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->nodes[0]);
+  const auto& call_module = dynamic_cast<FunctionCall&>(*script.ast->nodes[1]);
+
+  ASSERT_EQ(call.module, "");
+  ASSERT_EQ(call_module.module, "foo");
+}
+
 TEST(Ast, SyntaxError)
 {
   {
