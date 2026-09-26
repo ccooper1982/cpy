@@ -5,7 +5,7 @@
 #include <string_view>
 
 
-TEST(Parser, ZeroNodes)
+TEST(Ast, ZeroNodes)
 {
   Parser parser;
   const auto script = parser.parse(std::string_view{});
@@ -13,7 +13,7 @@ TEST(Parser, ZeroNodes)
   ASSERT_EQ(script.ast->nodes.size(), 0);
 }
 
-TEST(Parser, FuncCall_NotExist)
+TEST(Ast, FuncCall_NotExist)
 {
   const std::string_view src = R"(
     hello();
@@ -27,7 +27,7 @@ TEST(Parser, FuncCall_NotExist)
   ASSERT_EQ(dynamic_cast<FunctionCall&>(*script.ast->nodes[0]).name, "hello");
 }
 
-TEST(Parser, FuncDef_NoArgs)
+TEST(Ast, FuncDef_NoArgs)
 {
   const std::string_view src = R"(
     fn hello() {}
@@ -45,7 +45,7 @@ TEST(Parser, FuncDef_NoArgs)
 }
 
 
-TEST(Parser, FuncDef_1Arg)
+TEST(Ast, FuncDef_1Arg)
 {
   const std::string_view src = R"(
     fn hello(a: int) {}
@@ -66,7 +66,7 @@ TEST(Parser, FuncDef_1Arg)
   ASSERT_TRUE(def.params[0].type.is_type(BuiltInType::Int));
 }
 
-TEST(Parser, FuncDef_2Arg)
+TEST(Ast, FuncDef_2Arg)
 {
   const std::string_view src = R"(
     fn hello(a: int, b: str) {}
@@ -94,7 +94,7 @@ TEST(Parser, FuncDef_2Arg)
   ASSERT_TRUE(p2.type.is_type(BuiltInType::String));
 }
 
-TEST(Parser, FuncDef_1Arg_InvalidType)
+TEST(Ast, FuncDef_1Arg_InvalidType)
 {
   const std::string_view src = R"(
     fn hello(a: foo) {}
@@ -115,7 +115,7 @@ TEST(Parser, FuncDef_1Arg_InvalidType)
   ASSERT_FALSE(p1.valid);
 }
 
-TEST(Parser, FuncCall_NoArgs)
+TEST(Ast, FuncCall_NoArgs)
 {
   const std::string_view src = R"(
     fn hello() {}
@@ -134,7 +134,7 @@ TEST(Parser, FuncCall_NoArgs)
   ASSERT_TRUE(call.args.empty());
 }
 
-TEST(Parser, FuncCall_Args)
+TEST(Ast, FuncCall_Args)
 {
   const std::string_view src = R"(
     fn hello(a: int, b: str) {}
@@ -151,8 +151,8 @@ TEST(Parser, FuncCall_Args)
   const auto& call = dynamic_cast<FunctionCall&>(*script.ast->nodes[1]);
   ASSERT_EQ(call.name, "hello");
   ASSERT_EQ(call.args.size(), 2);
-  ASSERT_TRUE(call.args[0].is_type<IntegerLiteral>());
-  ASSERT_TRUE(call.args[1].is_type<StringLiteral>());
+  ASSERT_TRUE(call.args[0]->is_expr_type(ExpressionType::Int));
+  ASSERT_TRUE(call.args[1]->is_expr_type(ExpressionType::String));
 
   const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
   ASSERT_TRUE(param_arg_valid(def.params[0], call.args[0]));
@@ -163,7 +163,33 @@ TEST(Parser, FuncCall_Args)
   ASSERT_TRUE(func_call_valid(def, call));
 }
 
-TEST(Parser, FuncCall_AllPrimitives)
+TEST(Ast, FuncCall_InvalidCall)
+{
+  const std::string_view src = R"(
+    fn hello(a: int, b: str) {}
+    hello(1, 2);
+    hello(1, "2", 3);
+    hello(1);
+  )";
+
+  Parser parser;
+  const auto script = parser.parse(src);
+
+  ASSERT_EQ(script.ast->nodes.size(), 4);
+  ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->nodes[1]->node_type(), NodeType::FunctionCall);
+
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
+  const auto& wrong_type = dynamic_cast<FunctionCall&>(*script.ast->nodes[1]);
+  const auto& too_many = dynamic_cast<FunctionCall&>(*script.ast->nodes[2]);
+  const auto& too_few = dynamic_cast<FunctionCall&>(*script.ast->nodes[3]);
+
+  ASSERT_FALSE(func_call_valid(def, wrong_type));
+  ASSERT_FALSE(func_call_valid(def, too_many));
+  ASSERT_FALSE(func_call_valid(def, too_few));
+}
+
+TEST(Ast, FuncCall_AllPrimitives)
 {
   const std::string_view src = R"(
     fn hello(a: int, b: str, c: dec, d: bool) {}
@@ -189,13 +215,13 @@ TEST(Parser, FuncCall_AllPrimitives)
 
   const auto& call = dynamic_cast<FunctionCall&>(*script.ast->nodes[1]);
   ASSERT_EQ(call.args.size(), 4);
-  ASSERT_TRUE(call.args[0].is_type<IntegerLiteral>());
-  ASSERT_TRUE(call.args[1].is_type<StringLiteral>());
-  ASSERT_TRUE(call.args[2].is_type<DecimalLiteral>());
-  ASSERT_TRUE(call.args[3].is_type<BooleanLiteral>());
+  ASSERT_TRUE(call.args[0]->is_expr_type(ExpressionType::Int));
+  ASSERT_TRUE(call.args[1]->is_expr_type(ExpressionType::String));
+  ASSERT_TRUE(call.args[2]->is_expr_type(ExpressionType::Dec));
+  ASSERT_TRUE(call.args[3]->is_expr_type(ExpressionType::Bool));
 }
 
-TEST(Parser, SyntaxError)
+TEST(Ast, SyntaxError)
 {
   {
     Parser parser;

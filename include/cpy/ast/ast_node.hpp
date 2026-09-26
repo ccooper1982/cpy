@@ -17,12 +17,13 @@
 enum class NodeType
 {
   None,
-  Error,
+  SyntaxError,
   SourceFile,
   FunctionDef,
   FunctionParam,
   FunctionBody,
-  FunctionCall
+  FunctionCall,
+  Expression
 };
 
 enum class BuiltInType
@@ -108,48 +109,102 @@ inline bool operator==(const VarType& a, const VarType& b)
   return a.value() == b.value();
 }
 
-// Expressions
-struct IntegerLiteral
+struct AstNode
 {
-  explicit IntegerLiteral(const int64_t val) : v(val) {}
-  int64_t v;
-};
-struct StringLiteral
-{
-  explicit StringLiteral(const std::string_view val) : v(val) {}
-  std::string_view v;
-};
-struct DecimalLiteral
-{
-  explicit DecimalLiteral(const double val) : v(val) {}
-  double v;
-};
-struct BooleanLiteral
-{
-  explicit BooleanLiteral(const bool val) : v(val) {}
-  bool v;
-};
+  AstNode(const NodeType t) : type(t)
+  {}
 
-using Expression = std::variant<IntegerLiteral, StringLiteral, DecimalLiteral, BooleanLiteral>;
+  SourceRegion source;
+
+  NodeType node_type() const { return type; }
+  bool is_node_type(const NodeType t) const { return t == node_type(); }
+
+  virtual ~AstNode() = default;
+  virtual void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const = 0;
+
+private:
+  NodeType type;
+};
 
 
 // AST nodes
 
-struct AstNode
+
+// Expressions
+enum class ExpressionType
 {
-  SourceRegion source;
-
-  virtual NodeType node_type() const = 0;
-  virtual bool is_node_type(const NodeType t) const = 0;
-
-  virtual ~AstNode() = default;
-  virtual void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const = 0;
+  Int,
+  String,
+  Dec,
+  Bool
 };
 
-struct Error : public AstNode
+struct Expression : public AstNode
 {
-  NodeType node_type() const override { return NodeType::Error; }
-  bool is_node_type(const NodeType t) const override { return node_type() == t; }
+  Expression(const ExpressionType t)
+    : AstNode(NodeType::Expression)
+    , expr_type(t)
+  {}
+
+  virtual ~Expression() = default;
+
+  virtual bool is_expr_type(const ExpressionType t) const { return t == expr_type; };
+
+  ExpressionType expr_type;
+};
+
+struct IntegerLiteral : public Expression
+{
+  explicit IntegerLiteral(const int64_t val) : Expression(ExpressionType::Int), v(val) {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "int = " << v;
+  }
+
+  int64_t v;
+};
+
+struct StringLiteral : public Expression
+{
+  explicit StringLiteral(const std::string_view val) : Expression(ExpressionType::String), v(val) {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "str = " << v;
+  }
+
+  std::string_view v;
+};
+
+struct DecimalLiteral : public Expression
+{
+  explicit DecimalLiteral(const double val) : Expression(ExpressionType::Dec), v(val) {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "dec = " << v;
+  }
+
+  double v;
+};
+
+struct BooleanLiteral : public Expression
+{
+  explicit BooleanLiteral(const bool val) : Expression(ExpressionType::Bool), v(val) {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "bool = " << std::boolalpha << v;
+  }
+
+  bool v;
+};
+
+struct SyntaxError : public AstNode
+{
+  SyntaxError() : AstNode(NodeType::SyntaxError)
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -163,32 +218,35 @@ struct FunctionParam : public AstNode
   std::string name;
   bool valid{true};
 
-  FunctionParam() : type(BuiltInType::Unknown), valid(false)
+  FunctionParam() : FunctionParam("")
   {
 
   }
 
-  FunctionParam (std::string_view name) : type(BuiltInType::Unknown), name(name), valid(false)
+  FunctionParam (const std::string_view name) : FunctionParam(BuiltInType::Unknown, name, false)
   {
 
   }
 
-  FunctionParam(const VarType type) : type(type)
+  FunctionParam(const VarType type) : FunctionParam(type, "")
   {
   }
 
-  FunctionParam(const VarType type, std::string_view name) : type(type), name(name)
+  FunctionParam(const VarType type, std::string_view name, const bool valid = true)
+    : AstNode(NodeType::FunctionParam)
+    , type(type)
+    , name(name)
+    , valid(valid)
   {
   }
+
+public:
 
   template<typename T>
   bool is_type() const
   {
     return std::holds_alternative<T>(type);
   }
-
-  NodeType node_type() const override { return NodeType::FunctionParam; }
-  bool is_node_type(const NodeType t) const override { return node_type() == t; }
 
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
@@ -216,63 +274,25 @@ inline bool operator==(const FunctionParam& a, const FunctionParam& b)
   return FunctionParamCmp{}(a, b);
 }
 
-struct FunctionArg
-{
-  Expression value;
-
-  FunctionArg (const StringLiteral& v) : value(v)
-  {}
-
-  FunctionArg (const IntegerLiteral& v) : value(v)
-  {}
-
-  FunctionArg (const DecimalLiteral& v) : value(v)
-  {}
-
-  FunctionArg (const BooleanLiteral& v) : value(v)
-  {}
-
-  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const
-  {
-    const auto visitor = overloads
-    {
-      [&](const IntegerLiteral& v){ os << "int = " << v.v; },
-      [&](const StringLiteral& v){ os << "str = " << v.v; },
-      [&](const DecimalLiteral& v){ os << "dec = " << v.v; },
-      [&](const BooleanLiteral& v){ os << "bool = " << std::boolalpha << v.v; }
-    };
-
-    std::visit(visitor, value);
-  }
-
-  template<typename T>
-  bool is_type() const
-  {
-    return std::holds_alternative<T>(value);
-  }
-};
-
 
 struct FunctionCall : public AstNode
 {
   std::string_view name;
-  std::vector<FunctionArg> args;
+  std::vector<std::unique_ptr<Expression>> args;
 
-  FunctionCall(const std::string_view name, std::vector<FunctionArg> args = {})
-    : name(name)
+  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
+    : AstNode(NodeType::FunctionCall),
+      name(name)
     , args(std::move(args))
   {
   }
-
-  NodeType node_type() const override { return NodeType::FunctionCall; }
-  bool is_node_type(const NodeType t) const override { return node_type() == t; }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     os << name << '(';
     for (std::size_t i = 0; i < args.size() ; ++i)
     {
-      args[i].dump(os, tab);
+      args[i]->dump(os, tab);
       if (i+1 < args.size())
         os << ',';
     }
@@ -282,10 +302,10 @@ struct FunctionCall : public AstNode
 
 struct FunctionBody : public AstNode
 {
-  std::vector<std::unique_ptr<AstNode>> nodes;
+  FunctionBody() : AstNode(NodeType::FunctionBody)
+  {}
 
-  NodeType node_type() const override { return NodeType::FunctionBody; }
-  bool is_node_type(const NodeType t) const override { return node_type() == t; }
+  std::vector<std::unique_ptr<AstNode>> nodes;
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -296,13 +316,13 @@ struct FunctionBody : public AstNode
 
 struct FunctionDef : public AstNode
 {
+  FunctionDef() : AstNode(NodeType::FunctionDef)
+  {}
+
   std::string name;
   std::vector<FunctionParam> params;
   VarType return_type{BuiltInType::Void};
   FunctionBody body;
-
-  NodeType node_type() const override { return NodeType::FunctionDef; }
-  bool is_node_type(const NodeType t) const override { return node_type() == t; }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -319,11 +339,11 @@ struct FunctionDef : public AstNode
 
 struct SourceFile : public AstNode
 {
+  SourceFile() : AstNode(NodeType::SourceFile)
+  {}
+
   std::vector<std::unique_ptr<AstNode>> nodes;
   fs::path src_path;
-
-  NodeType node_type() const override { return NodeType::SourceFile; }
-  bool is_node_type(const NodeType t) const override { return node_type() == t; }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -336,7 +356,7 @@ struct SourceFile : public AstNode
 
 
 // useful
-inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& call_arg)
+inline bool param_arg_valid(const FunctionParam& def_param, const std::unique_ptr<Expression>& call_arg)
 {
   if (const auto param_type = def_param.type.value_as<BuiltInType>() ; !param_type)
     throw std::runtime_error("Function has unsupported UserType parameter");
@@ -346,16 +366,16 @@ inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& c
     {
       using enum BuiltInType;
       case Int:
-        return call_arg.is_type<IntegerLiteral>();
+        return call_arg->is_expr_type(ExpressionType::Int);
 
       case String:
-        return call_arg.is_type<StringLiteral>();
+        return call_arg->is_expr_type(ExpressionType::String);
 
       case Decimal:
-        return call_arg.is_type<DecimalLiteral>();
+        return call_arg->is_expr_type(ExpressionType::Dec);
 
       case Bool:
-        return call_arg.is_type<BooleanLiteral>();
+        return call_arg->is_expr_type(ExpressionType::Bool);
 
       case Unknown:
         return false;
@@ -370,15 +390,12 @@ inline bool param_arg_valid(const FunctionParam& def_param, const FunctionArg& c
 
 inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
 {
-  if (def.params.size() != call.args.size() || def.name != call.name) {
+  if (def.name != call.name) {
     return false;
   }
 
-  size_t i{};
-  for (const auto& param : def.params)
-  {
-    if (!param_arg_valid(param, call.args[i++]))
-      return false;
-  }
-  return true;
+  return std::ranges::equal(def.params, call.args, [](const auto& param, const auto& arg) {
+      return param_arg_valid(param, arg);
+    }
+  );
 }

@@ -78,9 +78,9 @@ void set_source_region (AstNode& ast_node, const uint32_t from, const uint32_t t
   ast_node.source = SourceRegion{from, to};
 }
 
-std::vector<FunctionArg> parse_function_args(const Script& src, const TSNode& args_node)
+std::vector<std::unique_ptr<Expression>> parse_function_args(const Script& src, const TSNode& args_node)
 {
-  std::vector<FunctionArg> args;
+  std::vector<std::unique_ptr<Expression>> args;
   if (!ts_node_is_null(args_node)) {
     const auto n_args = ts_node_named_child_count(args_node);
 
@@ -96,21 +96,21 @@ std::vector<FunctionArg> parse_function_args(const Script& src, const TSNode& ar
         {
           int64_t i{};
           std::from_chars(value.data(), value.data()+value.size(), i);
-          args.push_back(IntegerLiteral{i});
+          args.emplace_back(std::make_unique<IntegerLiteral>(i));
         }
         else if (expr_type == "literal_string")
         {
-          args.push_back(StringLiteral{value});
+          args.emplace_back(std::make_unique<StringLiteral>(value));
         }
         else if (expr_type == "decimal")
         {
           double d{};
           std::from_chars(value.data(), value.data()+value.size(), d);
-          args.push_back(DecimalLiteral{d});
+          args.emplace_back(std::make_unique<DecimalLiteral>(d));
         }
         else if (expr_type == "boolean")
         {
-          args.push_back(BooleanLiteral{value == "true"});
+          args.emplace_back(std::make_unique<BooleanLiteral>(value == "true"));
         }
       }
     }
@@ -209,7 +209,7 @@ void parse_script(Script& src, TSNode& ts_root, Issues& issues)
     if (ts_node_is_error(node))
     {
       create_issue_syntax_error(issues, node);
-      return std::make_unique<Error>();
+      return std::make_unique<SyntaxError>();
     }
 
     const std::string_view type = ts_node_type(node) ;
@@ -362,27 +362,11 @@ std::expected<Script, CpyError> Parser::parse(const fs::path src_file)
   return script;
 }
 
-
 Script Parser::parse(const std::string_view src)
 {
   Script script { .src = std::string(src.data(), src.size()) };
+
   parse(script);
-
-  // m_parser = ts_parser_new();
-
-  // ts_parser_set_language(m_parser, tree_sitter_cpy());
-
-  // m_tree = ts_parser_parse_string(m_parser, nullptr, script.src.data(), script.src.length());
-
-  // TSNode root = ts_tree_root_node(m_tree);
-
-  // if (const std::string_view root_type = ts_node_type(root) ; root_type != "source_file") {
-  //   throw std::runtime_error{"Root is not a source_file"};
-  // }
-
-  // parse_script(script, root, script.issues);
-
-  // semantic_checks(script, *script.ast, script.issues);
 
   return script;
 }

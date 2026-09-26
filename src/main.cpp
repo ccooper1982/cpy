@@ -19,6 +19,7 @@ int main ([[maybe_unused]] int argc, [[maybe_unused]] char ** argv)
 
   if (script)
   {
+    script->ast->dump(std::cout);
     script->issues.dump(std::cout, script->src);
     return script->issues.have_errors() ? 1 : 0;
   }
