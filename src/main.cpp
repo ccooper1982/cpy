@@ -1,5 +1,6 @@
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
+#include <cpy/modules.hpp>
 
 int main ([[maybe_unused]] int argc, [[maybe_unused]] char ** argv)
 {
@@ -13,6 +14,8 @@ int main ([[maybe_unused]] int argc, [[maybe_unused]] char ** argv)
   if (argc == 2) {
     file = argv[1];
   }
+
+  Modules::initialise();
 
   Parser parser;
   const auto script = parser.parse(file.empty() ? src : file);

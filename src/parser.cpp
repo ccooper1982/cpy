@@ -1,5 +1,7 @@
 #include "cpy/ast/ast_node.hpp"
+#include "tree_sitter/api.h"
 #include <cpy/parser.hpp>
+#include <cpy/modules.hpp>
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
@@ -122,15 +124,23 @@ std::unique_ptr<FunctionCall> parse_function_call(const Script& src, const TSNod
 {
   const auto name_node = ts_node_child_by_field_name(func_call, "name", 4);
   const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
-  const auto byte_start = ts_node_start_byte(func_call);
-  const auto byte_end = ts_node_end_byte(func_call);
 
   const auto func_name = from_source(src, name_node);
 
   auto args = parse_function_args(src, args_node);
 
   auto func_call_node = std::make_unique<FunctionCall>(func_name, std::move(args));
-  set_source_region(*func_call_node, byte_start, byte_end);
+  set_source_region(*func_call_node, ts_node_start_byte(func_call), ts_node_end_byte(func_call));
+
+  if (func_name.contains("::"))
+  {
+    // TODO move to semantic checks
+    func_call_node->module = func_name.substr(0, func_name.find_first_of(':'));
+
+    if (!Modules::exist(func_call_node->module)){
+      create_issue(issues, *func_call_node, std::format("Module does not exist: {}", func_call_node->module));
+    }
+  }
 
   return func_call_node;
 }

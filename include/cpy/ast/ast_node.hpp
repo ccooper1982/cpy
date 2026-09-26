@@ -109,6 +109,9 @@ inline bool operator==(const VarType& a, const VarType& b)
   return a.value() == b.value();
 }
 
+
+// AST nodes //
+
 struct AstNode
 {
   AstNode(const NodeType t) : type(t)
@@ -125,9 +128,6 @@ struct AstNode
 private:
   NodeType type;
 };
-
-
-// AST nodes
 
 
 // Expressions
@@ -277,6 +277,7 @@ inline bool operator==(const FunctionParam& a, const FunctionParam& b)
 
 struct FunctionCall : public AstNode
 {
+  std::string_view module;
   std::string_view name;
   std::vector<std::unique_ptr<Expression>> args;
 
@@ -287,8 +288,19 @@ struct FunctionCall : public AstNode
   {
   }
 
+  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args, const std::string_view module)
+    : AstNode(NodeType::FunctionCall)
+    , module(module)
+    , name(name)
+    , args(std::move(args))
+  {
+  }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
+    if (!module.empty()) {
+      os << module << "::";
+    }
     os << name << '(';
     for (std::size_t i = 0; i < args.size() ; ++i)
     {
