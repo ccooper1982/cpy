@@ -1,4 +1,5 @@
 #include "cpy/ast/ast_node.hpp"
+#include "cpy/issues.hpp"
 #include "tree_sitter/api.h"
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
@@ -12,6 +13,21 @@
 #include <utility>
 #include <vector>
 
+static BinaryOperator get_binary_operator(const std::string_view op)
+{
+  if (op == "+")  return BinaryOperator::Add;
+  if (op == "-")  return BinaryOperator::Subtract;
+  if (op == "*")  return BinaryOperator::Multiply;
+  if (op == "/")  return BinaryOperator::Divide;
+  if (op == "==") return BinaryOperator::Equal;
+  if (op == "!=") return BinaryOperator::NotEqual;
+  if (op == "<")  return BinaryOperator::Less;
+  if (op == ">")  return BinaryOperator::Greater;
+  if (op == "<=") return BinaryOperator::LessEqual;
+  if (op == ">=") return BinaryOperator::GreaterEqual;
+
+  std::unreachable();
+}
 
 std::string_view from_source (const Script& script, const TSNode& node)
 {
@@ -83,41 +99,62 @@ void set_source_region (AstNode& ast_node, const uint32_t from, const uint32_t t
   ast_node.source = SourceRegion{from, to};
 }
 
-std::vector<std::unique_ptr<Expression>> parse_function_args(const Script& src, const TSNode& args_node)
+std::unique_ptr<Expression> parse_expression(const Script& script, const TSNode& expr_node)
+{
+  std::unique_ptr<Expression> expr;
+
+  const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0));
+
+  if (!expr_type.empty())
+  {
+    const std::string_view value = from_source(script, ts_node_named_child(expr_node, 0));
+
+    if (expr_type == "integer")
+    {
+      int64_t i{};
+      std::from_chars(value.data(), value.data()+value.size(), i);
+      expr = std::make_unique<IntegerLiteral>(i);
+    }
+    else if (expr_type == "literal_string") {
+      expr = std::make_unique<StringLiteral>(value);
+    }
+    else if (expr_type == "decimal")
+    {
+      double d{};
+      std::from_chars(value.data(), value.data()+value.size(), d);
+      expr = std::make_unique<DecimalLiteral>(d);
+    }
+    else if (expr_type == "boolean") {
+      expr = std::make_unique<BooleanLiteral>(value == "true");
+    }
+    else if (expr_type == "binary_expression")
+    {
+      const auto bin_expr_node = ts_node_named_child(expr_node, 0);
+      const auto lhs_node = ts_node_child_by_field_name(bin_expr_node, "lhs", 3);
+      const auto op_node = ts_node_child_by_field_name(bin_expr_node, "op", 2);
+      const auto rhs_node = ts_node_child_by_field_name(bin_expr_node, "rhs", 3);
+
+      const auto op = get_binary_operator(from_source(script, op_node));
+      expr = std::make_unique<BinaryExpression>(
+        parse_expression(script, lhs_node),
+        parse_expression(script, rhs_node),
+        op);
+    }
+  }
+  return expr;
+}
+
+std::vector<std::unique_ptr<Expression>> parse_function_call_args(const Script& script, const TSNode& args_node)
 {
   std::vector<std::unique_ptr<Expression>> args;
-  if (!ts_node_is_null(args_node)) {
+  if (!ts_node_is_null(args_node))
+  {
     const auto n_args = ts_node_named_child_count(args_node);
 
     for (uint32_t arg = 0 ; arg < n_args ; ++arg)
     {
       const auto expr_node = ts_node_named_child(args_node, arg);
-      const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0));
-      if (!expr_type.empty())
-      {
-        const std::string_view value = from_source(src, ts_node_named_child(expr_node, 0));
-
-        if (expr_type == "integer")
-        {
-          int64_t i{};
-          std::from_chars(value.data(), value.data()+value.size(), i);
-          args.emplace_back(std::make_unique<IntegerLiteral>(i));
-        }
-        else if (expr_type == "literal_string")
-        {
-          args.emplace_back(std::make_unique<StringLiteral>(value));
-        }
-        else if (expr_type == "decimal")
-        {
-          double d{};
-          std::from_chars(value.data(), value.data()+value.size(), d);
-          args.emplace_back(std::make_unique<DecimalLiteral>(d));
-        }
-        else if (expr_type == "boolean")
-        {
-          args.emplace_back(std::make_unique<BooleanLiteral>(value == "true"));
-        }
-      }
+      args.push_back(parse_expression(script, expr_node));
     }
   }
   return args;
@@ -130,13 +167,12 @@ std::unique_ptr<FunctionCall> parse_function_call(const Script& src, const TSNod
 
   const auto func_name = from_source(src, name_node);
 
-  auto args = parse_function_args(src, args_node);
+  auto args = parse_function_call_args(src, args_node);
 
   auto func_call_node = std::make_unique<FunctionCall>(func_name, std::move(args));
   set_source_region(*func_call_node, ts_node_start_byte(func_call), ts_node_end_byte(func_call));
 
-  if (func_name.contains("::"))
-  {
+  if (func_name.contains("::")) {
     func_call_node->module = func_name.substr(0, func_name.find("::"));
   }
 
@@ -225,7 +261,8 @@ void parse_script(Script& script, TSNode& ts_root, Issues& issues)
     if (type == "function_def") {
       return parse_function(script, node, issues);
     }
-    else if (type == "statement") {
+    else if (type == "statement")
+    {
       const auto statement_count = ts_node_named_child_count(node);
 
       for (uint32_t s = 0; s < statement_count; ++s)
@@ -357,27 +394,27 @@ void Parser::parse(Script& script)
   semantic_checks(script, *script.ast, script.issues);
 }
 
-std::expected<Script, CpyError> Parser::parse(const fs::path src_file)
+bool Parser::parse(const fs::path src_file)
 {
-  Script script {.file = src_file, .issues = {src_file}};
+  m_script.file = src_file;
+  m_script.issues = Issues{src_file};
 
   std::ifstream stream(src_file);
   if (!stream) {
-    return make_error<Script>("Failed to open file");
+    return false;
   }
 
-  script.src = {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
+  m_script.src = {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
 
-  parse(script);
-
-  return script;
+  parse(m_script);
+  return true;
 }
 
-Script Parser::parse(const std::string_view src)
+void Parser::parse(const std::string_view src)
 {
-  Script script { .src = std::string(src.data(), src.size()) };
+  m_script.file.clear();
+  m_script.src = std::string{src};
+  m_script.issues = Issues{};
 
-  parse(script);
-
-  return script;
+  parse(m_script);
 }

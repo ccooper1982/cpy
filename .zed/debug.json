@@ -13,17 +13,30 @@
     "program": "$ZED_WORKTREE_ROOT/build/cpy",
     "request": "launch",
     "adapter": "CodeLLDB"
+  },
+  {
+    "label": "cpy with file",
+    "build": {
+      "command": "meson",
+      "args": ["compile", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT"
     },
-    {
-      "label": "Test",
-      "build": {
-        "command": "meson",
-        "args": ["test", "-C", "build"],
-        "cwd": "$ZED_WORKTREE_ROOT"
-      },
-      "program": "$ZED_WORKTREE_ROOT/build/cpy_tests",
-      "args": ["--gtest_filter=Parser.File"],
-      "request": "launch",
-      "adapter": "CodeLLDB"
-    }
+    "program": "$ZED_WORKTREE_ROOT/build/cpy",
+    "args": ["example.cpy"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
+
+  {
+    "label": "Test",
+    "build": {
+      "command": "meson",
+      "args": ["test", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/cpy_tests",
+    "args": ["--gtest_filter=Parser.File"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  }
 ]

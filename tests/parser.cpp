@@ -13,26 +13,22 @@ static const auto TestDataDir = fs::path{"tests/src"};
 TEST(Parser, String)
 {
   Parser parser;
-  Script script;
 
-  ASSERT_NO_THROW(script = parser.parse(std::string_view{"hello();"}));
-  ASSERT_FALSE(script.ast->nodes.empty());
+  ASSERT_NO_THROW(parser.parse(std::string_view{"hello();"}));
+  ASSERT_FALSE(parser.ast()->nodes.empty());
 }
 
 TEST(Parser, File)
 {
   {
     Parser parser;
-    const auto parsed = parser.parse(TestDataDir / "simple.cpy");
 
-    ASSERT_TRUE(parsed.has_value());
-    ASSERT_FALSE(parsed->ast->nodes.empty());
+    ASSERT_TRUE(parser.parse(TestDataDir / "simple.cpy"));
+    ASSERT_FALSE(parser.ast()->nodes.empty());
   }
 
   {
     Parser parser;
-    const auto parsed = parser.parse(TestDataDir / "dont_exist.cpy");
-
-    ASSERT_FALSE(parsed.has_value());
+    ASSERT_FALSE(parser.parse(TestDataDir / "dont_exist.cpy"));
   }
 }

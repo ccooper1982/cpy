@@ -131,13 +131,32 @@ private:
 
 
 // Expressions
+
+enum class BinaryOperator
+{
+  Add,
+  Subtract,
+  Multiply,
+  Divide,
+  Equal,
+  NotEqual,
+  Less,
+  Greater,
+  LessEqual,
+  GreaterEqual,
+};
+
 enum class ExpressionType
 {
   Int,
   String,
   Dec,
-  Bool
+  Bool,
+  Binary
 };
+
+std::string_view to_string(const BinaryOperator op);
+
 
 struct Expression : public AstNode
 {
@@ -200,6 +219,30 @@ struct BooleanLiteral : public Expression
 
   bool v;
 };
+
+struct BinaryExpression : public Expression
+{
+  explicit BinaryExpression() : Expression(ExpressionType::Binary) {}
+
+  explicit BinaryExpression(std::unique_ptr<Expression>&& lhs, std::unique_ptr<Expression>&& rhs, const BinaryOperator op)
+  : Expression(ExpressionType::Binary)
+  , lhs(std::move(lhs))
+  , op(op)
+  , rhs(std::move(rhs))
+  {}
+
+  std::unique_ptr<Expression> lhs;
+  BinaryOperator op;
+  std::unique_ptr<Expression> rhs;
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    lhs->dump(os, tab);
+    os << ' ' << to_string(op) << ' ';
+    rhs->dump(os, tab);
+  }
+};
+
 
 struct SyntaxError : public AstNode
 {
@@ -396,7 +439,7 @@ inline bool param_arg_valid(const FunctionParam& def_param, const std::unique_pt
         throw std::runtime_error("Function has unsupported BuiltInType parameter");
         break;
     }
-    return false; // appease clang
+    std::unreachable();
   }
 }
 
@@ -406,8 +449,29 @@ inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
     return false;
   }
 
-  return std::ranges::equal(def.params, call.args, [](const auto& param, const auto& arg) {
+  return rg::equal(def.params, call.args, [](const auto& param, const auto& arg) {
       return param_arg_valid(param, arg);
     }
   );
+}
+
+
+// to_string
+inline std::string_view to_string(const BinaryOperator op)
+{
+  switch (op)
+  {
+    case BinaryOperator::Add:         return "+";
+    case BinaryOperator::Subtract:    return "-";
+    case BinaryOperator::Multiply:    return "*";
+    case BinaryOperator::Divide:      return "/";
+    case BinaryOperator::Equal:       return "==";
+    case BinaryOperator::NotEqual:    return "!=";
+    case BinaryOperator::Less:        return "<";
+    case BinaryOperator::Greater:     return ">";
+    case BinaryOperator::LessEqual:   return "<=";
+    case BinaryOperator::GreaterEqual: return ">=";
+  }
+
+  std::unreachable();
 }

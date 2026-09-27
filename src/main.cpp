@@ -2,12 +2,10 @@
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
 
-int main ([[maybe_unused]] int argc, [[maybe_unused]] char ** argv)
+int main (int argc, char ** argv)
 {
   const std::string_view src = R"(
-    fn hello(a: int, b: str, c: dec, d: bool) {}
-
-    hello(1, "one", 1.1, true);
+    hello(1-2);
   )";
 
   fs::path file;
@@ -18,18 +16,21 @@ int main ([[maybe_unused]] int argc, [[maybe_unused]] char ** argv)
   Modules::initialise();
 
   Parser parser;
-  const auto script = parser.parse(file.empty() ? src : file);
 
-  if (script)
+  if (!file.empty())
   {
-    script->ast->dump(std::cout);
-    script->issues.dump(std::cout, script->src);
-    return script->issues.have_errors() ? 1 : 0;
+    if (!parser.parse(file))
+    {
+      std::cout << "Failed to open " << file.string() << '\n';
+      return 1;
+    }
   }
-  else
-  {
-    std::cout << script.error().msg() << "\n";
+  else {
+    parser.parse(src);
   }
 
-  return 1;
+  parser.ast()->dump(std::cout);
+  parser.issues().dump(std::cout, parser.src());
+
+  return parser.issues().have_errors() ? 1 : 0;
 }

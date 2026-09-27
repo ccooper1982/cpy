@@ -4,14 +4,12 @@ project(
   version: '0.1.0',
   default_options: [
     'cpp_std=c++23',
-    'warning_level=3',
+    'warning_level=3'
   ],
 )
 
 add_project_arguments(
-  '-Wall',
-  '-Wextra',
-  '-Wreturn-local-addr',
+  '-Werror=return-local-addr',
   language: 'cpp',
 )
 

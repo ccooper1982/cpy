@@ -1,5 +1,4 @@
 #pragma once
-#include <expected>
 #include <string_view>
 
 #include <tree_sitter/api.h>
@@ -17,13 +16,19 @@ struct Script
   Issues issues{};
 };
 
+
 class Parser
 {
 public:
+  Parser() = default;
   ~Parser();
 
-  Script parse(const std::string_view src);
-  std::expected<Script, CpyError> parse(const fs::path src_file);
+  void parse(const std::string_view src);
+  bool parse(const fs::path src_file);
+
+  const std::unique_ptr<SourceFile>& ast() const { return m_script.ast; }
+  const Issues& issues() const { return m_script.issues; }
+  const std::string& src() const { return m_script.src; }
 
 private:
   void parse(Script& script);
@@ -31,4 +36,5 @@ private:
 private:
   TSParser * m_parser{};
   TSTree * m_tree{};
+  Script m_script;
 };
