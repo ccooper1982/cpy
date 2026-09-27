@@ -12,19 +12,7 @@ TEST(Ast, ZeroNodes)
   ASSERT_EQ(parser.ast()->nodes.size(), 0);
 }
 
-TEST(Ast, FuncCall_NotExist)
-{
-  const std::string_view src = R"(
-    hello();
-  )";
-
-  Parser parser;
-  parser.parse(src);
-
-  ASSERT_EQ(parser.ast()->nodes.size(), 1);
-  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionCall);
-  ASSERT_EQ(dynamic_cast<FunctionCall&>(*parser.ast()->nodes[0]).name, "hello");
-}
+// Function Definition //
 
 TEST(Ast, FuncDef_NoArgs)
 {
@@ -112,6 +100,21 @@ TEST(Ast, FuncDef_1Arg_InvalidType)
 
   const FunctionParam& p1 = def.params[0];
   ASSERT_FALSE(p1.valid);
+}
+
+// Function Call //
+TEST(Ast, FuncCall_NotExist)
+{
+  const std::string_view src = R"(
+    hello();
+  )";
+
+  Parser parser;
+  parser.parse(src);
+
+  ASSERT_EQ(parser.ast()->nodes.size(), 1);
+  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(dynamic_cast<FunctionCall&>(*parser.ast()->nodes[0]).name, "hello");
 }
 
 TEST(Ast, FuncCall_NoArgs)
@@ -241,6 +244,42 @@ TEST(Ast, FuncCall_Module)
   ASSERT_EQ(call_module.module, "foo");
 }
 
+TEST(Ast, Expr_Binary)
+{
+  // expressions can only appear in function call args for now.
+  // expand when var declaration and assignment is implemented
+  const std::string_view src = R"(
+    fn foo(a: int) {}
+    foo(1+2);
+  )";
+
+  Parser parser;
+  parser.parse(src);
+
+  ASSERT_EQ(parser.ast()->nodes.size(), 2);
+  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
+
+  const auto& call = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
+  ASSERT_EQ(call.args.size(), 1);
+  ASSERT_EQ(call.args[0]->node_type(), NodeType::Expression);
+  ASSERT_TRUE(call.args[0]->is_expr_type(ExpressionType::Binary));
+
+  const auto& bin_expr = dynamic_cast<BinaryExpression&>(*call.args[0]);
+  ASSERT_NE(bin_expr.lhs, nullptr);
+  ASSERT_NE(bin_expr.rhs, nullptr);
+  ASSERT_EQ(bin_expr.op, BinaryOperator::Add);
+
+  ASSERT_TRUE(bin_expr.lhs->is_expr_type(ExpressionType::Int));
+  ASSERT_TRUE(bin_expr.rhs->is_expr_type(ExpressionType::Int));
+
+  const auto& lhs_expr = get_expression<IntegerLiteral>(bin_expr.lhs);
+  const auto& rhs_expr = get_expression<IntegerLiteral>(bin_expr.rhs);
+  ASSERT_EQ(lhs_expr.v, 1);
+  ASSERT_EQ(rhs_expr.v, 2);
+}
+
+// Syntax Errors //
 TEST(Ast, SyntaxError)
 {
   {

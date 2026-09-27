@@ -160,14 +160,14 @@ std::vector<std::unique_ptr<Expression>> parse_function_call_args(const Script& 
   return args;
 }
 
-std::unique_ptr<FunctionCall> parse_function_call(const Script& src, const TSNode& func_call, Issues& issues)
+std::unique_ptr<FunctionCall> parse_function_call(const Script& script, const TSNode& func_call, Issues& issues)
 {
   const auto name_node = ts_node_child_by_field_name(func_call, "name", 4);
   const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
 
-  const auto func_name = from_source(src, name_node);
+  const auto func_name = from_source(script, name_node);
 
-  auto args = parse_function_call_args(src, args_node);
+  auto args = parse_function_call_args(script, args_node);
 
   auto func_call_node = std::make_unique<FunctionCall>(func_name, std::move(args));
   set_source_region(*func_call_node, ts_node_start_byte(func_call), ts_node_end_byte(func_call));
@@ -179,20 +179,20 @@ std::unique_ptr<FunctionCall> parse_function_call(const Script& src, const TSNod
   return func_call_node;
 }
 
-std::unique_ptr<FunctionDef> parse_function(const Script& src, const TSNode& ts_node, Issues& issues)
+std::unique_ptr<FunctionDef> parse_function_def(const Script& script, const TSNode& ts_node, Issues& issues)
 {
   auto ast_node = std::make_unique<FunctionDef>();
   set_source_region(ts_node, *ast_node);
 
   // name
   TSNode name_node = ts_node_child_by_field_name(ts_node, "name", 4);
-  ast_node->name = from_source(src, name_node);
+  ast_node->name = from_source(script, name_node);
 
   // return type
   TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
   if (!ts_node_is_null(return_type)) {
     auto type_node = ts_node_child_by_field_name(return_type, "type", 4);
-    if (const auto type = create_type(src, type_node, issues); type)
+    if (const auto type = create_type(script, type_node, issues); type)
       ast_node->return_type = *type;
   }
 
@@ -212,11 +212,11 @@ std::unique_ptr<FunctionDef> parse_function(const Script& src, const TSNode& ts_
         TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
 
         FunctionParam param;
-        if (const auto type = create_type(src, param_type_node, issues) ; type) {
-          param = ast_node->params.emplace_back(*type, from_source(src, param_name_node));
+        if (const auto type = create_type(script, param_type_node, issues) ; type) {
+          param = ast_node->params.emplace_back(*type, from_source(script, param_name_node));
         }
         else {
-          param = ast_node->params.emplace_back(from_source(src, param_name_node));
+          param = ast_node->params.emplace_back(from_source(script, param_name_node));
         }
 
         set_source_region(param_name_node, param);
@@ -237,7 +237,7 @@ std::unique_ptr<FunctionDef> parse_function(const Script& src, const TSNode& ts_
 
       if (!ts_node_is_null(func_call))
       {
-        ast_node->body.nodes.push_back(parse_function_call(src, func_call, issues));
+        ast_node->body.nodes.push_back(parse_function_call(script, func_call, issues));
       }
     }
   }
@@ -259,7 +259,7 @@ void parse_script(Script& script, TSNode& ts_root, Issues& issues)
     const std::string_view type = ts_node_type(node) ;
 
     if (type == "function_def") {
-      return parse_function(script, node, issues);
+      return parse_function_def(script, node, issues);
     }
     else if (type == "statement")
     {

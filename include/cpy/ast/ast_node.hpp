@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concepts>
 #include <cstdint>
 #include <ios>
 #include <iostream>
@@ -162,19 +163,25 @@ struct Expression : public AstNode
 {
   Expression(const ExpressionType t)
     : AstNode(NodeType::Expression)
-    , expr_type(t)
+    , ex_type(t)
   {}
 
   virtual ~Expression() = default;
 
-  virtual bool is_expr_type(const ExpressionType t) const { return t == expr_type; };
+  virtual bool is_expr_type(const ExpressionType t) const { return t == expr_type(); };
 
-  ExpressionType expr_type;
+  ExpressionType expr_type() const { return ex_type; }
+
+private:
+  ExpressionType ex_type;
 };
 
 struct IntegerLiteral : public Expression
 {
-  explicit IntegerLiteral(const int64_t val) : Expression(ExpressionType::Int), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Int;
+
+  explicit IntegerLiteral(const int64_t val) : Expression(ExprType), v(val)
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -186,7 +193,10 @@ struct IntegerLiteral : public Expression
 
 struct StringLiteral : public Expression
 {
-  explicit StringLiteral(const std::string_view val) : Expression(ExpressionType::String), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::String;
+
+  explicit StringLiteral(const std::string_view val) : Expression(ExprType), v(val)
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -198,7 +208,10 @@ struct StringLiteral : public Expression
 
 struct DecimalLiteral : public Expression
 {
-  explicit DecimalLiteral(const double val) : Expression(ExpressionType::Dec), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Dec;
+
+  explicit DecimalLiteral(const double val) : Expression(ExprType), v(val)
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -210,7 +223,10 @@ struct DecimalLiteral : public Expression
 
 struct BooleanLiteral : public Expression
 {
-  explicit BooleanLiteral(const bool val) : Expression(ExpressionType::Bool), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Bool;
+
+  explicit BooleanLiteral(const bool val) : Expression(ExprType), v(val)
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -222,10 +238,13 @@ struct BooleanLiteral : public Expression
 
 struct BinaryExpression : public Expression
 {
-  explicit BinaryExpression() : Expression(ExpressionType::Binary) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Binary;
+
+  explicit BinaryExpression() : Expression(ExprType)
+  {}
 
   explicit BinaryExpression(std::unique_ptr<Expression>&& lhs, std::unique_ptr<Expression>&& rhs, const BinaryOperator op)
-  : Expression(ExpressionType::Binary)
+  : Expression(ExprType)
   , lhs(std::move(lhs))
   , op(op)
   , rhs(std::move(rhs))
@@ -242,6 +261,16 @@ struct BinaryExpression : public Expression
     rhs->dump(os, tab);
   }
 };
+
+
+template<typename ExprT> requires (std::derived_from<ExprT, Expression>)
+const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
+{
+  if (!expr->is_expr_type(ExprT::ExprType)) {
+    throw std::runtime_error{"get_expression() called with expr and ExprT mismatch"};
+  }
+  return dynamic_cast<ExprT&>(*expr);
+}
 
 
 struct SyntaxError : public AstNode
@@ -413,34 +442,33 @@ struct SourceFile : public AstNode
 // useful
 inline bool param_arg_valid(const FunctionParam& def_param, const std::unique_ptr<Expression>& call_arg)
 {
-  if (const auto param_type = def_param.type.value_as<BuiltInType>() ; !param_type)
+  const auto param_type = def_param.type.value_as<BuiltInType>();
+  if (!param_type)
     throw std::runtime_error("Function has unsupported UserType parameter");
-  else
+
+  switch (*param_type)
   {
-    switch (*param_type)
-    {
-      using enum BuiltInType;
-      case Int:
-        return call_arg->is_expr_type(ExpressionType::Int);
+    using enum BuiltInType;
+    case Int:
+      return call_arg->is_expr_type(ExpressionType::Int);
 
-      case String:
-        return call_arg->is_expr_type(ExpressionType::String);
+    case String:
+      return call_arg->is_expr_type(ExpressionType::String);
 
-      case Decimal:
-        return call_arg->is_expr_type(ExpressionType::Dec);
+    case Decimal:
+      return call_arg->is_expr_type(ExpressionType::Dec);
 
-      case Bool:
-        return call_arg->is_expr_type(ExpressionType::Bool);
+    case Bool:
+      return call_arg->is_expr_type(ExpressionType::Bool);
 
-      case Unknown:
-        return false;
+    case Unknown:
+      return false;
 
-      default:
-        throw std::runtime_error("Function has unsupported BuiltInType parameter");
-        break;
-    }
-    std::unreachable();
+    default:
+      throw std::runtime_error("Function has unsupported BuiltInType parameter");
+      break;
   }
+  std::unreachable();
 }
 
 inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
