@@ -8,27 +8,35 @@
 
 #include <cpy/common.hpp>
 
-
+enum class ErrorCode
+{
+  ModuleNotExist,
+  FunctionNotExist,
+  UnknownType,
+  SyntaxError
+};
 
 struct Issue
 {
-  Issue(const std::string_view m) : msg(m)
+  Issue(const std::string_view m, const ErrorCode ec) : msg(m), code(ec)
   {
   }
 
-  Issue(const std::string_view m, const std::optional<SourceRegion>& src)
+  Issue(const std::string_view m, const std::optional<SourceRegion>& src, const ErrorCode ec)
     : msg(m)
     , src(src)
+    , code(ec)
   {
   }
 
-  Issue(const std::string_view m, const uint32_t from, const uint32_t to)
-    : Issue(m, SourceRegion{from,to})
+  Issue(const std::string_view m, const uint32_t from, const uint32_t to, const ErrorCode ec)
+    : Issue(m, SourceRegion{from,to}, ec)
   {
   }
 
   std::string msg;
   std::optional<SourceRegion> src;
+  ErrorCode code;
 };
 
 class Issues
@@ -40,19 +48,19 @@ public:
   Issues() = default;
   Issues (const fs::path src) : src_path(src) {}
 
-  void add_error(const std::string_view msg)
+  void add_error(const std::string_view msg, const ErrorCode ec)
   {
-    m_errors.emplace_back(msg);
+    m_errors.emplace_back(msg, ec);
   }
 
-  void add_error(const std::string_view msg, const SourceRegion& sr)
+  void add_error(const std::string_view msg, const SourceRegion& sr, const ErrorCode ec)
   {
-    m_errors.emplace_back(msg, sr);
+    m_errors.emplace_back(msg, sr, ec);
   }
 
-  void add_error(const std::string_view msg, const uint32_t from, const uint32_t to)
+  void add_error(const std::string_view msg, const uint32_t from, const uint32_t to, const ErrorCode ec)
   {
-    m_errors.emplace_back(msg, from, to);
+    m_errors.emplace_back(msg, from, to, ec);
   }
 
   bool have_errors() const { return !m_errors.empty(); }

@@ -4,14 +4,39 @@
 // see: https://zed.dev/docs/debugger
 [
   {
-      "label": "Debug ",
-      "build": {
-        "command": "meson",
-        "args": ["compile", "-C", "build"],
-        "cwd": "$ZED_WORKTREE_ROOT"
-      },
-      "program": "$ZED_WORKTREE_ROOT/build/cpy",
-      "request": "launch",
-      "adapter": "CodeLLDB"
-    }
+    "label": "cpy",
+    "build": {
+      "command": "meson",
+      "args": ["compile", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/cpy",
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
+  {
+    "label": "cpy with file",
+    "build": {
+      "command": "meson",
+      "args": ["compile", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/cpy",
+    "args": ["example.cpy"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
+
+  {
+    "label": "Test",
+    "build": {
+      "command": "meson",
+      "args": ["test", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/cpy_tests",
+    "args": ["--gtest_filter=Parser.File"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  }
 ]

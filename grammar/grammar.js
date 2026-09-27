@@ -19,8 +19,7 @@ export default grammar({
       ),
 
     parameters: ($) => seq($.parameter, repeat(seq(",", $.parameter))),
-    parameter: ($) =>
-      seq(field("name", $.identifier), ":", field("type", $.type)),
+    parameter: ($) => seq(field("name", $.identifier), ":", field("type", $.type)),
     return_type: ($) => seq("->", field("type", $.type)),
     type: ($) => $.identifier,
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
@@ -36,12 +35,8 @@ export default grammar({
     ),
 
     statement: ($) =>
-      seq(
-        choice(
-          field("func_call", $.function_call),
-        ),
-        ";",
-      ),
+      seq(choice(field("func_call", $.function_call)),
+      ";"),
 
     function_call: ($) => seq(
       field("name", $.qualified_name),
@@ -67,6 +62,15 @@ export default grammar({
       $.boolean,
       $.function_call,
       $.identifier,
-    )
+      $.binary_expression
+    ),
+
+    // TODO operator precedence with prec(1,...), prec(2,...)
+    binary_expression: ($) =>
+      prec.left(seq(
+        field("lhs", $.expression),
+        field("op", choice("+", "-", "*", "/", "!=", "==", ">=", "<=", ">", "<")),
+        field("rhs", $.expression),
+      ))
   },
 });
