@@ -1,8 +1,7 @@
 #pragma once
 
-#include <concepts>
+#include <algorithm>
 #include <cstdint>
-#include <ios>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -10,7 +9,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <variant>
 #include <vector>
 
@@ -86,7 +84,6 @@ inline bool operator==(const VarType& a, const VarType& b)
   return a.value() == b.value();
 }
 
-
 // AST nodes //
 
 struct AstNode
@@ -106,9 +103,7 @@ private:
   NodeType type;
 };
 
-
-// Expressions
-
+// Expressions //
 enum class BinaryOperator
 {
   Add,
@@ -129,13 +124,14 @@ enum class ExpressionType
   String,
   Dec,
   Bool,
-  Binary
+  Binary,
+  FuncCall
 };
 
 
-inline std::string_view to_string(const BinaryOperator op);
 inline std::string_view to_string(const BuiltInType t);
 inline std::string_view to_string(const VarType& t);
+inline std::string_view to_string(const BinaryOperator op);
 
 
 struct Expression : public AstNode
@@ -236,6 +232,7 @@ struct BooleanLiteral : public Expression
   bool v;
 };
 
+
 struct BinaryExpression : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::Binary;
@@ -297,26 +294,20 @@ struct FunctionParam : public AstNode
   bool valid{true};
 
   FunctionParam() : FunctionParam("")
-  {
-
-  }
+  {}
 
   FunctionParam (const std::string_view name) : FunctionParam(BuiltInType::Unknown, name, false)
-  {
-
-  }
+  {}
 
   FunctionParam(const VarType type) : FunctionParam(type, "")
-  {
-  }
+  {}
 
   FunctionParam(const VarType type, std::string_view name, const bool valid = true)
     : AstNode(NodeType::FunctionParam)
     , type(type)
     , name(name)
     , valid(valid)
-  {
-  }
+  {}
 
 public:
 
@@ -353,26 +344,24 @@ inline bool operator==(const FunctionParam& a, const FunctionParam& b)
 }
 
 
-struct FunctionCall : public AstNode
+struct FunctionCall : public Expression
 {
   std::string_view module;
   std::string_view name;
   std::vector<std::unique_ptr<Expression>> args;
 
   FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
-    : AstNode(NodeType::FunctionCall),
+    : Expression(ExpressionType::FuncCall),
       name(name)
     , args(std::move(args))
-  {
-  }
+  {}
 
   FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args, const std::string_view module)
-    : AstNode(NodeType::FunctionCall)
+    : Expression(ExpressionType::FuncCall)
     , module(module)
     , name(name)
     , args(std::move(args))
-  {
-  }
+  {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -386,7 +375,7 @@ struct FunctionCall : public AstNode
       if (i+1 < args.size())
         os << ',';
     }
-    os << ')' << '\n';
+    os << ')';
   }
 };
 
@@ -441,7 +430,10 @@ struct SourceFile : public AstNode
     os << (src_path.empty() ? "" : src_path.string()) << '\n';
 
     for (const auto& n : nodes)
-      n->dump(os);
+    {
+      n->dump(os) ;
+      os << '\n';
+    }
   }
 };
 
@@ -491,26 +483,7 @@ inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
 
 
 // to_string
-inline std::string_view to_string(const BinaryOperator op)
-{
-  switch (op)
-  {
-    case BinaryOperator::Add:         return "+";
-    case BinaryOperator::Subtract:    return "-";
-    case BinaryOperator::Multiply:    return "*";
-    case BinaryOperator::Divide:      return "/";
-    case BinaryOperator::Equal:       return "==";
-    case BinaryOperator::NotEqual:    return "!=";
-    case BinaryOperator::Less:        return "<";
-    case BinaryOperator::Greater:     return ">";
-    case BinaryOperator::LessEqual:   return "<=";
-    case BinaryOperator::GreaterEqual: return ">=";
-  }
-
-  std::unreachable();
-}
-
-std::string_view to_string(const BuiltInType t)
+inline std::string_view to_string(const BuiltInType t)
 {
   switch (t)
   {
@@ -531,7 +504,7 @@ std::string_view to_string(const BuiltInType t)
   }
 }
 
-std::string_view to_string(const VarType& t)
+inline std::string_view to_string(const VarType& t)
 {
   if (t.is_type<BuiltInType>()) {
     return to_string(std::get<BuiltInType>(t.value()));
@@ -539,4 +512,23 @@ std::string_view to_string(const VarType& t)
   else {
      throw std::runtime_error{"UserType not implemented"};
   }
+}
+
+inline std::string_view to_string(const BinaryOperator op)
+{
+  switch (op)
+  {
+    case BinaryOperator::Add:         return "+";
+    case BinaryOperator::Subtract:    return "-";
+    case BinaryOperator::Multiply:    return "*";
+    case BinaryOperator::Divide:      return "/";
+    case BinaryOperator::Equal:       return "==";
+    case BinaryOperator::NotEqual:    return "!=";
+    case BinaryOperator::Less:        return "<";
+    case BinaryOperator::Greater:     return ">";
+    case BinaryOperator::LessEqual:   return "<=";
+    case BinaryOperator::GreaterEqual: return ">=";
+  }
+
+  std::unreachable();
 }
