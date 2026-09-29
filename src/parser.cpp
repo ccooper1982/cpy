@@ -13,6 +13,11 @@
 #include <utility>
 #include <vector>
 
+// TODO tidy. It's becoming a mess.
+
+std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call, Issues& issues);
+
+
 static BinaryOperator get_binary_operator(const std::string_view op)
 {
   if (op == "+")  return BinaryOperator::Add;
@@ -99,7 +104,7 @@ void set_source_region (AstNode& ast_node, const uint32_t from, const uint32_t t
   ast_node.source = SourceRegion{from, to};
 }
 
-std::unique_ptr<Expression> parse_expression(const Script& script, const TSNode& expr_node)
+std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_node)
 {
   std::unique_ptr<Expression> expr;
 
@@ -139,11 +144,15 @@ std::unique_ptr<Expression> parse_expression(const Script& script, const TSNode&
                                                 parse_expression(script, rhs_node),
                                                 op);
     }
+    else if (expr_type == "function_call")
+    {
+      expr = parse_function_call(script, ts_node_named_child(expr_node, 0), script.issues);
+    }
   }
   return expr;
 }
 
-std::vector<std::unique_ptr<Expression>> parse_function_call_args(const Script& script, const TSNode& args_node)
+std::vector<std::unique_ptr<Expression>> parse_function_call_args(Script& script, const TSNode& args_node)
 {
   std::vector<std::unique_ptr<Expression>> args;
   if (!ts_node_is_null(args_node))
@@ -159,7 +168,7 @@ std::vector<std::unique_ptr<Expression>> parse_function_call_args(const Script& 
   return args;
 }
 
-std::unique_ptr<FunctionCall> parse_function_call(const Script& script, const TSNode& func_call, Issues& issues)
+std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call, Issues& issues)
 {
   const auto name_node = ts_node_child_by_field_name(func_call, "name", 4);
   const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
@@ -178,7 +187,7 @@ std::unique_ptr<FunctionCall> parse_function_call(const Script& script, const TS
   return func_call_node;
 }
 
-std::unique_ptr<FunctionDef> parse_function_def(const Script& script, const TSNode& ts_node, Issues& issues)
+std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts_node, Issues& issues)
 {
   auto ast_node = std::make_unique<FunctionDef>();
   set_source_region(ts_node, *ast_node);

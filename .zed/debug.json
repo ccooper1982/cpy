@@ -3,29 +3,29 @@
 // For more documentation on how to configure debug tasks,
 // see: https://zed.dev/docs/debugger
 [
-  {
-    "label": "cpy",
-    "build": {
-      "command": "meson",
-      "args": ["compile", "-C", "build"],
-      "cwd": "$ZED_WORKTREE_ROOT"
-    },
-    "program": "$ZED_WORKTREE_ROOT/build/cpy",
-    "request": "launch",
-    "adapter": "CodeLLDB"
-  },
   // {
-  //   "label": "cpy with file",
+  //   "label": "cpy",
   //   "build": {
   //     "command": "meson",
   //     "args": ["compile", "-C", "build"],
   //     "cwd": "$ZED_WORKTREE_ROOT"
   //   },
   //   "program": "$ZED_WORKTREE_ROOT/build/cpy",
-  //   "args": ["example.cpy"],
   //   "request": "launch",
   //   "adapter": "CodeLLDB"
   // },
+  {
+    "label": "cpy file",
+    "build": {
+      "command": "meson",
+      "args": ["compile", "-C", "build"],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/build/cpy",
+    "args": ["example.cpy"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
   {
     "label": "Test",
     "build": {

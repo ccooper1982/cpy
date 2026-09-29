@@ -1,3 +1,5 @@
 fn hello(a: int) {}
-hello(1+2);
-hello(1.5+2);
+fn get_int1() -> int {}
+fn get_int2() -> int {}
+
+hello(get_int1() + get_int2());
