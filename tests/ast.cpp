@@ -12,19 +12,7 @@ TEST(Ast, ZeroNodes)
   ASSERT_EQ(parser.ast()->nodes.size(), 0);
 }
 
-TEST(Ast, FuncCall_NotExist)
-{
-  const std::string_view src = R"(
-    hello();
-  )";
-
-  Parser parser;
-  parser.parse(src);
-
-  ASSERT_EQ(parser.ast()->nodes.size(), 1);
-  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionCall);
-  ASSERT_EQ(dynamic_cast<FunctionCall&>(*parser.ast()->nodes[0]).name, "hello");
-}
+// Function Definition //
 
 TEST(Ast, FuncDef_NoArgs)
 {
@@ -112,6 +100,21 @@ TEST(Ast, FuncDef_1Arg_InvalidType)
 
   const FunctionParam& p1 = def.params[0];
   ASSERT_FALSE(p1.valid);
+}
+
+// Function Call //
+TEST(Ast, FuncCall_NotExist)
+{
+  const std::string_view src = R"(
+    hello();
+  )";
+
+  Parser parser;
+  parser.parse(src);
+
+  ASSERT_EQ(parser.ast()->nodes.size(), 1);
+  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(dynamic_cast<FunctionCall&>(*parser.ast()->nodes[0]).name, "hello");
 }
 
 TEST(Ast, FuncCall_NoArgs)
@@ -241,6 +244,60 @@ TEST(Ast, FuncCall_Module)
   ASSERT_EQ(call_module.module, "foo");
 }
 
+TEST(Ast, Expr_Binary)
+{
+  // expressions can only appear in function call args for now.
+  // expand when var declaration or assignment is implemented
+  const std::string_view src = R"(
+    fn foo(a: int) {}
+    foo(1+2);
+    foo(1+"2");
+  )";
+
+  Parser parser;
+  parser.parse(src);
+
+  ASSERT_EQ(parser.ast()->nodes.size(), 3);
+  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[2]->node_type(), NodeType::FunctionCall);
+
+  const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
+
+  const auto& call_ok = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
+  ASSERT_EQ(call_ok.args.size(), 1);
+  ASSERT_EQ(call_ok.args[0]->node_type(), NodeType::Expression);
+  ASSERT_TRUE(call_ok.args[0]->is_expr_type(ExpressionType::Binary));
+
+  const auto& bin_expr_ok = dynamic_cast<BinaryExpression&>(*call_ok.args[0]);
+  ASSERT_NE(bin_expr_ok.lhs, nullptr);
+  ASSERT_NE(bin_expr_ok.rhs, nullptr);
+  ASSERT_EQ(bin_expr_ok.op, BinaryOperator::Add);
+
+  ASSERT_TRUE(bin_expr_ok.lhs->is_expr_type(ExpressionType::Int));
+  ASSERT_TRUE(bin_expr_ok.rhs->is_expr_type(ExpressionType::Int));
+
+  const auto& lhs_expr = get_expression<IntegerLiteral>(bin_expr_ok.lhs);
+  const auto& rhs_expr = get_expression<IntegerLiteral>(bin_expr_ok.rhs);
+  ASSERT_EQ(lhs_expr.v, 1);
+  ASSERT_EQ(rhs_expr.v, 2);
+
+  // foo(1+"2") ; binary expression with Int + String
+  const auto& call_fail = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[2]);
+  const auto& bin_expr_fail = dynamic_cast<BinaryExpression&>(*call_fail.args[0]);
+
+  ASSERT_NE(bin_expr_fail.lhs, nullptr);
+  ASSERT_NE(bin_expr_fail.rhs, nullptr);
+  ASSERT_EQ(bin_expr_fail.op, BinaryOperator::Add);
+
+  ASSERT_TRUE(bin_expr_fail.lhs->is_expr_type(ExpressionType::Int));
+  ASSERT_TRUE(bin_expr_fail.rhs->is_expr_type(ExpressionType::String));
+
+  ASSERT_TRUE(func_call_valid(def, call_ok));
+  ASSERT_FALSE(func_call_valid(def, call_fail));
+}
+
+// Syntax Errors //
 TEST(Ast, SyntaxError)
 {
   {

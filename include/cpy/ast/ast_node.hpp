@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concepts>
 #include <cstdint>
 #include <ios>
 #include <iostream>
@@ -9,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -35,6 +37,7 @@ enum class BuiltInType
   Void,
   Unknown
 };
+
 
 struct UserType
 {
@@ -68,36 +71,10 @@ struct VarType
     return is_type<BuiltInType>() && *(value_as<BuiltInType>()) == t;
   }
 
-  std::string_view to_string() const
-  {
-    if (is_type<BuiltInType>())
-    {
-      switch (const auto t = std::get<BuiltInType>(type) ; t)
-      {
-        using enum BuiltInType;
-
-        case Int:
-          return "int";
-        case Decimal:
-          return "dec";
-        case Bool:
-          return "bool";
-        case String:
-          return "str";
-        case Void:
-          return "void";
-        default:
-          return "Unknown";
-      }
-    }
-    else {
-      throw std::runtime_error{"UserType not implemented"};
-    }
-  }
-
 private:
   std::variant<BuiltInType, UserType> type;
 };
+
 
 inline bool operator==([[maybe_unused]] const UserType& a, [[maybe_unused]] const UserType& b)
 {
@@ -155,26 +132,41 @@ enum class ExpressionType
   Binary
 };
 
-std::string_view to_string(const BinaryOperator op);
+
+inline std::string_view to_string(const BinaryOperator op);
+inline std::string_view to_string(const BuiltInType t);
+inline std::string_view to_string(const VarType& t);
 
 
 struct Expression : public AstNode
 {
   Expression(const ExpressionType t)
     : AstNode(NodeType::Expression)
-    , expr_type(t)
+    , ex_type(t)
   {}
 
   virtual ~Expression() = default;
 
-  virtual bool is_expr_type(const ExpressionType t) const { return t == expr_type; };
+  virtual bool is_expr_type(const ExpressionType t) const { return t == expr_type(); }
+  virtual bool is_convertible_to([[maybe_unused]] const BuiltInType t) const { return false; }
 
-  ExpressionType expr_type;
+  ExpressionType expr_type() const { return ex_type; }
+
+private:
+  ExpressionType ex_type;
 };
 
 struct IntegerLiteral : public Expression
 {
-  explicit IntegerLiteral(const int64_t val) : Expression(ExpressionType::Int), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Int;
+
+  explicit IntegerLiteral(const int64_t val) : Expression(ExprType), v(val)
+  {}
+
+  bool is_convertible_to(const BuiltInType t) const override
+  {
+    return t == BuiltInType::Int;
+  }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -186,7 +178,15 @@ struct IntegerLiteral : public Expression
 
 struct StringLiteral : public Expression
 {
-  explicit StringLiteral(const std::string_view val) : Expression(ExpressionType::String), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::String;
+
+  explicit StringLiteral(const std::string_view val) : Expression(ExprType), v(val)
+  {}
+
+  bool is_convertible_to(const BuiltInType t) const override
+  {
+    return t == BuiltInType::String;
+  }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -198,7 +198,15 @@ struct StringLiteral : public Expression
 
 struct DecimalLiteral : public Expression
 {
-  explicit DecimalLiteral(const double val) : Expression(ExpressionType::Dec), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Dec;
+
+  explicit DecimalLiteral(const double val) : Expression(ExprType), v(val)
+  {}
+
+  bool is_convertible_to(const BuiltInType t) const override
+  {
+    return t == BuiltInType::Decimal;
+  }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -210,7 +218,15 @@ struct DecimalLiteral : public Expression
 
 struct BooleanLiteral : public Expression
 {
-  explicit BooleanLiteral(const bool val) : Expression(ExpressionType::Bool), v(val) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Bool;
+
+  explicit BooleanLiteral(const bool val) : Expression(ExprType), v(val)
+  {}
+
+  bool is_convertible_to(const BuiltInType t) const override
+  {
+    return t == BuiltInType::Bool;
+  }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -222,18 +238,22 @@ struct BooleanLiteral : public Expression
 
 struct BinaryExpression : public Expression
 {
-  explicit BinaryExpression() : Expression(ExpressionType::Binary) {}
+  static constexpr ExpressionType ExprType = ExpressionType::Binary;
+
+  explicit BinaryExpression() : Expression(ExprType)
+  {}
 
   explicit BinaryExpression(std::unique_ptr<Expression>&& lhs, std::unique_ptr<Expression>&& rhs, const BinaryOperator op)
-  : Expression(ExpressionType::Binary)
+  : Expression(ExprType)
   , lhs(std::move(lhs))
   , op(op)
   , rhs(std::move(rhs))
   {}
 
-  std::unique_ptr<Expression> lhs;
-  BinaryOperator op;
-  std::unique_ptr<Expression> rhs;
+  bool is_convertible_to(const BuiltInType t) const override
+  {
+    return lhs->is_convertible_to(t) && rhs->is_convertible_to(t);
+  }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -241,7 +261,22 @@ struct BinaryExpression : public Expression
     os << ' ' << to_string(op) << ' ';
     rhs->dump(os, tab);
   }
+
+  std::unique_ptr<Expression> lhs;
+  BinaryOperator op;
+  std::unique_ptr<Expression> rhs;
+
 };
+
+
+template<typename ExprT> requires (std::derived_from<ExprT, Expression>)
+const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
+{
+  if (!expr->is_expr_type(ExprT::ExprType)) {
+    throw std::runtime_error{"get_expression() called with expr and ExprT mismatch"};
+  }
+  return dynamic_cast<ExprT&>(*expr);
+}
 
 
 struct SyntaxError : public AstNode
@@ -293,7 +328,7 @@ public:
 
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
-    os << std::string(tab*2, ' ') << name << ":" << type.to_string() << '\n';
+    os << std::string(tab*2, ' ') << name << ":" << to_string(type) << '\n';
   }
 };
 
@@ -381,9 +416,10 @@ struct FunctionDef : public AstNode
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << name << ": \n -> " << return_type.to_string() << '\n';
+    os << name << ": \n -> " << to_string(return_type) << '\n';
 
-    for(const auto& p : params) {
+    for(const auto& p : params)
+    {
       os << "  > " ;
       p.dump(os, tab);
     }
@@ -413,33 +449,31 @@ struct SourceFile : public AstNode
 // useful
 inline bool param_arg_valid(const FunctionParam& def_param, const std::unique_ptr<Expression>& call_arg)
 {
-  if (const auto param_type = def_param.type.value_as<BuiltInType>() ; !param_type)
+  const auto def_param_type = def_param.type.value_as<BuiltInType>();
+  if (!def_param_type)
     throw std::runtime_error("Function has unsupported UserType parameter");
-  else
+
+  switch (*def_param_type)
   {
-    switch (*param_type)
-    {
-      using enum BuiltInType;
-      case Int:
-        return call_arg->is_expr_type(ExpressionType::Int);
+    using enum BuiltInType;
+    case Int:
+      return call_arg->is_convertible_to(BuiltInType::Int) ;
 
-      case String:
-        return call_arg->is_expr_type(ExpressionType::String);
+    case String:
+      return call_arg->is_convertible_to(BuiltInType::String);
 
-      case Decimal:
-        return call_arg->is_expr_type(ExpressionType::Dec);
+    case Decimal:
+      return call_arg->is_convertible_to(BuiltInType::Decimal);
 
-      case Bool:
-        return call_arg->is_expr_type(ExpressionType::Bool);
+    case Bool:
+      return call_arg->is_convertible_to(BuiltInType::Bool);
 
-      case Unknown:
-        return false;
+    case Unknown:
+      return false;
 
-      default:
-        throw std::runtime_error("Function has unsupported BuiltInType parameter");
-        break;
-    }
-    std::unreachable();
+    default:
+      throw std::runtime_error("Function has unsupported BuiltInType parameter");
+      break;
   }
 }
 
@@ -474,4 +508,35 @@ inline std::string_view to_string(const BinaryOperator op)
   }
 
   std::unreachable();
+}
+
+std::string_view to_string(const BuiltInType t)
+{
+  switch (t)
+  {
+    using enum BuiltInType;
+
+    case Int:
+      return "int";
+    case Decimal:
+      return "dec";
+    case Bool:
+      return "bool";
+    case String:
+      return "str";
+    case Void:
+      return "void";
+    default:
+      return "Unknown";
+  }
+}
+
+std::string_view to_string(const VarType& t)
+{
+  if (t.is_type<BuiltInType>()) {
+    return to_string(std::get<BuiltInType>(t.value()));
+  }
+  else {
+     throw std::runtime_error{"UserType not implemented"};
+  }
 }
