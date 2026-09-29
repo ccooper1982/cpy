@@ -14,19 +14,18 @@
     "request": "launch",
     "adapter": "CodeLLDB"
   },
-  {
-    "label": "cpy with file",
-    "build": {
-      "command": "meson",
-      "args": ["compile", "-C", "build"],
-      "cwd": "$ZED_WORKTREE_ROOT"
-    },
-    "program": "$ZED_WORKTREE_ROOT/build/cpy",
-    "args": ["example.cpy"],
-    "request": "launch",
-    "adapter": "CodeLLDB"
-  },
-
+  // {
+  //   "label": "cpy with file",
+  //   "build": {
+  //     "command": "meson",
+  //     "args": ["compile", "-C", "build"],
+  //     "cwd": "$ZED_WORKTREE_ROOT"
+  //   },
+  //   "program": "$ZED_WORKTREE_ROOT/build/cpy",
+  //   "args": ["example.cpy"],
+  //   "request": "launch",
+  //   "adapter": "CodeLLDB"
+  // },
   {
     "label": "Test",
     "build": {

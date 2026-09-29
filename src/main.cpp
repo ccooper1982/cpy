@@ -5,7 +5,10 @@
 int main (int argc, char ** argv)
 {
   const std::string_view src = R"(
-    hello(1-2);
+    fn hello(a: int){}
+    hello(1+2);
+    hello(1.5+2);
+    hello(1.5+true);
   )";
 
   fs::path file;

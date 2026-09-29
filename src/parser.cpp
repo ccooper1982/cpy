@@ -135,10 +135,9 @@ std::unique_ptr<Expression> parse_expression(const Script& script, const TSNode&
       const auto rhs_node = ts_node_child_by_field_name(bin_expr_node, "rhs", 3);
 
       const auto op = get_binary_operator(from_source(script, op_node));
-      expr = std::make_unique<BinaryExpression>(
-        parse_expression(script, lhs_node),
-        parse_expression(script, rhs_node),
-        op);
+      expr = std::make_unique<BinaryExpression>(parse_expression(script, lhs_node),
+                                                parse_expression(script, rhs_node),
+                                                op);
     }
   }
   return expr;
@@ -329,10 +328,9 @@ bool have_entry_point(const SourceFile& src)
 }
 
 // semantics
-bool does_function_call_exist(const SourceFile& root, const FunctionCall& call)
+bool function_call_valid(const SourceFile& root, const FunctionCall& call)
 {
-  auto only_func_defs = [](const std::unique_ptr<AstNode>& n)
-  {
+  auto only_func_defs = [](const std::unique_ptr<AstNode>& n) {
     return n->is_node_type(NodeType::FunctionDef);
   };
 
@@ -360,7 +358,7 @@ void semantic_checks(const Script& script, const SourceFile& root, Issues& issue
     if (!func_call.module.empty() && !Modules::exist(func_call.module)) {
       create_issue_module_not_exist(issues, func_call, func_call.module);
     }
-    else if (!does_function_call_exist(root, func_call)) {
+    else if (!function_call_valid(root, func_call)) {
       create_issue_func_not_exist(issues, func_call, func_call.name);
     }
   }

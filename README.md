@@ -1,7 +1,7 @@
 # cpy
-C++ Pythony
+C++ Pythony, an alternative to shell script.
 
-An alternative to shell script.
+Mostly experimenting with Tree-sitter and creating an AST.
 
 # Build
 ```
@@ -11,10 +11,12 @@ meson setup build
 meson compile -C build
 ```
 
-# Tests
+# Test
 ```
 meson test -C build
 ```
+
+---
 
 # Ideas
 - Statically typed
