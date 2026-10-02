@@ -405,7 +405,7 @@ struct FunctionDef : public AstNode
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << name << ": \n -> " << to_string(return_type) << '\n';
+    os << name << "() -> " << to_string(return_type) << '\n';
 
     for(const auto& p : params)
     {
