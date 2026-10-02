@@ -275,17 +275,7 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
   return dynamic_cast<ExprT&>(*expr);
 }
 
-
-struct SyntaxError : public AstNode
-{
-  SyntaxError() : AstNode(NodeType::SyntaxError)
-  {}
-
-  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
-  {
-    os << "ERROR\n";
-  }
-};
+// Functions //
 
 struct FunctionParam : public AstNode
 {
@@ -417,6 +407,19 @@ struct FunctionDef : public AstNode
   }
 };
 
+
+struct SyntaxError : public AstNode
+{
+  SyntaxError() : AstNode(NodeType::SyntaxError)
+  {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "ERROR\n";
+  }
+};
+
+
 struct SourceFile : public AstNode
 {
   SourceFile() : AstNode(NodeType::SourceFile)
@@ -436,50 +439,6 @@ struct SourceFile : public AstNode
     }
   }
 };
-
-
-// useful
-inline bool param_arg_valid(const FunctionParam& def_param, const std::unique_ptr<Expression>& call_arg)
-{
-  const auto def_param_type = def_param.type.value_as<BuiltInType>();
-  if (!def_param_type)
-    throw std::runtime_error("Function has unsupported UserType parameter");
-
-  switch (*def_param_type)
-  {
-    using enum BuiltInType;
-    case Int:
-      return call_arg->is_convertible_to(BuiltInType::Int) ;
-
-    case String:
-      return call_arg->is_convertible_to(BuiltInType::String);
-
-    case Decimal:
-      return call_arg->is_convertible_to(BuiltInType::Decimal);
-
-    case Bool:
-      return call_arg->is_convertible_to(BuiltInType::Bool);
-
-    case Unknown:
-      return false;
-
-    default:
-      throw std::runtime_error("Function has unsupported BuiltInType parameter");
-      break;
-  }
-}
-
-inline bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
-{
-  if (def.name != call.name) {
-    return false;
-  }
-
-  return rg::equal(def.params, call.args, [](const auto& param, const auto& arg) {
-      return param_arg_valid(param, arg);
-    }
-  );
-}
 
 
 // to_string

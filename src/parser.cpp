@@ -1,6 +1,6 @@
-#include "cpy/ast/ast_node.hpp"
-#include "cpy/issues.hpp"
-#include "tree_sitter/api.h"
+#include "cpy/semantics.hpp"
+#include <cpy/ast/ast_node.hpp>
+#include <cpy/issues.hpp>
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
 #include <algorithm>
@@ -41,37 +41,6 @@ std::string_view from_source (const Script& script, const TSNode& node)
 
   return std::string_view{script.src}.substr(start, length);
 }
-
-// create errors
-void create_issue_syntax_error (Issues& issues, const TSNode& node)
-{
-  const auto start = ts_node_start_point(node);
-  const auto start_byte = ts_node_start_byte(node);
-  const auto end_byte = ts_node_end_byte(node);
-
-  issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::SyntaxError);
-}
-
-void create_issue_unknown_type (Issues& issues, const TSNode& node)
-{
-  const auto start = ts_node_start_point(node);
-  const auto start_byte = ts_node_start_byte(node);
-  const auto end_byte = ts_node_end_byte(node);
-
-  issues.add_error(std::format("Unknown type at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::UnknownType);
-}
-
-void create_issue_func_not_exist (Issues& issues, const AstNode& node, const std::string_view func)
-{
-  issues.add_error(std::format("Function does not exist: {}", func), node.source, ErrorCode::FunctionNotExist);
-}
-
-void create_issue_module_not_exist (Issues& issues, const AstNode& node, const std::string_view func)
-{
-  issues.add_error(std::format("Module does not exist: {}", func), node.source, ErrorCode::ModuleNotExist);
-}
-
-//
 
 std::optional<VarType> create_type (const Script& src, const TSNode& node, Issues& issues)
 {
@@ -305,74 +274,6 @@ void parse_script(Script& script, TSNode& ts_root, Issues& issues)
   }
 }
 
-bool does_function_exist(const SourceFile& src, const std::string_view name, const VarType return_type, const std::vector<FunctionParam>& params, const bool check_param_names = false)
-{
-  return rg::find_if(src.nodes, [&](const auto& node) {
-          if (!node->is_node_type(NodeType::FunctionDef))
-            return false;
-
-          const auto& func = dynamic_cast<const FunctionDef&>(*node);
-
-          if (func.return_type != return_type || func.name != name)
-            return false;
-
-          return check_param_names ? rg::equal(func.params, params, FunctionParamCmp{})
-                                   : rg::equal(func.params, params, FunctionParamCmpIgnoreName{});
-         }) != src.nodes.cend();
-}
-
-std::uint16_t count_function_definitions (const SourceFile& src, const std::string_view name)
-{
-  return rg::count_if(src.nodes, [&](const auto& node) {
-            if (!node->is_node_type(NodeType::FunctionDef))
-              return false;
-            return dynamic_cast<const FunctionDef&>(*node).name == name;
-         });
-}
-
-bool have_entry_point(const SourceFile& src)
-{
-  return does_function_exist(src, "main", BuiltInType::Int,  {FunctionParam{BuiltInType::String}}) &&
-         count_function_definitions(src, "main") == 1U;
-}
-
-// semantics
-bool function_call_valid(const SourceFile& root, const FunctionCall& call)
-{
-  auto only_func_defs = [](const std::unique_ptr<AstNode>& n) {
-    return n->is_node_type(NodeType::FunctionDef);
-  };
-
-  for (const auto& func_def_node : root.nodes | vw::filter(only_func_defs))
-  {
-    const auto& def = dynamic_cast<FunctionDef&>(*func_def_node);
-    if (func_call_valid(def, call))
-      return true;
-  }
-  return false;
-}
-
-void semantic_checks(const Script& script, const SourceFile& root, Issues& issues)
-{
-  auto by_node_type = [](const NodeType nt)
-  {
-    return [nt](const std::unique_ptr<AstNode>& n){ return n->is_node_type(nt); };
-  };
-
-  // function calls
-  for (const auto& func_call_node : root.nodes | vw::filter(by_node_type(NodeType::FunctionCall)))
-  {
-    const auto& func_call = dynamic_cast<FunctionCall&>(*func_call_node);
-
-    if (!func_call.module.empty() && !Modules::exist(func_call.module)) {
-      create_issue_module_not_exist(issues, func_call, func_call.module);
-    }
-    else if (!function_call_valid(root, func_call)) {
-      create_issue_func_not_exist(issues, func_call, func_call.name);
-    }
-  }
-}
-
 
 Parser::~Parser()
 {
@@ -398,7 +299,10 @@ void Parser::parse(Script& script)
 
   parse_script(script, root, script.issues);
 
-  semantic_checks(script, *script.ast, script.issues);
+  m_semantics = std::make_unique<Semantics>(*script.ast, script.issues, script.src);
+  m_semantics->process();
+
+  // semantic_checks(*script.ast, script.issues, script.src);
 }
 
 bool Parser::parse(const fs::path src_file)

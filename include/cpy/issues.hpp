@@ -7,11 +7,15 @@
 #include <vector>
 
 #include <cpy/common.hpp>
+#include <cpy/ast/ast_node.hpp>
+
+#include "tree_sitter/api.h"
 
 enum class ErrorCode
 {
   ModuleNotExist,
   FunctionNotExist,
+  FunctionCallInvalid,
   UnknownType,
   SyntaxError
 };
@@ -46,7 +50,8 @@ class Issues
 
 public:
   Issues() = default;
-  Issues (const fs::path src) : src_path(src) {}
+  Issues(const fs::path src_file) : src_path(src_file)
+  {}
 
   void add_error(const std::string_view msg, const ErrorCode ec)
   {
@@ -84,3 +89,32 @@ private:
   fs::path src_path;
   std::vector<Issue> m_errors;
 };
+
+
+inline void create_issue_syntax_error (Issues& issues, const TSNode& node)
+{
+  const auto start = ts_node_start_point(node);
+  const auto start_byte = ts_node_start_byte(node);
+  const auto end_byte = ts_node_end_byte(node);
+
+  issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::SyntaxError);
+}
+
+inline void create_issue_unknown_type (Issues& issues, const TSNode& node)
+{
+  const auto start = ts_node_start_point(node);
+  const auto start_byte = ts_node_start_byte(node);
+  const auto end_byte = ts_node_end_byte(node);
+
+  issues.add_error(std::format("Unknown type at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::UnknownType);
+}
+
+inline void create_issue_func_not_exist (Issues& issues, const AstNode& node, const std::string_view func)
+{
+  issues.add_error(std::format("Function does not exist: {}", func), node.source, ErrorCode::FunctionNotExist);
+}
+
+inline void create_issue_module_not_exist (Issues& issues, const AstNode& node, const std::string_view func)
+{
+  issues.add_error(std::format("Module does not exist: {}", func), node.source, ErrorCode::ModuleNotExist);
+}

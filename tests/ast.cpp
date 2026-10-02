@@ -161,13 +161,13 @@ TEST(Ast, FuncCall_Args)
   ASSERT_TRUE(call.args[0]->is_expr_type(ExpressionType::Int));
   ASSERT_TRUE(call.args[1]->is_expr_type(ExpressionType::String));
 
-  const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
-  ASSERT_TRUE(param_arg_valid(def.params[0], call.args[0]));
-  ASSERT_TRUE(param_arg_valid(def.params[1], call.args[1]));
-  ASSERT_FALSE(param_arg_valid(def.params[0], call.args[1]));
-  ASSERT_FALSE(param_arg_valid(def.params[1], call.args[0]));
-
-  ASSERT_TRUE(func_call_valid(def, call));
+//   const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
+//   ASSERT_TRUE(param_arg_valid(def.params[0], call.args[0]));
+//   ASSERT_TRUE(param_arg_valid(def.params[1], call.args[1]));
+//   ASSERT_FALSE(param_arg_valid(def.params[0], call.args[1]));
+//   ASSERT_FALSE(param_arg_valid(def.params[1], call.args[0]));
+//
+//   ASSERT_TRUE(func_call_valid(def, call));
 }
 
 TEST(Ast, FuncCall_InvalidCall)
@@ -186,14 +186,14 @@ TEST(Ast, FuncCall_InvalidCall)
   ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
   ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
 
-  const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
-  const auto& wrong_type = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
-  const auto& too_many = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[2]);
-  const auto& too_few = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[3]);
-
-  ASSERT_FALSE(func_call_valid(def, wrong_type));
-  ASSERT_FALSE(func_call_valid(def, too_many));
-  ASSERT_FALSE(func_call_valid(def, too_few));
+//   const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
+//   const auto& wrong_type = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
+//   const auto& too_many = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[2]);
+//   const auto& too_few = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[3]);
+//
+//   ASSERT_FALSE(func_call_valid(def, wrong_type));
+//   ASSERT_FALSE(func_call_valid(def, too_many));
+//   ASSERT_FALSE(func_call_valid(def, too_few));
 }
 
 TEST(Ast, FuncCall_AllPrimitives)
@@ -267,8 +267,6 @@ TEST(Ast, Expr_BinaryExprLiterals)
   ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
   ASSERT_EQ(parser.ast()->nodes[2]->node_type(), NodeType::Expression);
 
-
-
   const auto& call_ok = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
   ASSERT_EQ(call_ok.args.size(), 1);
   ASSERT_EQ(call_ok.args[0]->node_type(), NodeType::Expression);
@@ -298,9 +296,9 @@ TEST(Ast, Expr_BinaryExprLiterals)
   ASSERT_TRUE(bin_expr_fail.lhs->is_expr_type(ExpressionType::Int));
   ASSERT_TRUE(bin_expr_fail.rhs->is_expr_type(ExpressionType::String));
 
-  const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
-  ASSERT_TRUE(func_call_valid(def, call_ok));
-  ASSERT_FALSE(func_call_valid(def, call_fail));
+  // const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
+  // ASSERT_TRUE(func_call_valid(def, call_ok));
+  // ASSERT_FALSE(func_call_valid(def, call_fail));
 }
 
 

@@ -1,12 +1,15 @@
 #pragma once
 #include <string_view>
 
-#include <tree_sitter/api.h>
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/common.hpp>
 #include <cpy/issues.hpp>
+#include <cpy/semantics.hpp>
+
+#include <tree_sitter/api.h>
 
 extern "C" const TSLanguage *tree_sitter_cpy();
+
 
 struct Script
 {
@@ -37,4 +40,5 @@ private:
   TSParser * m_parser{};
   TSTree * m_tree{};
   Script m_script;
+  std::unique_ptr<Semantics> m_semantics;
 };
