@@ -2,7 +2,9 @@
 
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
+#include <iostream>
 #include <string_view>
+#include <utility>
 
 
 TEST(Ast, ZeroNodes)
@@ -112,8 +114,11 @@ TEST(Ast, FuncCall_NotExist)
   Parser parser;
   parser.parse(src);
 
+  const auto nt = parser.ast()->nodes[0]->node_type();
+  std::cerr << "NODET " << std::to_underlying(nt) << "\n";
+
   ASSERT_EQ(parser.ast()->nodes.size(), 1);
-  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::Expression);
   ASSERT_EQ(dynamic_cast<FunctionCall&>(*parser.ast()->nodes[0]).name, "hello");
 }
 
@@ -129,7 +134,7 @@ TEST(Ast, FuncCall_NoArgs)
 
   ASSERT_EQ(parser.ast()->nodes.size(), 2);
   ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
 
   const auto& call = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
   ASSERT_EQ(call.name, "hello");
@@ -148,7 +153,7 @@ TEST(Ast, FuncCall_Args)
 
   ASSERT_EQ(parser.ast()->nodes.size(), 2);
   ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
 
   const auto& call = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
   ASSERT_EQ(call.name, "hello");
@@ -179,7 +184,7 @@ TEST(Ast, FuncCall_InvalidCall)
 
   ASSERT_EQ(parser.ast()->nodes.size(), 4);
   ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
 
   const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
   const auto& wrong_type = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
@@ -204,7 +209,7 @@ TEST(Ast, FuncCall_AllPrimitives)
 
   ASSERT_EQ(parser.ast()->nodes.size(), 2);
   ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
 
   const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
   ASSERT_EQ(def.params.size(), 4);
@@ -234,8 +239,8 @@ TEST(Ast, FuncCall_Module)
   parser.parse(src);
 
   ASSERT_EQ(parser.ast()->nodes.size(), 2);
-  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionCall);
-  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::Expression);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
 
   const auto& call = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[0]);
   const auto& call_module = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
@@ -244,7 +249,7 @@ TEST(Ast, FuncCall_Module)
   ASSERT_EQ(call_module.module, "foo");
 }
 
-TEST(Ast, Expr_Binary)
+TEST(Ast, Expr_BinaryExprLiterals)
 {
   // expressions can only appear in function call args for now.
   // expand when var declaration or assignment is implemented
@@ -259,10 +264,10 @@ TEST(Ast, Expr_Binary)
 
   ASSERT_EQ(parser.ast()->nodes.size(), 3);
   ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionCall);
-  ASSERT_EQ(parser.ast()->nodes[2]->node_type(), NodeType::FunctionCall);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(parser.ast()->nodes[2]->node_type(), NodeType::Expression);
 
-  const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
+
 
   const auto& call_ok = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[1]);
   ASSERT_EQ(call_ok.args.size(), 1);
@@ -293,9 +298,53 @@ TEST(Ast, Expr_Binary)
   ASSERT_TRUE(bin_expr_fail.lhs->is_expr_type(ExpressionType::Int));
   ASSERT_TRUE(bin_expr_fail.rhs->is_expr_type(ExpressionType::String));
 
+  const auto& def = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
   ASSERT_TRUE(func_call_valid(def, call_ok));
   ASSERT_FALSE(func_call_valid(def, call_fail));
 }
+
+
+TEST(Ast, Expr_BinaryExprFuncs)
+{
+  const std::string_view src = R"(
+    fn foo(a: int) {}
+    fn get() -> int {}
+
+    foo(get() + get());
+  )";
+
+  Parser parser;
+  parser.parse(src);
+
+  ASSERT_EQ(parser.ast()->nodes.size(), 3);
+  ASSERT_EQ(parser.ast()->nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(parser.ast()->nodes[1]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(parser.ast()->nodes[2]->node_type(), NodeType::Expression);
+
+  const auto& def_foo = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[0]);
+  ASSERT_EQ(def_foo.params.size(), 1);
+
+  const auto& def_get = dynamic_cast<FunctionDef&>(*parser.ast()->nodes[1]);
+  ASSERT_TRUE(def_get.params.empty());
+  ASSERT_TRUE(def_get.return_type.is_type(BuiltInType::Int));
+
+  const auto& call_foo = dynamic_cast<FunctionCall&>(*parser.ast()->nodes[2]);
+  ASSERT_EQ(call_foo.args.size(), 1);
+  ASSERT_TRUE(call_foo.args[0]->is_expr_type(ExpressionType::Binary));
+
+  const auto& expr = dynamic_cast<BinaryExpression&>(*call_foo.args[0]);
+  ASSERT_TRUE(expr.lhs->is_expr_type(ExpressionType::FuncCall));
+  ASSERT_TRUE(expr.rhs->is_expr_type(ExpressionType::FuncCall));
+
+  // NOTE: The AST doesn't store this information: FunctionCall node
+  //       does not store the return type, only FunctionDef.
+  //       This must be done during semantic checks anyway, so will create tests for that.
+  // const auto& call_lhs = dynamic_cast<FunctionCall&>(*expr.lhs);
+  // ASSERT_TRUE(call_lhs.is_convertible_to(BuiltInType::Int));
+  // const auto& call_rhs = dynamic_cast<FunctionCall&>(*expr.rhs);
+  // ASSERT_TRUE(call_rhs.is_convertible_to(BuiltInType::Int));
+}
+
 
 // Syntax Errors //
 TEST(Ast, SyntaxError)
