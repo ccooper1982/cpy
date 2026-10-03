@@ -1,5 +1,16 @@
-fn hello(a: int) {}
-fn get_int1() -> int {}
-fn get_int2() -> int {}
+fn foo1(a: str)
+{
+}
 
-hello(get_int1() + get_int2());
+fn foo2(a: int)
+{
+}
+
+fn foo3() -> penguin
+{
+}
+
+foo1("l");
+foo2(1.1);
+foo3();
+foo4();

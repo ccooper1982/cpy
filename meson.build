@@ -20,6 +20,7 @@ gtest_main = dependency('gtest_main')
 cpy_sources = files(
   'src/main.cpp',
   'src/parser.cpp',
+  'src/semantics.cpp',
   'grammar/src/parser.c',
 )
 
@@ -33,8 +34,10 @@ executable('cpy', cpy_sources,
 
 cpy_tests = executable(
   'cpy_tests',
-  files('tests/ast.cpp', 'tests/parser.cpp',
+  files('tests/ast.cpp',
+        'tests/parser.cpp',
         'src/parser.cpp',
+        'src/semantics.cpp',
         'grammar/src/parser.c'
   ),
   include_directories: include_dirs,

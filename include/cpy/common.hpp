@@ -9,6 +9,20 @@ namespace fs = std::filesystem;
 namespace rg = std::ranges;
 namespace vw = std::views;
 
+
+struct SourceFile;
+class Issues;
+
+
+struct Script
+{
+  std::string src{};
+  fs::path file{};
+  std::unique_ptr<SourceFile> ast{};
+  std::unique_ptr<Issues> issues{};
+};
+
+
 // helper type for the visitor
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
@@ -24,6 +38,7 @@ struct SourceRegion
 
   uint32_t start{}, end{};
 };
+
 
 struct CpyError
 {
