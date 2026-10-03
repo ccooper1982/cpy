@@ -80,8 +80,10 @@ void Semantics::process_function_call(Context& ctx, const FunctionCall& call)
 {
   const auto& resolved = m_resolved_table.get_function_types(call.name);
 
-  if (call.args.size() != resolved.params.size()) {
+  if (call.args.size() != resolved.params.size())
+  {
     issue::func_args_count(ctx.issues, call);
+    return;
   }
 
   for (uint8_t i = 0 ; i < call.args.size() ; ++i)
