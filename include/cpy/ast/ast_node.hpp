@@ -21,7 +21,6 @@ enum class NodeType
   FunctionDef,
   FunctionParam,
   FunctionBody,
-  // FunctionCall,
   Expression
 };
 
@@ -297,39 +296,11 @@ struct FunctionParam : public AstNode
 
 public:
 
-  template<typename T>
-  bool is_type() const
-  {
-    return false;
-    //return std::holds_alternative<T>(type);
-  }
-
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
     os << std::string(tab*2, ' ') << param_name << ":" << type_name << '\n';
   }
 };
-
-template<bool CheckName>
-struct FunctionParamComparer
-{
-  bool operator()(const FunctionParam& a, const FunctionParam& b) const
-  {
-    return false;
-    // if constexpr (CheckName)
-    //   return a.type == b.type && a.name == b.name;
-    // else
-    //   return a.type == b.type;
-  }
-};
-
-using FunctionParamCmp = FunctionParamComparer<true>;
-using FunctionParamCmpIgnoreName = FunctionParamComparer<false>;
-
-inline bool operator==(const FunctionParam& a, const FunctionParam& b)
-{
-  return FunctionParamCmp{}(a, b);
-}
 
 
 struct FunctionCall : public Expression

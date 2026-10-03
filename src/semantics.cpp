@@ -2,8 +2,9 @@
 #include "cpy/issues.hpp"
 #include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
-#include <ranges>
+
 #include <stdexcept>
+#include <string_view>
 
 
 // Semantic checker
@@ -13,108 +14,84 @@
 //  ├── type checking
 //  └── diagnostics
 
-
-static bool param_arg_valid(const FunctionParam& def_param, const std::unique_ptr<Expression>& call_arg)
-{
-  return false;
-//   const auto def_param_type = def_param.type.value_as<BuiltInType>();
-//
-//   if (!def_param_type)
-//     throw std::runtime_error("Function has unsupported UserType parameter");
-//
-//   switch (*def_param_type)
-//   {
-//     using enum BuiltInType;
-//     case Int:
-//       return call_arg->is_convertible_to(BuiltInType::Int) ;
-//
-//     case String:
-//       return call_arg->is_convertible_to(BuiltInType::String);
-//
-//     case Decimal:
-//       return call_arg->is_convertible_to(BuiltInType::Decimal);
-//
-//     case Bool:
-//       return call_arg->is_convertible_to(BuiltInType::Bool);
-//
-//     case Unknown:
-//       return false;
-//
-//     default:
-//       throw std::runtime_error("Function has unsupported BuiltInType parameter");
-//       break;
-//   }
-}
-
-
-void Semantics::process_function_call(const SourceFile& root, const FunctionCall& call, Issues& issues)
-{
-  auto by_func_name = [&name = call.name](const std::unique_ptr<AstNode>& n)
-                      {
-                        if (!n->is_node_type(NodeType::FunctionDef))
-                          return false;
-
-                        return dynamic_cast<const FunctionDef&>(*n).name == name;
-                      };
-
-  for (const auto& func_def_node : root.nodes | vw::filter(by_func_name))
-  {
-    const auto& def = dynamic_cast<FunctionDef&>(*func_def_node);
-    const auto valid = rg::equal(def.params, call.args, [](const auto& param, const auto& arg)
-                       {
-                         return param_arg_valid(param, arg);
-                       });
-    if (!valid) {
-      issue::func_args(issues, call, call.name);
-    }
-  }
-}
-
 void Semantics::process(Script& script)
 {
   if (!(script.ast && script.issues)) {
     throw std::runtime_error{"Ast and/or Issues not allocated"};
   }
 
-  auto by_expr_type = [](const ExpressionType et)
-  {
-    return [et](const std::unique_ptr<AstNode>& n)
-    {
-      if (!n->is_node_type(NodeType::Expression))
-        return false;
+  Context ctx(*script.ast, *script.issues);
 
-      const auto& expr = dynamic_cast<const Expression&>(*n);
-      return expr.is_expr_type(et);
-    };
-  };
+  process_function_defs(ctx);
 
-  auto& src_file_node = *script.ast;
-  auto& issues = *script.issues;
-
-  create_cache(src_file_node);
-
-  // function calls
-  for (const auto& func_call_node : src_file_node.nodes | vw::filter(by_expr_type(ExpressionType::FuncCall)))
-  {
-    const auto& func_call = dynamic_cast<FunctionCall&>(*func_call_node);
-
-    if (!func_call.module.empty() && !Modules::exist(func_call.module)) {
-      issue::module_not_exist(issues, func_call, func_call.module);
-    }
-    else if (!m_function_names.contains(func_call.name)) {
-      issue::func_not_exist(issues, func_call, func_call.name);
-    }
-    else {
-      process_function_call(src_file_node, func_call, issues);
-    }
-  }
+  process_function_calls(ctx);
 }
 
-void Semantics::create_cache(const SourceFile& root)
+void Semantics::process_function_defs(Context& ctx)
 {
-  walk_ast<FunctionDef>(root, [this](const FunctionDef& node)
+  walk_nodes<FunctionDef>(ctx.ast, [&, this](const FunctionDef& def)
   {
-    m_function_names.emplace(node.name);
-  });
+    std::vector<ResolvedParam> resolved_params;
+    bool error{};
 
+    for (const auto& param : def.params)
+    {
+      if (const auto type = m_resolved_table.get_type(param.type_name); type) {
+        resolved_params.emplace_back(param.param_name, *type);
+      }
+      else
+      {
+        issue::unknown_param_type(ctx.issues, param);
+        error = true;
+        break;
+      }
+    }
+
+    const auto return_type = m_resolved_table.get_type(def.return_type);
+    if (!error && !return_type)
+    {
+      error = true;
+      issue::unknown_return_param_type(ctx.issues, def.name, def.return_type);
+    }
+
+    if (!error) {
+      m_resolved_table.add_function(def.name, std::move(resolved_params), *return_type);
+    }
+  });
+}
+
+void Semantics::process_function_calls(Context& ctx)
+{
+  walk_expressions<FunctionCall>(ctx.ast, [this, &ctx](const FunctionCall& call)
+  {
+    if (!call.module.empty() && !Modules::exist(call.module)) {
+      issue::module_not_exist(ctx.issues, call, call.module);
+    }
+    else if (!m_resolved_table.function_exists(call.name)) {
+      issue::func_not_exist(ctx.issues, call, call.name);
+    }
+    else {
+      process_function_call(ctx, call);
+    }
+  });
+}
+
+void Semantics::process_function_call(Context& ctx, const FunctionCall& call)
+{
+  const auto& resolved = m_resolved_table.get_function_types(call.name);
+
+  if (call.args.size() != resolved.params.size()) {
+    issue::func_args_count(ctx.issues, call);
+  }
+
+  for (uint8_t i = 0 ; i < call.args.size() ; ++i)
+  {
+    const auto builtin_type = resolved.params[i].type.value_as<BuiltInType>();
+    if (builtin_type)
+    {
+      if (!call.args[i]->is_convertible_to(*builtin_type)) {
+        issue::func_args(ctx.issues, *(call.args[i]), call.name, resolved.params[i].name);
+      }
+    }
+  }
 }

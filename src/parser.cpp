@@ -42,27 +42,6 @@ std::string_view from_source (const Script& script, const TSNode& node)
   return std::string_view{script.src}.substr(start, length);
 }
 
-std::optional<VarType> create_type (const Script& src, const TSNode& node, Issues& issues)
-{
-  const auto name = from_source(src, node);
-  if ( name == "int") {
-    return BuiltInType::Int;
-  }
-  else if (name == "str") {
-    return BuiltInType::String;
-  }
-  else if (name == "dec") {
-    return BuiltInType::Decimal;
-  }
-  else if (name == "bool") {
-    return BuiltInType::Bool;
-  }
-  else {
-    issue::unknown_type(issues, node);
-    return std::nullopt;
-  }
-}
-
 void set_source_region (const TSNode& ts_node, AstNode& ast_node)
 {
   ast_node.source = SourceRegion{ts_node_start_byte(ts_node), ts_node_end_byte(ts_node)};
@@ -79,45 +58,50 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
 
   const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0));
 
-  if (!expr_type.empty())
+  if (expr_type.empty())
+    return nullptr;
+
+  const std::string_view value = from_source(script, ts_node_named_child(expr_node, 0));
+
+  if (expr_type == "integer")
   {
-    const std::string_view value = from_source(script, ts_node_named_child(expr_node, 0));
-
-    if (expr_type == "integer")
-    {
-      int64_t i{};
-      std::from_chars(value.data(), value.data()+value.size(), i);
-      expr = std::make_unique<IntegerLiteral>(i);
-    }
-    else if (expr_type == "literal_string") {
-      expr = std::make_unique<StringLiteral>(value);
-    }
-    else if (expr_type == "decimal")
-    {
-      double d{};
-      std::from_chars(value.data(), value.data()+value.size(), d);
-      expr = std::make_unique<DecimalLiteral>(d);
-    }
-    else if (expr_type == "boolean") {
-      expr = std::make_unique<BooleanLiteral>(value == "true");
-    }
-    else if (expr_type == "binary_expression")
-    {
-      const auto bin_expr_node = ts_node_named_child(expr_node, 0);
-      const auto lhs_node = ts_node_child_by_field_name(bin_expr_node, "lhs", 3);
-      const auto op_node = ts_node_child_by_field_name(bin_expr_node, "op", 2);
-      const auto rhs_node = ts_node_child_by_field_name(bin_expr_node, "rhs", 3);
-
-      const auto op = get_binary_operator(from_source(script, op_node));
-      expr = std::make_unique<BinaryExpression>(parse_expression(script, lhs_node),
-                                                parse_expression(script, rhs_node),
-                                                op);
-    }
-    else if (expr_type == "function_call")
-    {
-      expr = parse_function_call(script, ts_node_named_child(expr_node, 0), *script.issues);
-    }
+    int64_t i{};
+    std::from_chars(value.data(), value.data()+value.size(), i);
+    expr = std::make_unique<IntegerLiteral>(i);
   }
+  else if (expr_type == "literal_string") {
+    expr = std::make_unique<StringLiteral>(value);
+  }
+  else if (expr_type == "decimal")
+  {
+    double d{};
+    std::from_chars(value.data(), value.data()+value.size(), d);
+    expr = std::make_unique<DecimalLiteral>(d);
+  }
+  else if (expr_type == "boolean") {
+    expr = std::make_unique<BooleanLiteral>(value == "true");
+  }
+  else if (expr_type == "binary_expression")
+  {
+    const auto bin_expr_node = ts_node_named_child(expr_node, 0);
+    const auto lhs_node = ts_node_child_by_field_name(bin_expr_node, "lhs", 3);
+    const auto op_node = ts_node_child_by_field_name(bin_expr_node, "op", 2);
+    const auto rhs_node = ts_node_child_by_field_name(bin_expr_node, "rhs", 3);
+
+    const auto op = get_binary_operator(from_source(script, op_node));
+    expr = std::make_unique<BinaryExpression>(parse_expression(script, lhs_node),
+                                              parse_expression(script, rhs_node),
+                                              op);
+  }
+  else if (expr_type == "function_call") {
+    expr = parse_function_call(script, ts_node_named_child(expr_node, 0), *script.issues);
+  }
+
+  if (expr)
+  {
+    set_source_region(expr_node, *expr);
+  }
+
   return expr;
 }
 
@@ -172,6 +156,9 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
     auto type_node = ts_node_child_by_field_name(return_type, "type", 4);
     ast_node->return_type = from_source(script, type_node);
   }
+  else {
+    ast_node->return_type = "void";
+  }
 
   // params
   TSNode parameters = ts_node_child_by_field_name(ts_node, "parameters", 10);
@@ -190,13 +177,13 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
 
         FunctionParam param;
         if (!ts_node_is_null(param_name_node)) {
-          param.type_name = from_source(script, param_name_node);
+          param.param_name = from_source(script, param_name_node);
         }
         if (!ts_node_is_null(param_type_node)) {
           param.type_name = from_source(script, param_type_node);
         }
 
-        set_source_region(param_name_node, param);
+        set_source_region(parameter, param);
 
         ast_node->params.push_back(std::move(param));
     }
