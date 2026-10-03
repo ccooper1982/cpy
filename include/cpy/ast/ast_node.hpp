@@ -282,24 +282,17 @@ struct FunctionParam : public AstNode
 {
   static constexpr NodeType Type = NodeType::FunctionParam;
 
-  VarType type;
-  std::string name;
-  bool valid{true};
+  std::string_view param_name;
+  std::string_view type_name;
 
-  FunctionParam() : FunctionParam("")
+
+  FunctionParam() : AstNode(NodeType::FunctionParam)
   {}
 
-  FunctionParam (const std::string_view name) : FunctionParam(BuiltInType::Unknown, name, false)
-  {}
-
-  FunctionParam(const VarType type) : FunctionParam(type, "")
-  {}
-
-  FunctionParam(const VarType type, std::string_view name, const bool valid = true)
+  FunctionParam(const std::string_view param_name, const std::string_view type)
     : AstNode(NodeType::FunctionParam)
-    , type(type)
-    , name(name)
-    , valid(valid)
+    , param_name(param_name)
+    , type_name(type)
   {}
 
 public:
@@ -307,12 +300,13 @@ public:
   template<typename T>
   bool is_type() const
   {
-    return std::holds_alternative<T>(type);
+    return false;
+    //return std::holds_alternative<T>(type);
   }
 
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
-    os << std::string(tab*2, ' ') << name << ":" << to_string(type) << '\n';
+    os << std::string(tab*2, ' ') << param_name << ":" << type_name << '\n';
   }
 };
 
@@ -321,10 +315,11 @@ struct FunctionParamComparer
 {
   bool operator()(const FunctionParam& a, const FunctionParam& b) const
   {
-    if constexpr (CheckName)
-      return a.type == b.type && a.name == b.name;
-    else
-      return a.type == b.type;
+    return false;
+    // if constexpr (CheckName)
+    //   return a.type == b.type && a.name == b.name;
+    // else
+    //   return a.type == b.type;
   }
 };
 
@@ -399,12 +394,12 @@ struct FunctionDef : public AstNode
 
   std::string name;
   std::vector<FunctionParam> params;
-  VarType return_type{BuiltInType::Void};
+  std::string_view return_type;
   FunctionBody body;
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << name << "() -> " << to_string(return_type) << '\n';
+    os << name << "() -> " << return_type << '\n';
 
     for(const auto& p : params)
     {

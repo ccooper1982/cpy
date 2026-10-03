@@ -167,10 +167,10 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
 
   // return type
   TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
-  if (!ts_node_is_null(return_type)) {
+  if (!ts_node_is_null(return_type))
+  {
     auto type_node = ts_node_child_by_field_name(return_type, "type", 4);
-    if (const auto type = create_type(script, type_node, issues); type)
-      ast_node->return_type = *type;
+    ast_node->return_type = from_source(script, type_node);
   }
 
   // params
@@ -189,14 +189,16 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
         TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
 
         FunctionParam param;
-        if (const auto type = create_type(script, param_type_node, issues) ; type) {
-          param = ast_node->params.emplace_back(*type, from_source(script, param_name_node));
+        if (!ts_node_is_null(param_name_node)) {
+          param.type_name = from_source(script, param_name_node);
         }
-        else {
-          param = ast_node->params.emplace_back(from_source(script, param_name_node));
+        if (!ts_node_is_null(param_type_node)) {
+          param.type_name = from_source(script, param_type_node);
         }
 
         set_source_region(param_name_node, param);
+
+        ast_node->params.push_back(std::move(param));
     }
   }
 
@@ -212,8 +214,7 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
       const auto statement = ts_node_named_child(body, s);
       const auto func_call = ts_node_child_by_field_name(statement, "func_call", 9);
 
-      if (!ts_node_is_null(func_call))
-      {
+      if (!ts_node_is_null(func_call)) {
         ast_node->body.nodes.push_back(parse_function_call(script, func_call, issues));
       }
     }
