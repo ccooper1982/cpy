@@ -1,6 +1,7 @@
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
+#include <cpy/semantics.hpp>
 #include <filesystem>
 
 int main (int argc, char ** argv)
@@ -20,22 +21,38 @@ int main (int argc, char ** argv)
   Modules::initialise();
 
   Parser parser;
+  Script script;
 
   if (file.empty()) {
-    parser.parse(src);
+    script = parser.parse(src);
   }
-  else if (!fs::exists(file)) {
+  else if (!fs::exists(file))
+  {
     std::cerr << "File does not exist: " << file.string() << '\n';
     return 1;
   }
-  else if (!parser.parse(file))
+  else
   {
-    std::cerr << "Failed to open " << file.string() << '\n';
-    return 1;
+    try
+    {
+      script = parser.parse(file);
+    }
+    catch (const std::exception& ex)
+    {
+      std::cerr << ex.what() << '\n';
+      return 1;
+    }
   }
 
-  parser.ast()->dump(std::cout);
-  parser.issues().dump(std::cout, parser.src());
+  script.ast->dump(std::cout);
 
-  return parser.issues().have_errors() ? 1 : 0;
+  if (!script.issues->have_errors())
+  {
+    Semantics sems;
+    sems.process(script);
+  }
+
+  script.issues->dump(std::cout, script.src);
+
+  return script.issues->have_errors() ? 1 : 0;
 }

@@ -1,5 +1,9 @@
+#include "cpy/ast/ast_node.hpp"
+#include "cpy/issues.hpp"
 #include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
+#include <ranges>
+#include <stdexcept>
 
 
 // Semantic checker
@@ -70,51 +74,74 @@ static bool param_arg_valid(const FunctionParam& def_param, const std::unique_pt
 }
 
 
-static bool func_call_valid(const FunctionDef& def, const FunctionCall& call)
+void Semantics::process_function_call(const SourceFile& root, const FunctionCall& call, Issues& issues)
 {
-  if (def.name != call.name) {
-    return false;
-  }
+  auto by_func_name = [&name = call.name](const std::unique_ptr<AstNode>& n)
+                      {
+                        if (!n->is_node_type(NodeType::FunctionDef))
+                          return false;
 
-  return rg::equal(def.params, call.args, [](const auto& param, const auto& arg) {
-      return param_arg_valid(param, arg);
-    }
-  );
-}
+                        return dynamic_cast<const FunctionDef&>(*n).name == name;
+                      };
 
-static bool function_call_valid(const SourceFile& root, const FunctionCall& call)
-{
-  auto only_func_defs = [](const std::unique_ptr<AstNode>& n) {
-    return n->is_node_type(NodeType::FunctionDef);
-  };
-
-  for (const auto& func_def_node : root.nodes | vw::filter(only_func_defs))
+  for (const auto& func_def_node : root.nodes | vw::filter(by_func_name))
   {
     const auto& def = dynamic_cast<FunctionDef&>(*func_def_node);
-    if (func_call_valid(def, call))
-      return true;
+    const auto valid = rg::equal(def.params, call.args, [](const auto& param, const auto& arg)
+                       {
+                         return param_arg_valid(param, arg);
+                       });
+    if (!valid) {
+      issue::func_args(issues, call, call.name);
+    }
   }
-  return false;
 }
 
-
-void Semantics::process()
+void Semantics::process(Script& script)
 {
-  auto by_node_type = [](const NodeType nt)
+  if (!(script.ast && script.issues)) {
+    throw std::runtime_error{"Ast and/or Issues not allocated"};
+  }
+
+  auto by_expr_type = [](const ExpressionType et)
   {
-    return [nt](const std::unique_ptr<AstNode>& n){ return n->is_node_type(nt); };
+    return [et](const std::unique_ptr<AstNode>& n)
+    {
+      if (!n->is_node_type(NodeType::Expression))
+        return false;
+
+      const auto& expr = dynamic_cast<const Expression&>(*n);
+      return expr.is_expr_type(et);
+    };
   };
 
+  auto& src_file_node = *script.ast;
+  auto& issues = *script.issues;
+
+  create_cache(src_file_node);
+
   // function calls
-  for (const auto& func_call_node : root.nodes | vw::filter(by_node_type(NodeType::FunctionCall)))
+  for (const auto& func_call_node : src_file_node.nodes | vw::filter(by_expr_type(ExpressionType::FuncCall)))
   {
     const auto& func_call = dynamic_cast<FunctionCall&>(*func_call_node);
 
     if (!func_call.module.empty() && !Modules::exist(func_call.module)) {
-      create_issue_module_not_exist(issues, func_call, func_call.module);
+      issue::module_not_exist(issues, func_call, func_call.module);
     }
-    else if (!function_call_valid(root, func_call)) {
-      create_issue_func_not_exist(issues, func_call, func_call.name);
+    else if (!m_function_names.contains(func_call.name)) {
+      issue::func_not_exist(issues, func_call, func_call.name);
+    }
+    else {
+      process_function_call(src_file_node, func_call, issues);
     }
   }
+}
+
+void Semantics::create_cache(const SourceFile& root)
+{
+  walk_ast<FunctionDef>(root, [this](const FunctionDef& node)
+  {
+    m_function_names.emplace(node.name);
+  });
+
 }

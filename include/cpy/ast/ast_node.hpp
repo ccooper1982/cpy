@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -22,7 +21,7 @@ enum class NodeType
   FunctionDef,
   FunctionParam,
   FunctionBody,
-  FunctionCall,
+  // FunctionCall,
   Expression
 };
 
@@ -136,8 +135,10 @@ inline std::string_view to_string(const BinaryOperator op);
 
 struct Expression : public AstNode
 {
+  static constexpr NodeType Type = NodeType::Expression;
+
   Expression(const ExpressionType t)
-    : AstNode(NodeType::Expression)
+    : AstNode(Type)
     , ex_type(t)
   {}
 
@@ -279,6 +280,8 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
 
 struct FunctionParam : public AstNode
 {
+  static constexpr NodeType Type = NodeType::FunctionParam;
+
   VarType type;
   std::string name;
   bool valid{true};
@@ -336,18 +339,20 @@ inline bool operator==(const FunctionParam& a, const FunctionParam& b)
 
 struct FunctionCall : public Expression
 {
+  static constexpr ExpressionType ExprType = ExpressionType::FuncCall;
+
   std::string_view module;
   std::string_view name;
   std::vector<std::unique_ptr<Expression>> args;
 
   FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
-    : Expression(ExpressionType::FuncCall),
+    : Expression(ExprType),
       name(name)
     , args(std::move(args))
   {}
 
   FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args, const std::string_view module)
-    : Expression(ExpressionType::FuncCall)
+    : Expression(ExprType)
     , module(module)
     , name(name)
     , args(std::move(args))
@@ -371,7 +376,9 @@ struct FunctionCall : public Expression
 
 struct FunctionBody : public AstNode
 {
-  FunctionBody() : AstNode(NodeType::FunctionBody)
+  static constexpr NodeType Type = NodeType::FunctionBody;
+
+  FunctionBody() : AstNode(Type)
   {}
 
   std::vector<std::unique_ptr<AstNode>> nodes;
@@ -385,7 +392,9 @@ struct FunctionBody : public AstNode
 
 struct FunctionDef : public AstNode
 {
-  FunctionDef() : AstNode(NodeType::FunctionDef)
+  static constexpr NodeType Type = NodeType::FunctionDef;
+
+  FunctionDef() : AstNode(Type)
   {}
 
   std::string name;
@@ -410,7 +419,9 @@ struct FunctionDef : public AstNode
 
 struct SyntaxError : public AstNode
 {
-  SyntaxError() : AstNode(NodeType::SyntaxError)
+  static constexpr NodeType Type = NodeType::SyntaxError;
+
+  SyntaxError() : AstNode(Type)
   {}
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -422,7 +433,9 @@ struct SyntaxError : public AstNode
 
 struct SourceFile : public AstNode
 {
-  SourceFile() : AstNode(NodeType::SourceFile)
+  static constexpr NodeType Type = NodeType::SourceFile;
+
+  SourceFile() : AstNode(Type)
   {}
 
   std::vector<std::unique_ptr<AstNode>> nodes;

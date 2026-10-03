@@ -58,7 +58,7 @@ std::optional<VarType> create_type (const Script& src, const TSNode& node, Issue
     return BuiltInType::Bool;
   }
   else {
-    create_issue_unknown_type(issues, node);
+    issue::unknown_type(issues, node);
     return std::nullopt;
   }
 }
@@ -115,7 +115,7 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
     }
     else if (expr_type == "function_call")
     {
-      expr = parse_function_call(script, ts_node_named_child(expr_node, 0), script.issues);
+      expr = parse_function_call(script, ts_node_named_child(expr_node, 0), *script.issues);
     }
   }
   return expr;
@@ -229,7 +229,7 @@ void parse_script(Script& script, TSNode& ts_root, Issues& issues)
   {
     if (ts_node_is_error(node))
     {
-      create_issue_syntax_error(issues, node);
+      issue::syntax_error(issues, node);
       return std::make_unique<SyntaxError>();
     }
 
@@ -297,35 +297,32 @@ void Parser::parse(Script& script)
     throw std::runtime_error{"Root is not a source_file"};
   }
 
-  parse_script(script, root, script.issues);
-
-  m_semantics = std::make_unique<Semantics>(*script.ast, script.issues, script.src);
-  m_semantics->process();
-
-  // semantic_checks(*script.ast, script.issues, script.src);
+  parse_script(script, root, *script.issues);
 }
 
-bool Parser::parse(const fs::path src_file)
+Script Parser::parse(const fs::path src_file)
 {
-  m_script.file = src_file;
-  m_script.issues = Issues{src_file};
+  Script script;
+  script.file = src_file;
+  script.issues = std::make_unique<Issues>(src_file);
 
   std::ifstream stream(src_file);
   if (!stream) {
-    return false;
+      throw std::runtime_error{"Failed to open source file: " + src_file.string()};
   }
 
-  m_script.src = {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
+  script.src = {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
 
-  parse(m_script);
-  return true;
+  parse(script);
+  return script;
 }
 
-void Parser::parse(const std::string_view src)
+Script Parser::parse(const std::string_view src)
 {
-  m_script.file.clear();
-  m_script.src = std::string{src};
-  m_script.issues = Issues{};
+  Script script;
+  script.src = std::string{src};
+  script.issues = std::make_unique<Issues>();
 
-  parse(m_script);
+  parse(script);
+  return script;
 }
