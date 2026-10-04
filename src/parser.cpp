@@ -1,4 +1,3 @@
-#include "cpy/semantics.hpp"
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/issues.hpp>
 #include <cpy/parser.hpp>
@@ -13,9 +12,8 @@
 #include <utility>
 #include <vector>
 
-// TODO tidy. It's becoming a mess.
 
-std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call, Issues& issues);
+std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call);
 
 
 static BinaryOperator get_binary_operator(const std::string_view op)
@@ -94,7 +92,7 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
                                               op);
   }
   else if (expr_type == "function_call") {
-    expr = parse_function_call(script, ts_node_named_child(expr_node, 0), *script.issues);
+    expr = parse_function_call(script, ts_node_named_child(expr_node, 0));
   }
 
   if (expr)
@@ -121,7 +119,7 @@ std::vector<std::unique_ptr<Expression>> parse_function_call_args(Script& script
   return args;
 }
 
-std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call, Issues& issues)
+std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call)
 {
   const auto name_node = ts_node_child_by_field_name(func_call, "name", 4);
   const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
@@ -140,7 +138,7 @@ std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& 
   return func_call_node;
 }
 
-std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts_node, Issues& issues)
+std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts_node)
 {
   auto ast_node = std::make_unique<FunctionDef>();
   set_source_region(ts_node, *ast_node);
@@ -202,7 +200,7 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
       const auto func_call = ts_node_child_by_field_name(statement, "func_call", 9);
 
       if (!ts_node_is_null(func_call)) {
-        ast_node->body.nodes.push_back(parse_function_call(script, func_call, issues));
+        ast_node->body.nodes.push_back(parse_function_call(script, func_call));
       }
     }
   }
@@ -211,20 +209,20 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
 }
 
 
-void parse_script(Script& script, TSNode& ts_root, Issues& issues)
+void parse_script(Script& script, TSNode& ts_root)
 {
   auto process_node = [&](const TSNode& node) -> std::unique_ptr<AstNode>
   {
     if (ts_node_is_error(node))
     {
-      issue::syntax_error(issues, node);
+      issue::syntax_error(*script.issues, node);
       return std::make_unique<SyntaxError>();
     }
 
     const std::string_view type = ts_node_type(node) ;
 
     if (type == "function_def") {
-      return parse_function_def(script, node, issues);
+      return parse_function_def(script, node);
     }
     else if (type == "statement")
     {
@@ -237,7 +235,7 @@ void parse_script(Script& script, TSNode& ts_root, Issues& issues)
         const std::string_view type = ts_node_type(statement);
 
         if (type == "function_call") {
-          return parse_function_call(script, statement, issues);
+          return parse_function_call(script, statement);
         }
       }
 
@@ -285,7 +283,7 @@ void Parser::parse(Script& script)
     throw std::runtime_error{"Root is not a source_file"};
   }
 
-  parse_script(script, root, *script.issues);
+  parse_script(script, root);
 }
 
 Script Parser::parse(const fs::path src_file)
