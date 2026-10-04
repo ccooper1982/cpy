@@ -31,6 +31,11 @@ void Semantics::process_function_defs(Context& ctx)
 {
   walk_nodes<FunctionDef>(ctx.ast, [&, this](const FunctionDef& def)
   {
+    // overloading not permitted yet
+    if (m_resolved_table.function_exists(def.name)) {
+      issue::func_duplicate(ctx.issues, def, def.name);
+    }
+
     std::vector<ResolvedParam> resolved_params;
     bool error{};
 
@@ -51,7 +56,7 @@ void Semantics::process_function_defs(Context& ctx)
     if (!error && !return_type)
     {
       error = true;
-      issue::unknown_return_param_type(ctx.issues, def.name, def.return_type);
+      issue::unknown_return_type(ctx.issues, def.name, def.return_type);
     }
 
     if (!error) {

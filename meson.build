@@ -36,6 +36,7 @@ cpy_tests = executable(
   'cpy_tests',
   files('tests/ast.cpp',
         'tests/parser.cpp',
+        'tests/semantics.cpp',
         'src/parser.cpp',
         'src/semantics.cpp',
         'grammar/src/parser.c'
