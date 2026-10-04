@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <optional>
 #include <ostream>
@@ -15,10 +16,12 @@
 enum class ErrorCode
 {
   ModuleNotExist,
+  FunctionDuplicate,
   FunctionNotExist,
-  FunctionCallInvalid,
+  FunctionCallArgType,
   FunctionCallArgsCount,
   UnknownParamType,
+  UnknownReturnType,
   SyntaxError
 };
 
@@ -72,6 +75,11 @@ public:
 
   bool have_errors() const { return !m_errors.empty(); }
 
+  size_t get_count(const ErrorCode ec) const
+  {
+    return rg::count(m_errors, ec, &Issue::code);
+  }
+
   void dump(std::ostream& os, std::string_view src) const
   {
     if (m_errors.empty())
@@ -105,21 +113,22 @@ namespace issue
 
   inline void unknown_param_type (Issues& issues, const AstNode& node)
   {
-    // const auto start = ts_node_start_point(node);
-    // const auto start_byte = ts_node_start_byte(node);
-    // const auto end_byte = ts_node_end_byte(node);
-    // issues.add_error(std::format("Unknown type at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::UnknownType);
     issues.add_error(std::format("Unknown parameter type"), node.source, ErrorCode::UnknownParamType);
   }
 
-  inline void unknown_return_param_type(Issues& issues, const std::string_view func, const std::string_view type)
+  inline void unknown_return_type(Issues& issues, const std::string_view func, const std::string_view type)
   {
-    issues.add_error(std::format("Unknown return type '{}' for {}", type, func), ErrorCode::UnknownParamType);
+    issues.add_error(std::format("Unknown return type '{}' for {}", type, func), ErrorCode::UnknownReturnType);
   }
 
   inline void module_not_exist (Issues& issues, const AstNode& node, const std::string_view func)
   {
     issues.add_error(std::format("Module does not exist: {}", func), node.source, ErrorCode::ModuleNotExist);
+  }
+
+  inline void func_duplicate (Issues& issues, const AstNode& node, const std::string_view func)
+  {
+    issues.add_error(std::format("Function already defined: {}", func), node.source, ErrorCode::FunctionDuplicate);
   }
 
   inline void func_not_exist (Issues& issues, const AstNode& node, const std::string_view func)
@@ -129,7 +138,7 @@ namespace issue
 
   inline void func_args (Issues& issues, const AstNode& node, const std::string_view func, const std::string_view arg_name)
   {
-    issues.add_error(std::format("Function call '{}' has invalid type for argument: {}", func, arg_name), node.source, ErrorCode::FunctionCallInvalid);
+    issues.add_error(std::format("Function call '{}' has invalid type for argument: {}", func, arg_name), node.source, ErrorCode::FunctionCallArgType);
   }
 
   inline void func_args_count (Issues& issues, const AstNode& node)
