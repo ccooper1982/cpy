@@ -21,7 +21,8 @@ enum class NodeType
   FunctionDef,
   FunctionParam,
   FunctionBody,
-  Expression
+  Expression,
+  VariableDecl
 };
 
 enum class BuiltInType
@@ -347,13 +348,20 @@ struct FunctionBody : public AstNode
   FunctionBody() : AstNode(Type)
   {}
 
-  std::vector<std::unique_ptr<AstNode>> nodes;
+  void add_node(std::unique_ptr<AstNode>&& node)
+  {
+    if (node) {
+      nodes.push_back(std::move(node));
+    }
+  }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     for (const auto& n : nodes)
       n->dump(os);
   }
+
+  std::vector<std::unique_ptr<AstNode>> nodes;
 };
 
 struct FunctionDef : public AstNode
@@ -362,11 +370,6 @@ struct FunctionDef : public AstNode
 
   FunctionDef() : AstNode(Type)
   {}
-
-  std::string name;
-  std::vector<FunctionParam> params;
-  std::string_view return_type;
-  FunctionBody body;
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -380,6 +383,29 @@ struct FunctionDef : public AstNode
 
     body.dump(os, tab);
   }
+
+
+  std::string name;
+  std::vector<FunctionParam> params;
+  std::string_view return_type;
+  FunctionBody body;
+};
+
+
+struct VariableDecl : public AstNode
+{
+  static constexpr NodeType Type = NodeType::VariableDecl;
+
+  VariableDecl() : AstNode(Type)
+  {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << var_name << ':' << var_type;
+  }
+
+  std::string_view var_name;
+  std::string_view var_type;
 };
 
 

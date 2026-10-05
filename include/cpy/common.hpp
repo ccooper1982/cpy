@@ -16,10 +16,10 @@ class Issues;
 
 struct Script
 {
-  std::string src{};
-  fs::path file{};
+  std::unique_ptr<std::string> src{};
   std::unique_ptr<SourceFile> ast{};
   std::unique_ptr<Issues> issues{};
+  fs::path file{};
 };
 
 

@@ -25,11 +25,13 @@ void Semantics::process(Script& script)
   process_function_defs(ctx);
 
   process_function_calls(ctx);
+
+  process_variable_declarations(ctx);
 }
 
 void Semantics::process_function_defs(Context& ctx)
 {
-  walk_nodes<FunctionDef>(ctx.ast, [&, this](const FunctionDef& def)
+  walk_nodes<FunctionDef>(ctx.ast.nodes, [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
     if (m_resolved_table.function_exists(def.name)) {
@@ -101,4 +103,26 @@ void Semantics::process_function_call(Context& ctx, const FunctionCall& call)
       }
     }
   }
+}
+
+void Semantics::process_variable_declarations(Context& ctx)
+{
+  auto check_vars = [&ctx, this](const std::vector<std::unique_ptr<AstNode>>& nodes)
+  {
+    walk_nodes<VariableDecl>(nodes, [this, &ctx](const VariableDecl& decl)
+    {
+      if (!m_resolved_table.get_type(decl.var_type)) {
+        issue::unknown_variable_type(ctx.issues, decl);
+      }
+    });
+  };
+
+  // top level
+  check_vars(ctx.ast.nodes);
+
+  // declarions within functions
+  walk_nodes<FunctionDef>(ctx.ast.nodes, [&check_vars](const FunctionDef& func_def)
+  {
+    check_vars(func_def.body.nodes);
+  });
 }

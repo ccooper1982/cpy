@@ -22,6 +22,7 @@ enum class ErrorCode
   FunctionCallArgsCount,
   UnknownParamType,
   UnknownReturnType,
+  UnknownVarType,
   SyntaxError
 };
 
@@ -114,6 +115,11 @@ namespace issue
   inline void unknown_param_type (Issues& issues, const AstNode& node)
   {
     issues.add_error(std::format("Unknown parameter type"), node.source, ErrorCode::UnknownParamType);
+  }
+
+  inline void unknown_variable_type (Issues& issues, const AstNode& node)
+  {
+    issues.add_error(std::format("Unknown variable type"), node.source, ErrorCode::UnknownVarType);
   }
 
   inline void unknown_return_type(Issues& issues, const std::string_view func, const std::string_view type)
