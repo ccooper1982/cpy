@@ -187,3 +187,63 @@ TEST(Semantics, FuncCall)
     ASSERT_EQ(script.issues->get_count(ErrorCode::ModuleNotExist), 1);
   }
 }
+
+
+TEST(Semantics, VariableDecl)
+{
+  {
+    const std::string_view src = R"(
+      a: int;
+      b: bacon;
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::UnknownVarType), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      a: int;
+
+      fn foo()
+      {
+        b: bacon;
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::UnknownVarType), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      a: bacon;
+
+      fn foo()
+      {
+        b: cheese;
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::UnknownVarType), 2);
+  }
+}

@@ -2,10 +2,14 @@
 
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
-#include <iostream>
 #include <string_view>
-#include <utility>
 
+/// The AST tests confirm the AST contains expected node types.
+/// Syntax errors are found during creating the AST, though has not been a priority.
+/// The semantic checker is where most of the checks are:
+/// - AST : what the user wrote
+/// - Semamtics : what the user meant
+/// i.e. the AST does not consider variable types, that is handled by Semantics.
 
 TEST(Ast, ZeroNodes)
 {
@@ -109,9 +113,6 @@ TEST(Ast, FuncCall_NotExist)
   Parser parser;
   auto script = parser.parse(src);
 
-  const auto nt = script.ast->nodes[0]->node_type();
-  std::cerr << "NODET " << std::to_underlying(nt) << "\n";
-
   ASSERT_EQ(script.ast->nodes.size(), 1);
   ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::Expression);
   ASSERT_EQ(dynamic_cast<FunctionCall&>(*script.ast->nodes[0]).name, "hello");
@@ -155,14 +156,6 @@ TEST(Ast, FuncCall_Args)
   ASSERT_EQ(call.args.size(), 2);
   ASSERT_TRUE(call.args[0]->is_expr_type(ExpressionType::Int));
   ASSERT_TRUE(call.args[1]->is_expr_type(ExpressionType::String));
-
-//   const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
-//   ASSERT_TRUE(param_arg_valid(def.params[0], call.args[0]));
-//   ASSERT_TRUE(param_arg_valid(def.params[1], call.args[1]));
-//   ASSERT_FALSE(param_arg_valid(def.params[0], call.args[1]));
-//   ASSERT_FALSE(param_arg_valid(def.params[1], call.args[0]));
-//
-//   ASSERT_TRUE(func_call_valid(def, call));
 }
 
 TEST(Ast, FuncCall_InvalidCall)
@@ -180,15 +173,6 @@ TEST(Ast, FuncCall_InvalidCall)
   ASSERT_EQ(script.ast->nodes.size(), 4);
   ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::FunctionDef);
   ASSERT_EQ(script.ast->nodes[1]->node_type(), NodeType::Expression);
-
-//   const auto& def = dynamic_cast<FunctionDef&>(*script.ast->nodes[0]);
-//   const auto& wrong_type = dynamic_cast<FunctionCall&>(*script.ast->nodes[1]);
-//   const auto& too_many = dynamic_cast<FunctionCall&>(*script.ast->nodes[2]);
-//   const auto& too_few = dynamic_cast<FunctionCall&>(*script.ast->nodes[3]);
-//
-//   ASSERT_FALSE(func_call_valid(def, wrong_type));
-//   ASSERT_FALSE(func_call_valid(def, too_many));
-//   ASSERT_FALSE(func_call_valid(def, too_few));
 }
 
 TEST(Ast, FuncCall_AllPrimitives)
@@ -328,6 +312,37 @@ TEST(Ast, Expr_BinaryExprFuncs)
   const auto& expr = dynamic_cast<BinaryExpression&>(*call_foo.args[0]);
   ASSERT_TRUE(expr.lhs->is_expr_type(ExpressionType::FuncCall));
   ASSERT_TRUE(expr.rhs->is_expr_type(ExpressionType::FuncCall));
+}
+
+
+// Variables //
+TEST(Ast, VariableDecl)
+{
+  const std::string_view src = R"(
+    a: int;
+    b: str;
+    c: bacon;
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  ASSERT_EQ(script.ast->nodes.size(), 3);
+  ASSERT_EQ(script.ast->nodes[0]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(script.ast->nodes[1]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(script.ast->nodes[2]->node_type(), NodeType::VariableDecl);
+
+  const auto& var_a = dynamic_cast<VariableDecl&>(*script.ast->nodes[0]);
+  ASSERT_EQ(var_a.var_name, "a");
+  ASSERT_EQ(var_a.var_type, "int");
+
+  const auto& var_b = dynamic_cast<VariableDecl&>(*script.ast->nodes[1]);
+  ASSERT_EQ(var_b.var_name, "b");
+  ASSERT_EQ(var_b.var_type, "str");
+
+  const auto& var_c = dynamic_cast<VariableDecl&>(*script.ast->nodes[2]);
+  ASSERT_EQ(var_c.var_name, "c");
+  ASSERT_EQ(var_c.var_type, "bacon");
 }
 
 

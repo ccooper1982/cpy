@@ -1,3 +1,4 @@
+#include "tree_sitter/api.h"
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/issues.hpp>
 #include <cpy/parser.hpp>
@@ -37,7 +38,7 @@ std::string_view from_source (const Script& script, const TSNode& node)
   const auto start = ts_node_start_byte(node);
   const auto length = ts_node_end_byte(node) - start;
 
-  return std::string_view{script.src}.substr(start, length);
+  return std::string_view{*script.src}.substr(start, length);
 }
 
 void set_source_region (const TSNode& ts_node, AstNode& ast_node)
@@ -103,6 +104,26 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
   return expr;
 }
 
+
+std::unique_ptr<VariableDecl> parse_variable_decl(Script& script, const TSNode& ts_node)
+{
+  const auto name_node = ts_node_child_by_field_name(ts_node, "name", 4);
+  const auto type_node = ts_node_child_by_field_name(ts_node, "type_name", 9);
+
+  if (ts_node_is_null(name_node) || ts_node_is_null(type_node))
+  {
+    issue::syntax_error(*script.issues, ts_node);
+    return nullptr;
+  }
+
+  auto var_decl = std::make_unique<VariableDecl>();
+  var_decl->var_name = from_source(script, name_node);
+  var_decl->var_type = from_source(script, type_node);
+  set_source_region(ts_node, *var_decl);
+  return var_decl;
+}
+
+
 std::vector<std::unique_ptr<Expression>> parse_function_call_args(Script& script, const TSNode& args_node)
 {
   std::vector<std::unique_ptr<Expression>> args;
@@ -151,7 +172,7 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
   TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
   if (!ts_node_is_null(return_type))
   {
-    auto type_node = ts_node_child_by_field_name(return_type, "type", 4);
+    auto type_node = ts_node_child_by_field_name(return_type, "type_name", 9);
     ast_node->return_type = from_source(script, type_node);
   }
   else {
@@ -198,9 +219,13 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
     {
       const auto statement = ts_node_named_child(body, s);
       const auto func_call = ts_node_child_by_field_name(statement, "func_call", 9);
+      const auto var_decl = ts_node_child_by_field_name(statement, "variable_declaration", 20);
 
       if (!ts_node_is_null(func_call)) {
-        ast_node->body.nodes.push_back(parse_function_call(script, func_call));
+        ast_node->body.add_node(parse_function_call(script, func_call));
+      }
+      else if (!ts_node_is_null(var_decl)) {
+        ast_node->body.add_node(parse_variable_decl(script, var_decl));
       }
     }
   }
@@ -236,6 +261,9 @@ void parse_script(Script& script, TSNode& ts_root)
 
         if (type == "function_call") {
           return parse_function_call(script, statement);
+        }
+        else if (type == "variable_declaration") {
+          return parse_variable_decl(script, statement);
         }
       }
 
@@ -275,7 +303,7 @@ void Parser::parse(Script& script)
 
   ts_parser_set_language(m_parser, tree_sitter_cpy());
 
-  m_tree = ts_parser_parse_string(m_parser, nullptr, script.src.data(), script.src.length());
+  m_tree = ts_parser_parse_string(m_parser, nullptr, script.src->data(), script.src->length());
 
   TSNode root = ts_tree_root_node(m_tree);
 
@@ -297,7 +325,9 @@ Script Parser::parse(const fs::path src_file)
       throw std::runtime_error{"Failed to open source file: " + src_file.string()};
   }
 
-  script.src = {std::istreambuf_iterator<char>{stream}, std::istreambuf_iterator<char>{}};
+  script.src = std::make_unique<std::string> (
+    std::istreambuf_iterator<char>{stream},
+    std::istreambuf_iterator<char>{});
 
   parse(script);
   return script;
@@ -306,7 +336,7 @@ Script Parser::parse(const fs::path src_file)
 Script Parser::parse(const std::string_view src)
 {
   Script script;
-  script.src = std::string{src};
+  script.src = std::make_unique<std::string> (src);
   script.issues = std::make_unique<Issues>();
 
   parse(script);

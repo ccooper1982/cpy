@@ -83,16 +83,19 @@ private:
   template<typename NodeT>
   using NodeHandler = std::function<void(const NodeT&)>;
 
+  // functions
   void process_function_defs(Context& ctx);
-
   void process_function_calls(Context& ctx);
   void process_function_call(Context& ctx, const FunctionCall& call);
 
+  // variables
+  void process_variable_declarations(Context& ctx);
 
+  // utils
   template<typename NodeT, typename Handler>
     requires std::derived_from<NodeT, AstNode> &&
              std::convertible_to<decltype(NodeT::Type), NodeType>
-  void walk_nodes(const SourceFile& root, Handler&& handler)
+  void walk_nodes(const std::vector<std::unique_ptr<AstNode>>& nodes, Handler&& handler)
   {
     const constexpr NodeType nt = NodeT::Type;
 
@@ -100,7 +103,7 @@ private:
       return n->is_node_type(nt);
     };
 
-    for (const auto& node : root.nodes | vw::filter(by_node_type)) {
+    for (const auto& node : nodes | vw::filter(by_node_type)) {
       handler(dynamic_cast<const NodeT&>(*node));
     }
   }
@@ -112,7 +115,7 @@ private:
   {
     const constexpr ExpressionType et = ExprT::ExprType;
 
-    walk_nodes<Expression>(root, [&](const Expression& expr_node)
+    walk_nodes<Expression>(root.nodes, [&](const Expression& expr_node)
     {
       if (expr_node.is_expr_type(et)) {
         handler(dynamic_cast<const ExprT&>(expr_node));
