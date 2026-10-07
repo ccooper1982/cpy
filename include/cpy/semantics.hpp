@@ -13,40 +13,51 @@
 #include <string_view>
 
 
-struct ResolvedParam
+struct ResolvedSymbol
 {
   std::string_view name;
   VarType type;
 };
 
-struct ResolvedTypes
+struct ResolvedFunction
 {
-  std::vector<ResolvedParam> params;
+  std::vector<ResolvedSymbol> params;
   VarType return_type;
 };
 
-class ResolvedTypesTable
+
+class SymbolTable
 {
   inline static const std::map<const std::string_view, const BuiltInType> BuiltIntTypes = {
-    {"int", BuiltInType::Int},
-    {"dec", BuiltInType::Decimal},
-    {"bool", BuiltInType::Bool},
-    {"str", BuiltInType::String},
-    {"void", BuiltInType::Void}
+    {"int",   BuiltInType::Int},
+    {"dec",   BuiltInType::Decimal},
+    {"bool",  BuiltInType::Bool},
+    {"str",   BuiltInType::String},
+    {"void",  BuiltInType::Void}
   };
 
 public:
-  void add_function (const std::string_view name, std::vector<ResolvedParam> params, VarType return_type)
+  void add_function (const std::string_view name, std::vector<ResolvedSymbol> params, VarType return_type)
   {
-    m_function_table.emplace(name, ResolvedTypes{.params = std::move(params), .return_type = return_type});
+    m_functions.emplace(name, ResolvedFunction{.params = std::move(params), .return_type = return_type});
   }
 
-  bool function_exists(const std::string_view name)
+  void add_variable(const std::string_view name, VarType type)
   {
-    return m_function_table.contains(name);
+    m_vars.emplace(name, ResolvedSymbol{.name = name, .type = type});
   }
 
-  std::optional<BuiltInType> get_type(const std::string_view t)
+  bool have_variable(const std::string_view name) const
+  {
+    return m_vars.contains(name);
+  }
+
+  bool have_function(const std::string_view name) const
+  {
+    return m_functions.contains(name);
+  }
+
+  std::optional<BuiltInType> get_type(const std::string_view t) const
   {
     const auto it = BuiltIntTypes.find(t) ;
     if (it == rg::end(BuiltIntTypes))
@@ -55,13 +66,19 @@ public:
     return it->second;
   }
 
-  const ResolvedTypes& get_function_types(const std::string_view func) const
+  const ResolvedFunction& get_function(const std::string_view func) const
   {
-    return m_function_table.find(func)->second;
+    return m_functions.find(func)->second;
+  }
+
+  const ResolvedSymbol& get_variable(const std::string_view var) const
+  {
+    return m_vars.find(var)->second;
   }
 
 private:
-  std::map<std::string_view, const ResolvedTypes> m_function_table;
+  std::map<std::string_view, const ResolvedFunction> m_functions;
+  std::map<std::string_view, const ResolvedSymbol> m_vars;
 };
 
 
@@ -78,6 +95,7 @@ class Semantics
 
 public:
   void process(Script& script);
+  const SymbolTable& symbol_table() const { return m_symbol_table; }
 
 private:
   template<typename NodeT>
@@ -104,7 +122,7 @@ private:
     };
 
     for (const auto& node : nodes | vw::filter(by_node_type)) {
-      handler(dynamic_cast<const NodeT&>(*node));
+      handler(dynamic_cast<NodeT&>(*node));
     }
   }
 
@@ -115,15 +133,14 @@ private:
   {
     const constexpr ExpressionType et = ExprT::ExprType;
 
-    walk_nodes<Expression>(root.nodes, [&](const Expression& expr_node)
+    walk_nodes<Expression>(root.nodes, [&](Expression& expr_node)
     {
       if (expr_node.is_expr_type(et)) {
-        handler(dynamic_cast<const ExprT&>(expr_node));
+        handler(dynamic_cast<ExprT&>(expr_node));
       }
     });
   }
 
 private:
-  ResolvedTypesTable m_resolved_table;
-  std::set<std::string_view> m_function_names;
+  SymbolTable m_symbol_table;
 };

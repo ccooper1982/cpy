@@ -109,16 +109,30 @@ std::unique_ptr<VariableDecl> parse_variable_decl(Script& script, const TSNode& 
 {
   const auto name_node = ts_node_child_by_field_name(ts_node, "name", 4);
   const auto type_node = ts_node_child_by_field_name(ts_node, "type_name", 9);
+  const auto init_node = ts_node_child_by_field_name(ts_node, "initialiser", 11);
+  const auto have_type = !ts_node_is_null(type_node);
+  const auto have_init = !ts_node_is_null(init_node);
 
-  if (ts_node_is_null(name_node) || ts_node_is_null(type_node))
+  // name always required. If we don't have a type, we must have an initialiser
+  if (ts_node_has_error(ts_node) || ts_node_is_null(name_node) || (!have_type && !have_init))
   {
     issue::syntax_error(*script.issues, ts_node);
     return nullptr;
   }
 
-  auto var_decl = std::make_unique<VariableDecl>();
+  std::unique_ptr<VariableDecl> var_decl;
+
+  if (have_type)
+  {
+    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_explicit(have_init ? parse_expression(script, init_node) : nullptr));
+    var_decl->var_type = from_source(script, type_node);
+  }
+  else {
+    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_inferred(parse_expression(script, init_node)));
+  }
+
   var_decl->var_name = from_source(script, name_node);
-  var_decl->var_type = from_source(script, type_node);
+
   set_source_region(ts_node, *var_decl);
   return var_decl;
 }

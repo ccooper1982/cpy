@@ -34,16 +34,16 @@ void Semantics::process_function_defs(Context& ctx)
   walk_nodes<FunctionDef>(ctx.ast.nodes, [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
-    if (m_resolved_table.function_exists(def.name)) {
+    if (m_symbol_table.have_function(def.name)) {
       issue::func_duplicate(ctx.issues, def, def.name);
     }
 
-    std::vector<ResolvedParam> resolved_params;
+    std::vector<ResolvedSymbol> resolved_params;
     bool error{};
 
     for (const auto& param : def.params)
     {
-      if (const auto type = m_resolved_table.get_type(param.type_name); type) {
+      if (const auto type = m_symbol_table.get_type(param.type_name); type) {
         resolved_params.emplace_back(param.param_name, *type);
       }
       else
@@ -54,7 +54,7 @@ void Semantics::process_function_defs(Context& ctx)
       }
     }
 
-    const auto return_type = m_resolved_table.get_type(def.return_type);
+    const auto return_type = m_symbol_table.get_type(def.return_type);
     if (!error && !return_type)
     {
       error = true;
@@ -62,7 +62,7 @@ void Semantics::process_function_defs(Context& ctx)
     }
 
     if (!error) {
-      m_resolved_table.add_function(def.name, std::move(resolved_params), *return_type);
+      m_symbol_table.add_function(def.name, std::move(resolved_params), *return_type);
     }
   });
 }
@@ -74,7 +74,7 @@ void Semantics::process_function_calls(Context& ctx)
     if (!call.module.empty() && !Modules::exist(call.module)) {
       issue::module_not_exist(ctx.issues, call, call.module);
     }
-    else if (!m_resolved_table.function_exists(call.name)) {
+    else if (!m_symbol_table.have_function(call.name)) {
       issue::func_not_exist(ctx.issues, call, call.name);
     }
     else {
@@ -85,7 +85,7 @@ void Semantics::process_function_calls(Context& ctx)
 
 void Semantics::process_function_call(Context& ctx, const FunctionCall& call)
 {
-  const auto& resolved = m_resolved_table.get_function_types(call.name);
+  const auto& resolved = m_symbol_table.get_function(call.name);
 
   if (call.args.size() != resolved.params.size())
   {
@@ -111,8 +111,62 @@ void Semantics::process_variable_declarations(Context& ctx)
   {
     walk_nodes<VariableDecl>(nodes, [this, &ctx](const VariableDecl& decl)
     {
-      if (!m_resolved_table.get_type(decl.var_type)) {
-        issue::unknown_variable_type(ctx.issues, decl);
+      if (m_symbol_table.have_variable(decl.var_name))
+      {
+        issue::var_duplicate(ctx.issues, decl, decl.var_name);
+        return;
+      }
+
+      if (decl.has_explicit_type())
+      {
+        if (const auto type = m_symbol_table.get_type(decl.var_type); !type) {
+          issue::unknown_variable_type(ctx.issues, decl);
+        }
+        else {
+          m_symbol_table.add_variable(decl.var_name, *type);
+        }
+      }
+      else
+      {
+        // TODO over simplifies, needs more thought for binary expression initialiser:
+        //  a := foo() + bar();
+        if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall)
+        {
+          const auto& call = dynamic_cast<const FunctionCall&>(init);
+
+          if (!m_symbol_table.have_function(call.name)) {
+            issue::func_not_exist(ctx.issues, decl, call.name);
+          }
+          else
+          {
+            const auto& types = m_symbol_table.get_function(call.name);
+            if (types.return_type == BuiltInType::Void) {
+              issue::var_init_void(ctx.issues, decl, decl.var_name);
+            }
+            else {
+              m_symbol_table.add_variable(decl.var_name, types.return_type);
+            }
+          }
+        }
+        else if (init.expr_type() == ExpressionType::Binary)
+        {
+          const auto& expr = dynamic_cast<const BinaryExpression&>(init);
+          const auto& lhs = *expr.lhs;
+          const auto& rhs = *expr.rhs;
+
+          if (lhs.is_expr_type(ExpressionType::FuncCall) || rhs.is_expr_type(ExpressionType::FuncCall)) {
+            issue::unsupported(ctx.issues, decl, "Initialise from this binary expression");
+          }
+          else if (lhs.expr_type() != rhs.expr_type()) {
+            issue::var_init_binary_invalid(ctx.issues, decl, decl.var_name);
+          }
+          else {
+            m_symbol_table.add_variable(decl.var_name, lhs.get_var_type());
+          }
+        }
+        else {
+          m_symbol_table.add_variable(decl.var_name, init.get_var_type());
+        }
       }
     });
   };
@@ -120,7 +174,7 @@ void Semantics::process_variable_declarations(Context& ctx)
   // top level
   check_vars(ctx.ast.nodes);
 
-  // declarions within functions
+  // declarations within functions
   walk_nodes<FunctionDef>(ctx.ast.nodes, [&check_vars](const FunctionDef& func_def)
   {
     check_vars(func_def.body.nodes);

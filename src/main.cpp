@@ -35,6 +35,7 @@ int main (int argc, char ** argv)
     }
   }
 
+  std::cout << "AST:";
   script.ast->dump(std::cout);
 
   // errors here if tree-sitter found syntax errors
@@ -44,6 +45,7 @@ int main (int argc, char ** argv)
     sems.process(script);
   }
 
+  std::cout << "Issues:\n";
   script.issues->dump(std::cout, *script.src);
 
   return script.issues->have_errors() ? 1 : 0;

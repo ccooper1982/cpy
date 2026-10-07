@@ -316,7 +316,7 @@ TEST(Ast, Expr_BinaryExprFuncs)
 
 
 // Variables //
-TEST(Ast, VariableDecl)
+TEST(Ast, VariableDeclNoInit)
 {
   const std::string_view src = R"(
     a: int;
@@ -324,6 +324,7 @@ TEST(Ast, VariableDecl)
     c: bacon;
   )";
 
+  // bacon is not a type, the test checks the AST doesn't care
   Parser parser;
   auto script = parser.parse(src);
 
@@ -335,16 +336,52 @@ TEST(Ast, VariableDecl)
   const auto& var_a = dynamic_cast<VariableDecl&>(*script.ast->nodes[0]);
   ASSERT_EQ(var_a.var_name, "a");
   ASSERT_EQ(var_a.var_type, "int");
+  ASSERT_EQ(var_a.get_decl_type(), VariableDecl::DeclType::ExplicitNoInit);
 
   const auto& var_b = dynamic_cast<VariableDecl&>(*script.ast->nodes[1]);
   ASSERT_EQ(var_b.var_name, "b");
   ASSERT_EQ(var_b.var_type, "str");
+  ASSERT_EQ(var_a.get_decl_type(), VariableDecl::DeclType::ExplicitNoInit);
 
   const auto& var_c = dynamic_cast<VariableDecl&>(*script.ast->nodes[2]);
   ASSERT_EQ(var_c.var_name, "c");
   ASSERT_EQ(var_c.var_type, "bacon");
+  ASSERT_EQ(var_a.get_decl_type(), VariableDecl::DeclType::ExplicitNoInit);
 }
 
+TEST(Ast, VariableDeclInit)
+{
+  const std::string_view src = R"(
+    fn foo() -> int {}
+
+    a := 5;
+    b := "xyz";
+    c := foo();
+    d: int = 5;
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  const auto& ast = *script.ast;
+
+  ASSERT_EQ(ast.nodes.size(), 5);
+  ASSERT_EQ(ast.nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(ast.nodes[1]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.nodes[2]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.nodes[3]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.nodes[4]->node_type(), NodeType::VariableDecl);
+
+  const auto& var_decl_a = dynamic_cast<const VariableDecl&>(*ast.nodes[1]);
+  const auto& var_decl_b = dynamic_cast<const VariableDecl&>(*ast.nodes[2]);
+  const auto& var_decl_c = dynamic_cast<const VariableDecl&>(*ast.nodes[3]);
+  const auto& var_decl_d = dynamic_cast<const VariableDecl&>(*ast.nodes[4]);
+
+  ASSERT_EQ(var_decl_a.get_decl_type(), VariableDecl::DeclType::InferredType);
+  ASSERT_EQ(var_decl_b.get_decl_type(), VariableDecl::DeclType::InferredType);
+  ASSERT_EQ(var_decl_c.get_decl_type(), VariableDecl::DeclType::InferredType);
+  ASSERT_EQ(var_decl_d.get_decl_type(), VariableDecl::DeclType::ExplicitInit);
+}
 
 // Syntax Errors //
 TEST(Ast, SyntaxError)

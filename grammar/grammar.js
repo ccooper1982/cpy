@@ -53,8 +53,20 @@ export default grammar({
     variable_declaration: ($) =>
       seq(
         field("name", $.identifier),
-        ":",
-        field("type_name", $.type_name),
+        choice(
+          seq(
+            ":",
+            field("type_name", $.type_name),
+            optional(seq(
+              "=",
+              field("initialiser", $.expression),
+            )),
+          ),
+          seq(
+            ":=",
+            field("initialiser", $.expression),
+          ),
+        ),
       ),
 
     qualified_name: ($) => seq(

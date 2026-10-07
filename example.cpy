@@ -1,7 +1,6 @@
 
-a: horse;
+fn foo() -> int {}
 
-fn hello()
-{
-    b: horse;
-}
+a := foo();
+b := 5;
+c: int = 5;
