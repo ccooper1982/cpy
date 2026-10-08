@@ -32,7 +32,7 @@ enum class BuiltInType
   Bool,
   String,
   Void,
-  Unknown
+  Unknown // or Unset
 };
 
 
@@ -43,9 +43,11 @@ struct UserType
 
 struct VarType
 {
+  VarType() : type (BuiltInType::Unknown)
+  {}
+
   VarType(const BuiltInType t) : type (t)
-  {
-  }
+  {}
 
   const auto& value() const { return type; }
 

@@ -227,4 +227,21 @@ TEST(Semantics, VariableDecl)
     ASSERT_TRUE(script.issues->have_errors());
     ASSERT_EQ(script.issues->get_count(ErrorCode::UnknownVarType), 2);
   }
+
+  {
+    const std::string_view src = R"(
+      fn foo() {}
+
+      a := foo();
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitVoid), 1);
+  }
 }

@@ -3,6 +3,7 @@
 #include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
 
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 
@@ -83,14 +84,14 @@ void Semantics::process_function_calls(Context& ctx)
   });
 }
 
-void Semantics::process_function_call(Context& ctx, const FunctionCall& call)
+bool Semantics::process_function_call(Context& ctx, const FunctionCall& call)
 {
   const auto& resolved = m_symbol_table.get_function(call.name);
 
   if (call.args.size() != resolved.params.size())
   {
     issue::func_args_count(ctx.issues, call);
-    return;
+    return false;
   }
 
   for (uint8_t i = 0 ; i < call.args.size() ; ++i)
@@ -98,11 +99,17 @@ void Semantics::process_function_call(Context& ctx, const FunctionCall& call)
     const auto builtin_type = resolved.params[i].type.value_as<BuiltInType>();
     if (builtin_type)
     {
-      if (!call.args[i]->is_convertible_to(*builtin_type)) {
+      if (call.args[i]->is_expr_type(ExpressionType::FuncCall)) {
+        issue::unsupported(ctx.issues, *(call.args[i]), "Function call as function argument");
+      }
+      else if (!call.args[i]->is_convertible_to(*builtin_type))
+      {
         issue::func_args(ctx.issues, *(call.args[i]), call.name, resolved.params[i].name);
+        return false;
       }
     }
   }
+  return true;
 }
 
 void Semantics::process_variable_declarations(Context& ctx)
@@ -128,24 +135,31 @@ void Semantics::process_variable_declarations(Context& ctx)
       }
       else
       {
-        // TODO over simplifies, needs more thought for binary expression initialiser:
-        //  a := foo() + bar();
+        auto get_type_from_func_call = [this, &ctx, &decl](const FunctionCall& call) -> std::optional<VarType>
+        {
+          if (!m_symbol_table.have_function(call.name)) {
+            issue::func_not_exist(ctx.issues, decl, call.name);
+          }
+          else if (process_function_call(ctx, call))
+          {
+            const auto& types = m_symbol_table.get_function(call.name);
+            if (types.return_type != BuiltInType::Void) {
+              return types.return_type;
+            }
+            else {
+              issue::var_init_void(ctx.issues, decl, decl.var_name);
+            }
+          }
+
+          return std::nullopt;
+        };
+
         if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall)
         {
           const auto& call = dynamic_cast<const FunctionCall&>(init);
 
-          if (!m_symbol_table.have_function(call.name)) {
-            issue::func_not_exist(ctx.issues, decl, call.name);
-          }
-          else
-          {
-            const auto& types = m_symbol_table.get_function(call.name);
-            if (types.return_type == BuiltInType::Void) {
-              issue::var_init_void(ctx.issues, decl, decl.var_name);
-            }
-            else {
-              m_symbol_table.add_variable(decl.var_name, types.return_type);
-            }
+          if (auto type = get_type_from_func_call(call); type) {
+            m_symbol_table.add_variable(decl.var_name, *type);
           }
         }
         else if (init.expr_type() == ExpressionType::Binary)
@@ -154,14 +168,33 @@ void Semantics::process_variable_declarations(Context& ctx)
           const auto& lhs = *expr.lhs;
           const auto& rhs = *expr.rhs;
 
-          if (lhs.is_expr_type(ExpressionType::FuncCall) || rhs.is_expr_type(ExpressionType::FuncCall)) {
-            issue::unsupported(ctx.issues, decl, "Initialise from this binary expression");
-          }
-          else if (lhs.expr_type() != rhs.expr_type()) {
-            issue::var_init_binary_invalid(ctx.issues, decl, decl.var_name);
+          VarType lhs_type, rhs_type;
+
+          if (lhs.is_expr_type(ExpressionType::FuncCall))
+          {
+            if (const auto type = get_type_from_func_call(dynamic_cast<const FunctionCall&>(lhs)); type) {
+              lhs_type = *type;
+            }
           }
           else {
-            m_symbol_table.add_variable(decl.var_name, lhs.get_var_type());
+            lhs_type = lhs.get_var_type();
+          }
+
+          if (rhs.is_expr_type(ExpressionType::FuncCall))
+          {
+            if (const auto type = get_type_from_func_call(dynamic_cast<const FunctionCall&>(rhs)); type) {
+              rhs_type = *type;
+            }
+          }
+          else {
+            rhs_type = rhs.get_var_type();
+          }
+
+          if (lhs_type != rhs_type) {
+            issue::var_init_binary_differ(ctx.issues, decl);
+          }
+          else if (lhs_type != BuiltInType::Unknown && rhs_type != BuiltInType::Unknown) {
+            m_symbol_table.add_variable(decl.var_name, lhs_type);
           }
         }
         else {

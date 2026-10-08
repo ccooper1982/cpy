@@ -166,9 +166,9 @@ namespace issue
     issues.add_error(std::format("Cannot intialise variable from void: {}", var), node.source, ErrorCode::VariableInitVoid);
   }
 
-  inline void var_init_binary_invalid (Issues& issues, const AstNode& node, const std::string_view var)
+  inline void var_init_binary_differ (Issues& issues, const AstNode& node)
   {
-    issues.add_error(std::format("Variable initialise from binary expression with incompatible types: {}", var), node.source, ErrorCode::VariableInitBinaryInvalid);
+    issues.add_error("Variable initialised from binary expression with incompatible types", node.source, ErrorCode::VariableInitBinaryInvalid);
   }
 
   inline void unsupported (Issues& issues, const AstNode& node, const std::string_view feature)

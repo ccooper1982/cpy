@@ -2,8 +2,10 @@
 
 #include <concepts>
 #include <functional>
+#include <iomanip>
 #include <map>
 #include <optional>
+#include <ostream>
 #include <ranges>
 #include <set>
 
@@ -37,6 +39,15 @@ class SymbolTable
   };
 
 public:
+  SymbolTable() = default;
+  ~SymbolTable() = default;
+
+  SymbolTable(const SymbolTable&) = delete;
+  SymbolTable& operator=(const SymbolTable&) = delete;
+  SymbolTable(SymbolTable&&) = default;
+  SymbolTable& operator=(SymbolTable&&) = default;
+
+
   void add_function (const std::string_view name, std::vector<ResolvedSymbol> params, VarType return_type)
   {
     m_functions.emplace(name, ResolvedFunction{.params = std::move(params), .return_type = return_type});
@@ -76,6 +87,25 @@ public:
     return m_vars.find(var)->second;
   }
 
+  void dump (std::ostream& os) const
+  {
+    os << "-- Functions --\n";
+    for(const auto& [name, resolved] : m_functions)
+    {
+      os << name << '\n';
+      os << "  - return: "<< to_string(resolved.return_type) << '\n' ;
+      os << "  - params:\n";
+      for(const auto& symbol : resolved.params) {
+        os << std::setw(8) << symbol.name << " : " << to_string(symbol.type) << '\n';
+      }
+    }
+
+    os << "\n-- Variables --\n";
+    for(const auto& [name, resolved] : m_vars) {
+      os << name << std::setw(4) << '|' << to_string(resolved.type) << '\n';
+    }
+  }
+
 private:
   std::map<std::string_view, const ResolvedFunction> m_functions;
   std::map<std::string_view, const ResolvedSymbol> m_vars;
@@ -104,7 +134,7 @@ private:
   // functions
   void process_function_defs(Context& ctx);
   void process_function_calls(Context& ctx);
-  void process_function_call(Context& ctx, const FunctionCall& call);
+  bool process_function_call(Context& ctx, const FunctionCall& call);
 
   // variables
   void process_variable_declarations(Context& ctx);

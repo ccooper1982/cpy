@@ -1,6 +1,4 @@
-
 fn foo() -> int {}
+fn bar(a: int) -> str {}
 
-a := foo();
-b := 5;
-c: int = 5;
+a := bar(foo());
