@@ -1,6 +1,5 @@
-fn foo1(a: int) -> int {}
-fn foo2(a: int) -> int {}
-fn foo3(a: str) -> int {}
+fn foo1(a: int, b: str) -> int {}
+fn foo2() -> int {}
+fn foo3() -> str {}
 
-a := foo2(foo1(1));
-b := foo2(foo1(foo3("hello")));
+a := foo1(foo2(), foo3());

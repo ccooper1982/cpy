@@ -102,24 +102,26 @@ bool Semantics::process_function_call(Context& ctx, const FunctionCall& call)
     const auto builtin_type = resolved.params[i].type.value_as<BuiltInType>();
     if (builtin_type)
     {
-      if (call.args[i]->is_expr_type(ExpressionType::FuncCall))
+      const auto& call_arg = *call.args[i];
+
+      if (call_arg.is_expr_type(ExpressionType::FuncCall))
       {
-        const auto& arg_call = dynamic_cast<const FunctionCall&>(*call.args[i]);
+        const auto& arg_call = dynamic_cast<const FunctionCall&>(call_arg);
 
         if (process_function_call(ctx, arg_call))
         {
-          const auto& resolved = m_symbol_table.get_function(call.name);
+          const auto& resolved = m_symbol_table.get_function(arg_call.name);
           if (resolved.return_type == BuiltInType::Void) {
-            issue::func_arg_void(ctx.issues, *(call.args[i]), resolved.params[i].name);
+            issue::func_arg_void(ctx.issues, call_arg, resolved.params[i].name);
           }
           else if (resolved.return_type != *builtin_type) {
-            issue::func_arg(ctx.issues, *(call.args[i]), arg_call.name, resolved.params[i].name);
+            issue::func_arg(ctx.issues, call_arg, arg_call.name, resolved.params[i].name);
           }
         }
       }
-      else if (!call.args[i]->is_convertible_to(*builtin_type))
+      else if (!call_arg.is_convertible_to(*builtin_type))
       {
-        issue::func_arg(ctx.issues, *(call.args[i]), call.name, resolved.params[i].name);
+        issue::func_arg(ctx.issues, call_arg, call.name, resolved.params[i].name);
         return false;
       }
     }
