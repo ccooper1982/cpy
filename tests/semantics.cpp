@@ -231,7 +231,6 @@ TEST(Semantics, VariableDecl)
   {
     const std::string_view src = R"(
       fn foo() {}
-
       a := foo();
     )";
 
@@ -243,5 +242,20 @@ TEST(Semantics, VariableDecl)
 
     ASSERT_TRUE(script.issues->have_errors());
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitVoid), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo() -> int {}
+      a := foo();
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
   }
 }

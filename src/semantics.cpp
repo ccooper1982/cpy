@@ -75,9 +75,6 @@ void Semantics::process_function_calls(Context& ctx)
     if (!call.module.empty() && !Modules::exist(call.module)) {
       issue::module_not_exist(ctx.issues, call, call.module);
     }
-    else if (!m_symbol_table.have_function(call.name)) {
-      issue::func_not_exist(ctx.issues, call, call.name);
-    }
     else {
       process_function_call(ctx, call);
     }
@@ -86,11 +83,17 @@ void Semantics::process_function_calls(Context& ctx)
 
 bool Semantics::process_function_call(Context& ctx, const FunctionCall& call)
 {
+  if (!m_symbol_table.have_function(call.name))
+  {
+    issue::func_not_exist(ctx.issues, call, call.name);
+    return false;
+  }
+
   const auto& resolved = m_symbol_table.get_function(call.name);
 
   if (call.args.size() != resolved.params.size())
   {
-    issue::func_args_count(ctx.issues, call);
+    issue::func_arg_count(ctx.issues, call);
     return false;
   }
 
@@ -99,12 +102,24 @@ bool Semantics::process_function_call(Context& ctx, const FunctionCall& call)
     const auto builtin_type = resolved.params[i].type.value_as<BuiltInType>();
     if (builtin_type)
     {
-      if (call.args[i]->is_expr_type(ExpressionType::FuncCall)) {
-        issue::unsupported(ctx.issues, *(call.args[i]), "Function call as function argument");
+      if (call.args[i]->is_expr_type(ExpressionType::FuncCall))
+      {
+        const auto& arg_call = dynamic_cast<const FunctionCall&>(*call.args[i]);
+
+        if (process_function_call(ctx, arg_call))
+        {
+          const auto& resolved = m_symbol_table.get_function(call.name);
+          if (resolved.return_type == BuiltInType::Void) {
+            issue::func_arg_void(ctx.issues, *(call.args[i]), resolved.params[i].name);
+          }
+          else if (resolved.return_type != *builtin_type) {
+            issue::func_arg(ctx.issues, *(call.args[i]), arg_call.name, resolved.params[i].name);
+          }
+        }
       }
       else if (!call.args[i]->is_convertible_to(*builtin_type))
       {
-        issue::func_args(ctx.issues, *(call.args[i]), call.name, resolved.params[i].name);
+        issue::func_arg(ctx.issues, *(call.args[i]), call.name, resolved.params[i].name);
         return false;
       }
     }
@@ -137,14 +152,11 @@ void Semantics::process_variable_declarations(Context& ctx)
       {
         auto get_type_from_func_call = [this, &ctx, &decl](const FunctionCall& call) -> std::optional<VarType>
         {
-          if (!m_symbol_table.have_function(call.name)) {
-            issue::func_not_exist(ctx.issues, decl, call.name);
-          }
-          else if (process_function_call(ctx, call))
+          if (process_function_call(ctx, call))
           {
-            const auto& types = m_symbol_table.get_function(call.name);
-            if (types.return_type != BuiltInType::Void) {
-              return types.return_type;
+            const auto& resolved = m_symbol_table.get_function(call.name);
+            if (resolved.return_type != BuiltInType::Void) {
+              return resolved.return_type;
             }
             else {
               issue::var_init_void(ctx.issues, decl, decl.var_name);

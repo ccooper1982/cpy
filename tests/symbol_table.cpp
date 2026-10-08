@@ -123,12 +123,10 @@ TEST(SymbolTable, VarDecl)
     ASSERT_FALSE(sym_table.have_variable("c"));
 
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
-
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitBinaryInvalid), 2);
   }
 
   {
-    // don't handle function call args which are function calls
     const std::string_view src = R"(
       fn foo1() -> int {}
       fn foo2(a: int) {}
@@ -148,6 +146,52 @@ TEST(SymbolTable, VarDecl)
     ASSERT_TRUE(sym_table.have_function("foo2"));
     ASSERT_FALSE(sym_table.have_variable("a"));
 
-    ASSERT_EQ(script.issues->get_count(ErrorCode::Unsupported), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitVoid), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo1() -> str {}
+      fn foo2(a: str) -> str {}
+
+      a := foo2(foo1());
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.have_function("foo1"));
+    ASSERT_TRUE(sym_table.have_function("foo2"));
+    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::String});
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo1(a: str) -> int {}
+      fn foo2(a: int) -> str {}
+      fn foo3(a: str) -> int {}
+
+      a := foo1(foo2(foo3("recursing")));
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.have_function("foo1"));
+    ASSERT_TRUE(sym_table.have_function("foo2"));
+    ASSERT_TRUE(sym_table.have_function("foo3"));
+    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   }
 }

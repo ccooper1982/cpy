@@ -19,6 +19,7 @@ enum class ErrorCode
   FunctionDuplicate,
   FunctionNotExist,
   FunctionCallArgType,
+  FunctionCallArgVoid,
   FunctionCallArgsCount,
   UnknownParamType,
   UnknownReturnType,
@@ -123,7 +124,7 @@ namespace issue
 
   inline void unknown_variable_type (Issues& issues, const AstNode& node)
   {
-    issues.add_error(std::format("Unknown variable type"), node.source, ErrorCode::UnknownVarType);
+    issues.add_error("Unknown variable type", node.source, ErrorCode::UnknownVarType);
   }
 
   inline void unknown_return_type(Issues& issues, const std::string_view func, const std::string_view type)
@@ -146,14 +147,19 @@ namespace issue
     issues.add_error(std::format("Function does not exist: {}", func), node.source, ErrorCode::FunctionNotExist);
   }
 
-  inline void func_args (Issues& issues, const AstNode& node, const std::string_view func, const std::string_view arg_name)
+  inline void func_arg (Issues& issues, const AstNode& node, const std::string_view func, const std::string_view arg_name)
   {
     issues.add_error(std::format("Function call '{}' has invalid type for argument: {}", func, arg_name), node.source, ErrorCode::FunctionCallArgType);
   }
 
-  inline void func_args_count (Issues& issues, const AstNode& node)
+  inline void func_arg_void (Issues& issues, const AstNode& node, const std::string_view arg_name)
   {
-    issues.add_error(std::format("Function call with incorrect number of arguments"), node.source, ErrorCode::FunctionCallArgsCount);
+    issues.add_error(std::format("Function argument for parameter '{}' is void", arg_name), node.source, ErrorCode::FunctionCallArgVoid);
+  }
+
+  inline void func_arg_count (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Function call with incorrect number of arguments", node.source, ErrorCode::FunctionCallArgsCount);
   }
 
   inline void var_duplicate (Issues& issues, const AstNode& node, const std::string_view var)
