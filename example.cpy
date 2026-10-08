@@ -1,7 +1,4 @@
+fn foo() -> int {}
+fn bar(a: int) -> str {}
 
-a: horse;
-
-fn hello()
-{
-    b: horse;
-}
+a := bar(foo());

@@ -23,6 +23,10 @@ enum class ErrorCode
   UnknownParamType,
   UnknownReturnType,
   UnknownVarType,
+  VariableDuplicate,
+  VariableInitVoid,
+  VariableInitBinaryInvalid,
+  Unsupported,
   SyntaxError
 };
 
@@ -150,5 +154,25 @@ namespace issue
   inline void func_args_count (Issues& issues, const AstNode& node)
   {
     issues.add_error(std::format("Function call with incorrect number of arguments"), node.source, ErrorCode::FunctionCallArgsCount);
+  }
+
+  inline void var_duplicate (Issues& issues, const AstNode& node, const std::string_view var)
+  {
+    issues.add_error(std::format("Variable already defined: {}", var), node.source, ErrorCode::VariableDuplicate);
+  }
+
+  inline void var_init_void (Issues& issues, const AstNode& node, const std::string_view var)
+  {
+    issues.add_error(std::format("Cannot intialise variable from void: {}", var), node.source, ErrorCode::VariableInitVoid);
+  }
+
+  inline void var_init_binary_differ (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Variable initialised from binary expression with incompatible types", node.source, ErrorCode::VariableInitBinaryInvalid);
+  }
+
+  inline void unsupported (Issues& issues, const AstNode& node, const std::string_view feature)
+  {
+    issues.add_error(std::format("Unsupported feature: {}", feature), node.source, ErrorCode::Unsupported);
   }
 }

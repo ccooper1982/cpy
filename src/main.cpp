@@ -3,7 +3,10 @@
 #include <cpy/modules.hpp>
 #include <cpy/semantics.hpp>
 #include <filesystem>
+#include <iostream>
 
+// TODO
+//  - separate into libcpy and cpy executable
 int main (int argc, char ** argv)
 {
   if (argc != 2) {
@@ -35,6 +38,7 @@ int main (int argc, char ** argv)
     }
   }
 
+  std::cout << "AST:";
   script.ast->dump(std::cout);
 
   // errors here if tree-sitter found syntax errors
@@ -42,8 +46,12 @@ int main (int argc, char ** argv)
   {
     Semantics sems;
     sems.process(script);
+
+    std::cout << "Sym Table:\n";
+    sems.symbol_table().dump(std::cout);
   }
 
+  std::cout << "Issues:\n";
   script.issues->dump(std::cout, *script.src);
 
   return script.issues->have_errors() ? 1 : 0;

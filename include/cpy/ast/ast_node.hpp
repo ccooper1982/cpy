@@ -32,7 +32,7 @@ enum class BuiltInType
   Bool,
   String,
   Void,
-  Unknown
+  Unknown // or Unset
 };
 
 
@@ -43,9 +43,11 @@ struct UserType
 
 struct VarType
 {
+  VarType() : type (BuiltInType::Unknown)
+  {}
+
   VarType(const BuiltInType t) : type (t)
-  {
-  }
+  {}
 
   const auto& value() const { return type; }
 
@@ -146,6 +148,7 @@ struct Expression : public AstNode
 
   virtual bool is_expr_type(const ExpressionType t) const { return t == expr_type(); }
   virtual bool is_convertible_to([[maybe_unused]] const BuiltInType t) const { return false; }
+  virtual VarType get_var_type() const = 0;
 
   ExpressionType expr_type() const { return ex_type; }
 
@@ -163,6 +166,11 @@ struct IntegerLiteral : public Expression
   bool is_convertible_to(const BuiltInType t) const override
   {
     return t == BuiltInType::Int;
+  }
+
+  VarType get_var_type() const override
+  {
+    return BuiltInType::Int;
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -185,6 +193,11 @@ struct StringLiteral : public Expression
     return t == BuiltInType::String;
   }
 
+  VarType get_var_type() const override
+  {
+    return BuiltInType::String;
+  }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     os << "str = " << v;
@@ -205,6 +218,11 @@ struct DecimalLiteral : public Expression
     return t == BuiltInType::Decimal;
   }
 
+  VarType get_var_type() const override
+  {
+    return BuiltInType::Decimal;
+  }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     os << "dec = " << v;
@@ -223,6 +241,11 @@ struct BooleanLiteral : public Expression
   bool is_convertible_to(const BuiltInType t) const override
   {
     return t == BuiltInType::Bool;
+  }
+
+  VarType get_var_type() const override
+  {
+    return BuiltInType::Bool;
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -253,6 +276,20 @@ struct BinaryExpression : public Expression
     return lhs->is_convertible_to(t) && rhs->is_convertible_to(t);
   }
 
+  VarType get_var_type() const override
+  {
+    if (lhs->is_expr_type(ExpressionType::FuncCall) || rhs->is_expr_type(ExpressionType::FuncCall)) {
+      throw std::runtime_error{"get_var_type() called on BinaryExpression with FunctionCall operand(s)"};
+    }
+
+    if (lhs->get_var_type() == rhs->get_var_type()) {
+      return lhs->get_var_type();
+    }
+    else {
+      throw std::runtime_error{"get_var_type() called on BinaryExpression with incompatible operands"};
+    }
+  }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     lhs->dump(os, tab);
@@ -267,6 +304,53 @@ struct BinaryExpression : public Expression
 };
 
 
+struct FunctionCall : public Expression
+{
+  static constexpr ExpressionType ExprType = ExpressionType::FuncCall;
+
+  std::string_view module;
+  std::string_view name;
+  std::vector<std::unique_ptr<Expression>> args;
+
+  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
+    : Expression(ExprType)
+    , name(name)
+    , args(std::move(args))
+  {}
+
+  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args, const std::string_view module)
+    : Expression(ExprType)
+    , module(module)
+    , name(name)
+    , args(std::move(args))
+  {}
+
+  VarType get_var_type() const override
+  {
+    // never called because the type is taken from the return type of
+    // the function being called
+    throw std::runtime_error{"get_var_type() called on FunctionCall"};
+  }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    if (!module.empty()) {
+      os << module << "::";
+    }
+    os << name << '(';
+    for (std::size_t i = 0; i < args.size() ; ++i)
+    {
+      args[i]->dump(os, tab);
+      if (i+1 < args.size())
+        os << ',';
+    }
+    os << ')';
+  }
+};
+
+
+inline std::string_view to_string(const Expression& expr);
+
 template<typename ExprT> requires (std::derived_from<ExprT, Expression>)
 const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
 {
@@ -276,7 +360,8 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
   return dynamic_cast<ExprT&>(*expr);
 }
 
-// Functions //
+
+// Functions Definition //
 
 struct FunctionParam : public AstNode
 {
@@ -303,43 +388,6 @@ public:
   }
 };
 
-
-struct FunctionCall : public Expression
-{
-  static constexpr ExpressionType ExprType = ExpressionType::FuncCall;
-
-  std::string_view module;
-  std::string_view name;
-  std::vector<std::unique_ptr<Expression>> args;
-
-  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
-    : Expression(ExprType),
-      name(name)
-    , args(std::move(args))
-  {}
-
-  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args, const std::string_view module)
-    : Expression(ExprType)
-    , module(module)
-    , name(name)
-    , args(std::move(args))
-  {}
-
-  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
-  {
-    if (!module.empty()) {
-      os << module << "::";
-    }
-    os << name << '(';
-    for (std::size_t i = 0; i < args.size() ; ++i)
-    {
-      args[i]->dump(os, tab);
-      if (i+1 < args.size())
-        os << ',';
-    }
-    os << ')';
-  }
-};
 
 struct FunctionBody : public AstNode
 {
@@ -392,20 +440,80 @@ struct FunctionDef : public AstNode
 };
 
 
+// <var_name>: <var_type>;                  // explicit type
+// <var_name>: <var_type> = <init_expr>;    // explicit type, initialised
+// <var_name> := <init_expr>;               // inferred type, initialised
+// foo: int;
+// foo: int = 5;
+// foo := 5;
 struct VariableDecl : public AstNode
 {
   static constexpr NodeType Type = NodeType::VariableDecl;
 
+  enum class DeclType
+  {
+    ExplicitNoInit,
+    ExplicitInit,
+    InferredType
+  };
+
   VariableDecl() : AstNode(Type)
   {}
 
+  static VariableDecl create_explicit(std::unique_ptr<Expression>&& init)
+  {
+    VariableDecl decl;
+    if (init)
+    {
+      decl.decl_type = DeclType::ExplicitInit;
+      decl.initialiser = std::move(init);
+    }
+    else {
+      decl.decl_type = DeclType::ExplicitNoInit;
+    }
+    return decl;
+  }
+
+  static VariableDecl create_inferred(std::unique_ptr<Expression>&& init)
+  {
+    if (!init) {
+      throw std::runtime_error{"VariableDecl - InferredType created without init expr"};
+    }
+
+    VariableDecl decl;
+    decl.decl_type = DeclType::InferredType;
+    decl.initialiser = std::move(init);
+    return decl;
+  }
+
+  DeclType get_decl_type() const
+  {
+    return decl_type;
+  }
+
+  bool has_explicit_type() const
+  {
+    return decl_type == DeclType::ExplicitNoInit || decl_type == DeclType::ExplicitInit;
+  }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << var_name << ':' << var_type;
+    os << var_name << ':';
+
+    if (has_explicit_type()) {
+      os << var_type;
+    }
+    else if (initialiser) {
+      os << "[inferred " << to_string(*initialiser) << "]";
+    }
   }
 
   std::string_view var_name;
   std::string_view var_type;
+  std::unique_ptr<Expression> initialiser;
+
+  private:
+    DeclType decl_type;
 };
 
 
@@ -494,5 +602,27 @@ inline std::string_view to_string(const BinaryOperator op)
     case BinaryOperator::GreaterEqual: return ">=";
   }
 
+  std::unreachable();
+}
+
+inline std::string_view to_string(const Expression& expr)
+{
+  switch (expr.expr_type())
+  {
+    using enum ExpressionType;
+
+    case Dec:
+      return "DecimalLiteral";
+    case Int:
+      return "IntegerLiteral";
+    case Bool:
+      return "BooleanLiteral";
+    case String:
+      return "StringLiteral";
+    case Binary:
+      return "BinaryExpression";
+    case FuncCall:
+      return "FunctionCall";
+  }
   std::unreachable();
 }
