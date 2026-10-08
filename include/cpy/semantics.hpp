@@ -7,7 +7,6 @@
 #include <optional>
 #include <ostream>
 #include <ranges>
-#include <set>
 
 #include <cpy/common.hpp>
 #include <cpy/issues.hpp>
@@ -135,9 +134,13 @@ private:
   void process_function_defs(Context& ctx);
   void process_function_calls(Context& ctx);
   bool process_function_call(Context& ctx, const FunctionCall& call);
+  std::optional<VarType> get_function_call_return_type(Context& ctx, const AstNode& parent, const FunctionCall& call);
 
   // variables
   void process_variable_declarations(Context& ctx);
+
+  // expressions
+  std::pair<VarType,VarType> process_binary_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr);
 
   // utils
   template<typename NodeT, typename Handler>

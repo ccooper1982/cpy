@@ -218,4 +218,30 @@ TEST(SymbolTable, VarDecl)
     ASSERT_TRUE(sym_table.have_variable("a"));
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   }
+
+  {
+    const std::string_view src = R"(
+      fn foo1(a: int, b: str) -> int {}
+      fn foo2() -> int {}
+      fn foo3() -> str {}
+      fn foo4(a: int, b: str, c: int) -> int {}
+
+      a := foo4(foo2(), foo3(), foo1(foo2(), foo3()));
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.have_function("foo1"));
+    ASSERT_TRUE(sym_table.have_function("foo2"));
+    ASSERT_TRUE(sym_table.have_function("foo3"));
+    ASSERT_TRUE(sym_table.have_function("foo4"));
+    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+  }
 }
