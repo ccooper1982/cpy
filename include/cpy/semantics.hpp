@@ -152,7 +152,7 @@ private:
     };
 
     for (const auto& node : nodes | vw::filter(by_node_type)) {
-      handler(dynamic_cast<NodeT&>(*node));
+      handler(dynamic_cast<const NodeT&>(*node));
     }
   }
 
@@ -163,10 +163,10 @@ private:
   {
     const constexpr ExpressionType et = ExprT::ExprType;
 
-    walk_nodes<Expression>(root.nodes, [&](Expression& expr_node)
+    walk_nodes<Expression>(root.nodes, [&](const Expression& expr_node)
     {
       if (expr_node.is_expr_type(et)) {
-        handler(dynamic_cast<ExprT&>(expr_node));
+        handler(dynamic_cast<const ExprT&>(expr_node));
       }
     });
   }
