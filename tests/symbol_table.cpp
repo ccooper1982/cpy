@@ -125,7 +125,11 @@ TEST(SymbolTable, VarDecl)
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitBinaryInvalid), 2);
   }
+}
 
+
+TEST(SymbolTable, VarDecl_NestedFuncCall)
+{
   {
     const std::string_view src = R"(
       fn foo1() -> int {}
@@ -244,4 +248,35 @@ TEST(SymbolTable, VarDecl)
     ASSERT_TRUE(sym_table.have_variable("a"));
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   }
+}
+
+TEST(SymbolTable, VarDecl_BinExpr)
+{
+  const std::string_view src = R"(
+    fn foo1(a: int) -> int {}
+    fn foo2() -> int {}
+    fn foo3() -> int {}
+    fn foo4() -> str {}
+
+    a := foo1(foo2() + foo3());
+    b := foo1(foo2() + foo4());
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  Semantics sem;
+  sem.process(script);
+
+  const auto& sym_table = sem.symbol_table();
+
+  ASSERT_TRUE(sym_table.have_function("foo1"));
+  ASSERT_TRUE(sym_table.have_function("foo2"));
+  ASSERT_TRUE(sym_table.have_function("foo3"));
+  ASSERT_TRUE(sym_table.have_function("foo4"));
+  ASSERT_TRUE(sym_table.have_variable("a"));
+  ASSERT_FALSE(sym_table.have_variable("b"));
+
+  ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+  ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgBinaryInvalid), 1);
 }

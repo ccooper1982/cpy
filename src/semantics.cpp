@@ -119,6 +119,17 @@ bool Semantics::process_function_call(Context& ctx, const FunctionCall& call)
           }
         }
       }
+      else if (arg.is_expr_type(ExpressionType::Binary))
+      {
+        const auto& expr = dynamic_cast<const BinaryExpression&>(arg);
+        auto [lhs_type, rhs_type] = process_binary_expression(ctx, arg, expr);
+
+        if (lhs_type != rhs_type)
+        {
+          issue::func_arg_binary_differ(ctx.issues, arg);
+          return false;
+        }
+      }
       else if (!arg.is_convertible_to(*builtin_type))
       {
         issue::func_arg(ctx.issues, arg, call.name, resolved.params[i].name);

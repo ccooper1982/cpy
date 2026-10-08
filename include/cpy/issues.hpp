@@ -21,6 +21,7 @@ enum class ErrorCode
   FunctionCallArgType,
   FunctionCallArgVoid,
   FunctionCallArgsCount,
+  FunctionCallArgBinaryInvalid,
   UnknownParamType,
   UnknownReturnType,
   UnknownVarType,
@@ -155,6 +156,11 @@ namespace issue
   inline void func_arg_void (Issues& issues, const AstNode& node, const std::string_view arg_name)
   {
     issues.add_error(std::format("Function argument for parameter '{}' is void", arg_name), node.source, ErrorCode::FunctionCallArgVoid);
+  }
+
+  inline void func_arg_binary_differ (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Function argument from binary expression with incompatible types", node.source, ErrorCode::FunctionCallArgBinaryInvalid);
   }
 
   inline void func_arg_count (Issues& issues, const AstNode& node)

@@ -96,9 +96,11 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
     expr = parse_function_call(script, ts_node_named_child(expr_node, 0));
   }
 
-  if (expr)
-  {
+  if (expr) {
     set_source_region(expr_node, *expr);
+  }
+  else {
+    throw std::runtime_error{std::format("Unknown expression: {}", from_source(script, expr_node))};
   }
 
   return expr;
