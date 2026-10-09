@@ -28,6 +28,7 @@ enum class ErrorCode
   VariableDuplicate,
   VariableInitVoid,
   VariableInitBinaryInvalid,
+  VariableUnknown,
   Unsupported,
   SyntaxError
 };
@@ -148,14 +149,14 @@ namespace issue
     issues.add_error(std::format("Function does not exist: {}", func), node.source, ErrorCode::FunctionNotExist);
   }
 
-  inline void func_arg (Issues& issues, const AstNode& node, const std::string_view func, const std::string_view arg_name)
+  inline void func_arg (Issues& issues, const AstNode& node, const std::string_view arg_name)
   {
-    issues.add_error(std::format("Function call '{}' has invalid type for argument: {}", func, arg_name), node.source, ErrorCode::FunctionCallArgType);
+    issues.add_error(std::format("Function call has invalid type for argument: {}", arg_name), node.source, ErrorCode::FunctionCallArgType);
   }
 
   inline void func_arg_void (Issues& issues, const AstNode& node, const std::string_view arg_name)
   {
-    issues.add_error(std::format("Function argument for parameter '{}' is void", arg_name), node.source, ErrorCode::FunctionCallArgVoid);
+    issues.add_error(std::format("Parameter '{}' in function call is void", arg_name), node.source, ErrorCode::FunctionCallArgVoid);
   }
 
   inline void func_arg_binary_differ (Issues& issues, const AstNode& node)
@@ -181,6 +182,11 @@ namespace issue
   inline void var_init_binary_differ (Issues& issues, const AstNode& node)
   {
     issues.add_error("Variable initialised from binary expression with incompatible types", node.source, ErrorCode::VariableInitBinaryInvalid);
+  }
+
+  inline void var_unknown (Issues& issues, const AstNode& node, const std::string_view var)
+  {
+    issues.add_error(std::format("Variable not declared: {}", var), node.source, ErrorCode::VariableUnknown);
   }
 
   inline void unsupported (Issues& issues, const AstNode& node, const std::string_view feature)

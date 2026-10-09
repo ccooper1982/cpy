@@ -258,4 +258,21 @@ TEST(Semantics, VariableDecl)
 
     ASSERT_FALSE(script.issues->have_errors());
   }
+
+  {
+    const std::string_view src = R"(
+      fn foo1(a: int) -> int {}
+
+      a: int;
+      foo1(a);
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
 }

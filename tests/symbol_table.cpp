@@ -280,3 +280,111 @@ TEST(SymbolTable, VarDecl_BinExpr)
   ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgBinaryInvalid), 1);
 }
+
+TEST(SymbolTable, FuncCall_VarRef)
+{
+  {
+    const std::string_view src = R"(
+      fn foo1(a: int) -> int {}
+
+      a: int;
+      foo1(a);
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.have_function("foo1"));
+    ASSERT_TRUE(sym_table.have_variable("a"));
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo1(a: int){}
+
+      a: str;
+      foo1(a);
+      foo1(b);
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.have_function("foo1"));
+    ASSERT_TRUE(sym_table.have_variable("a"));
+
+    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::String});
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgType), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo1(a: int, b: str) -> int {}
+
+      a: int;
+      b: str;
+      foo1(a, b);
+      foo1(b, a);
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.have_function("foo1"));
+    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_variable("b"));
+
+    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::String});
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgType), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo1(a: int) -> int {}
+      fn foo2(a: int, b: str) -> int {}
+
+      a: int;
+      b: str;
+
+      foo1(a+a);
+      foo2(foo1(a), "abc");
+      foo2(foo1(a), b);
+      foo1(a+b);
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.have_function("foo1"));
+    ASSERT_TRUE(sym_table.have_function("foo2"));
+    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_variable("b"));
+    ASSERT_TRUE(script.issues->have_errors());
+
+    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::String});
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgBinaryInvalid), 1);
+  }
+}

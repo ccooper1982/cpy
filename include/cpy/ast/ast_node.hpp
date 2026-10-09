@@ -70,6 +70,11 @@ struct VarType
     return is_type<BuiltInType>() && *(value_as<BuiltInType>()) == t;
   }
 
+  explicit operator bool() const
+  {
+    return !is_type(BuiltInType::Unknown);
+  }
+
 private:
   std::variant<BuiltInType, UserType> type;
 };
@@ -126,7 +131,8 @@ enum class ExpressionType
   Dec,
   Bool,
   Binary,
-  FuncCall
+  FuncCall,
+  VariableRef
 };
 
 
@@ -349,6 +355,33 @@ struct FunctionCall : public Expression
 };
 
 
+// Note: not a "ref" like a C++ reference, but "a node which refers to a variable"
+struct VariableRef : public Expression
+{
+  static constexpr ExpressionType ExprType = ExpressionType::VariableRef;
+
+  VariableRef() : Expression(ExprType)
+  {}
+
+  VariableRef(const std::string_view name)
+    : Expression(ExprType)
+    , name(name)
+  {}
+
+  VarType get_var_type() const override
+  {
+    // never called because the type is taken from the type of the variable
+    throw std::runtime_error{"get_var_type() called on VariableRef"};
+  }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << name;
+  }
+
+  std::string_view name;
+};
+
 inline std::string_view to_string(const Expression& expr);
 
 template<typename ExprT> requires (std::derived_from<ExprT, Expression>)
@@ -517,6 +550,7 @@ struct VariableDecl : public AstNode
 };
 
 
+
 struct SyntaxError : public AstNode
 {
   static constexpr NodeType Type = NodeType::SyntaxError;
@@ -623,6 +657,9 @@ inline std::string_view to_string(const Expression& expr)
       return "BinaryExpression";
     case FuncCall:
       return "FunctionCall";
+    case VariableRef:
+      return "VariableReference";
   }
+
   std::unreachable();
 }

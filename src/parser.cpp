@@ -95,6 +95,9 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
   else if (expr_type == "function_call") {
     expr = parse_function_call(script, ts_node_named_child(expr_node, 0));
   }
+  else if (expr_type == "identifier") {
+    expr = std::make_unique<VariableRef>(from_source(script, expr_node));
+  }
 
   if (expr) {
     set_source_region(expr_node, *expr);
