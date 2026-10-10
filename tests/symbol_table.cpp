@@ -22,9 +22,9 @@ TEST(SymbolTable, FunctionDef)
   const auto& sym_table = sem.symbol_table();
 
   // baz not stored because 'bacon' and 'cheese' are unknown types
-  ASSERT_TRUE(sym_table.have_function("foo"));
-  ASSERT_TRUE(sym_table.have_function("bar"));
-  ASSERT_FALSE(sym_table.have_function("baz"));
+  ASSERT_TRUE(sym_table.have_resolved_function("foo"));
+  ASSERT_TRUE(sym_table.have_resolved_function("bar"));
+  ASSERT_FALSE(sym_table.have_resolved_function("baz"));
 
   const auto& resolved_foo = sym_table.get_function("foo");
   ASSERT_EQ(resolved_foo.params.size(), 1);
@@ -60,9 +60,9 @@ TEST(SymbolTable, VarDecl)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
-    ASSERT_TRUE(sym_table.have_variable("b"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("b"));
 
     ASSERT_EQ(sym_table.get_function("foo").return_type, VarType{BuiltInType::Int});
 
@@ -88,10 +88,10 @@ TEST(SymbolTable, VarDecl)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_FALSE(sym_table.have_variable("a"));
-    ASSERT_FALSE(sym_table.have_variable("b"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_FALSE(sym_table.have_resolved_variable("a"));
+    ASSERT_FALSE(sym_table.have_resolved_variable("b"));
 
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitVoid), 2);
   }
@@ -115,12 +115,12 @@ TEST(SymbolTable, VarDecl)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_TRUE(sym_table.have_function("foo3"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
-    ASSERT_FALSE(sym_table.have_variable("b"));
-    ASSERT_FALSE(sym_table.have_variable("c"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+    ASSERT_FALSE(sym_table.have_resolved_variable("b"));
+    ASSERT_FALSE(sym_table.have_resolved_variable("c"));
 
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
@@ -145,9 +145,9 @@ TEST(SymbolTable, VarDecl_Operation)
 
   const auto& sym_table = sem.symbol_table();
 
-  ASSERT_TRUE(sym_table.have_variable("a"));
-  ASSERT_TRUE(sym_table.have_variable("b"));
-  ASSERT_FALSE(sym_table.have_variable("c"));
+  ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+  ASSERT_TRUE(sym_table.have_resolved_variable("b"));
+  ASSERT_FALSE(sym_table.have_resolved_variable("c"));
 
   ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::Bool});
@@ -172,9 +172,9 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_FALSE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_FALSE(sym_table.have_resolved_variable("a"));
 
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitVoid), 1);
   }
@@ -195,9 +195,9 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::String});
   }
 
@@ -218,10 +218,10 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_TRUE(sym_table.have_function("foo3"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   }
 
@@ -242,10 +242,10 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_TRUE(sym_table.have_function("foo3"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   }
 
@@ -267,11 +267,11 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_TRUE(sym_table.have_function("foo3"));
-    ASSERT_TRUE(sym_table.have_function("foo4"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo4"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   }
 }
@@ -297,12 +297,12 @@ TEST(SymbolTable, VarDecl_BinExpr)
 
   const auto& sym_table = sem.symbol_table();
 
-  ASSERT_TRUE(sym_table.have_function("foo1"));
-  ASSERT_TRUE(sym_table.have_function("foo2"));
-  ASSERT_TRUE(sym_table.have_function("foo3"));
-  ASSERT_TRUE(sym_table.have_function("foo4"));
-  ASSERT_TRUE(sym_table.have_variable("a"));
-  ASSERT_FALSE(sym_table.have_variable("b"));
+  ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+  ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+  ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
+  ASSERT_TRUE(sym_table.have_resolved_function("foo4"));
+  ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+  ASSERT_FALSE(sym_table.have_resolved_variable("b"));
 
   ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
@@ -327,8 +327,8 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
   }
 
   {
@@ -348,8 +348,8 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
 
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgType), 1);
@@ -374,9 +374,9 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
-    ASSERT_TRUE(sym_table.have_variable("b"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("b"));
 
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
     ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::String});
@@ -405,10 +405,10 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_function("foo1"));
-    ASSERT_TRUE(sym_table.have_function("foo2"));
-    ASSERT_TRUE(sym_table.have_variable("a"));
-    ASSERT_TRUE(sym_table.have_variable("b"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
+    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+    ASSERT_TRUE(sym_table.have_resolved_variable("b"));
     ASSERT_TRUE(script.issues->have_errors());
 
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});

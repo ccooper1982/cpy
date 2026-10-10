@@ -35,9 +35,13 @@ void Semantics::process_function_defs(Context& ctx)
   walk_nodes<FunctionDef>(ctx.ast.nodes, [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
-    if (m_symbol_table.have_function(def.name)) {
+    if (m_symbol_table.have_function(def.name))
+    {
       issue::func_duplicate(ctx.issues, def, def.name);
+      return;
     }
+
+    m_symbol_table.add_function(def.name);
 
     std::vector<ResolvedSymbol> resolved_params;
     bool error{};
@@ -63,7 +67,7 @@ void Semantics::process_function_defs(Context& ctx)
     }
 
     if (!error) {
-      m_symbol_table.add_function(def.name, std::move(resolved_params), *return_type);
+      m_symbol_table.add_resolved_function(def.name, std::move(resolved_params), *return_type);
     }
   });
 }
@@ -87,55 +91,7 @@ void Semantics::process_variable_declarations(Context& ctx)
   {
     walk_nodes<VariableDecl>(nodes, [this, &ctx](const VariableDecl& decl)
     {
-      if (m_symbol_table.have_variable(decl.var_name))
-      {
-        issue::var_duplicate(ctx.issues, decl, decl.var_name);
-        return;
-      }
-
-      VarType var_type, init_type;
-
-      if (decl.has_explicit_type())
-      {
-        if (const auto type = m_symbol_table.get_type(decl.var_type); !type) {
-          issue::unknown_variable_type(ctx.issues, decl);
-          return;
-        }
-        else if (type == BuiltInType::Void) {
-          issue::var_init_void(ctx.issues, decl);
-        }
-        else {
-          var_type = *type;
-        }
-      }
-
-      if (decl.has_initialiser())
-      {
-        if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall) {
-          init_type = process_expression(ctx, decl, dynamic_cast<const FunctionCall&>(init));
-        }
-        else if (init.expr_type() == ExpressionType::Binary) {
-          init_type = process_expression(ctx, decl, dynamic_cast<const BinaryExpression&>(init));
-        }
-        else {
-          init_type = init.get_var_type(); // literal expression
-        }
-
-        if (init_type == BuiltInType::Void) {
-          issue::var_init_void(ctx.issues, decl);
-          return;
-        }
-        else if (init_type == unresolved_t) {
-          return;
-        }
-      }
-
-      if (decl.has_initialiser() && decl.has_explicit_type() && var_type != init_type) {
-        issue::var_init_type_differ(ctx.issues, decl);
-      }
-      else {
-        m_symbol_table.add_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type);
-      }
+      process_variable_declaration(ctx, decl);
     });
   };
 
@@ -149,9 +105,65 @@ void Semantics::process_variable_declarations(Context& ctx)
   });
 }
 
+void Semantics::process_variable_declaration(Context& ctx, const VariableDecl& decl)
+{
+  if (m_symbol_table.have_variable(decl.var_name))
+  {
+    issue::var_duplicate(ctx.issues, decl, decl.var_name);
+    return;
+  }
+
+  m_symbol_table.add_variable(decl.var_name);
+
+  VarType var_type, init_type;
+
+  if (decl.has_explicit_type())
+  {
+    if (const auto type = m_symbol_table.get_type(decl.var_type); !type) {
+      issue::unknown_variable_type(ctx.issues, decl);
+      return;
+    }
+    else if (type == BuiltInType::Void) {
+      issue::var_init_void(ctx.issues, decl);
+    }
+    else {
+      var_type = *type;
+    }
+  }
+
+  if (decl.has_initialiser())
+  {
+    if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall) {
+      init_type = process_expression(ctx, decl, dynamic_cast<const FunctionCall&>(init));
+    }
+    else if (init.expr_type() == ExpressionType::Binary) {
+      init_type = process_expression(ctx, decl, dynamic_cast<const BinaryExpression&>(init));
+    }
+    else {
+      init_type = init.get_var_type(); // literal expression
+    }
+
+    if (init_type == BuiltInType::Void) {
+      issue::var_init_void(ctx.issues, decl);
+      return;
+    }
+    else if (init_type == unresolved_t) {
+      return;
+    }
+  }
+
+  if (decl.has_initialiser() && decl.has_explicit_type() && var_type != init_type) {
+    issue::var_init_type_differ(ctx.issues, decl);
+  }
+  else {
+    m_symbol_table.add_resolved_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type);
+  }
+}
+
+
 VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const FunctionCall& call)
 {
-  if (!m_symbol_table.have_function(call.name))
+  if (!m_symbol_table.have_resolved_function(call.name))
   {
     issue::func_not_exist(ctx.issues, call, call.name);
     return unresolved_t;
@@ -225,7 +237,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 
 VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const VariableRef& expr)
 {
-  if (!m_symbol_table.have_variable(expr.name))
+  if (!m_symbol_table.have_resolved_variable(expr.name))
   {
     issue::var_unknown(ctx.issues, parent, expr.name);
     return unresolved_t;
@@ -235,19 +247,19 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   }
 }
 
-/// This handles binary expressions, including nested binary expressions, i.e:
+/// Returns the return value type of a binary expressions.
+/// Determines the return type of lhs and rhs then calls process_operator()
+/// which determines if those are valid for the operator.
+///
+/// Nested binary expressions, example:
 ///   a := foo1() + foo2() + foo3()
 ///
 ///  lhs = (foo1() + foo2())
-///  rhs = (foo3())
-/// Then lhs is also a binary expression.
+///  rhs = foo3()
 ///
-/// Each binary expression returns two types (for lhs and rhs). The parent decides if those are suitable.
-/// In the example above:
-///
-/// - foo1()+foo2() may return an int
-/// - foo3() may return a str
-/// - result: invalid
+/// - Calls `process_expression(Context&, const AstNode&, BinaryExpression)` to get the result type of `foo1()+foo2()`
+/// - Calls `process_expression(Context&, const AstNode&, FunctionCall)` to get the result type of `foo3()`
+/// - Calls `process_operator()` with the types
 VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr)
 {
   const auto& lhs = *expr.lhs;
