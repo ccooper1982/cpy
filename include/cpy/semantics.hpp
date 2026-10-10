@@ -140,8 +140,7 @@ private:
   // expressions
   VarType process_expression(Context& ctx, const AstNode& parent, const FunctionCall& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const VariableRef& expr);
-
-  std::pair<VarType,VarType> process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr);
+  VarType process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr);
 
   // utils
   template<typename NodeT, typename Handler>

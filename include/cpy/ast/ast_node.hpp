@@ -27,12 +27,12 @@ enum class NodeType
 
 enum class BuiltInType
 {
+  Unset,
   Int,
   Decimal,
   Bool,
   String,
-  Void,
-  Unknown // or Unset
+  Void
 };
 
 
@@ -43,13 +43,16 @@ struct UserType
 
 struct VarType
 {
-  VarType() : type (BuiltInType::Unknown)
+  VarType() : type (BuiltInType::Unset)
   {}
 
   VarType(const BuiltInType t) : type (t)
   {}
 
-  const auto& value() const { return type; }
+  const auto& value() const
+  {
+    return type;
+  }
 
   template<typename T>
   const std::optional<T> value_as() const
@@ -72,12 +75,14 @@ struct VarType
 
   explicit operator bool() const
   {
-    return !is_type(BuiltInType::Unknown);
+    return !is_type(BuiltInType::Unset);
   }
 
 private:
   std::variant<BuiltInType, UserType> type;
 };
+
+inline constexpr const auto unresolved_t = BuiltInType::Unset;
 
 
 inline bool operator==([[maybe_unused]] const UserType& a, [[maybe_unused]] const UserType& b)

@@ -123,7 +123,8 @@ TEST(SymbolTable, VarDecl)
     ASSERT_FALSE(sym_table.have_variable("c"));
 
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
-    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitBinaryInvalid), 2);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsVoid), 1);
   }
 }
 
@@ -278,7 +279,7 @@ TEST(SymbolTable, VarDecl_BinExpr)
   ASSERT_FALSE(sym_table.have_variable("b"));
 
   ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
-  ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgBinaryInvalid), 1);
+  ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
 }
 
 TEST(SymbolTable, FuncCall_VarRef)
@@ -385,6 +386,6 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
     ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::String});
-    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgBinaryInvalid), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
   }
 }

@@ -1,10 +1,5 @@
-fn foo1(a: int) -> int {}
-fn foo2(a: int, b: str) -> int {}
+fn foo1() -> int {}
+fn foo2() {}
 
-a: int;
-b: str;
-
-foo1(a+a);
-foo2(foo1(a), "abc");
-foo2(foo1(a), b);
-foo1(a+b);
+a := foo2() + foo2();
+a := foo1() + foo2();

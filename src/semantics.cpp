@@ -1,5 +1,5 @@
-#include "cpy/ast/ast_node.hpp"
-#include "cpy/issues.hpp"
+#include <cpy/ast/ast_node.hpp>
+#include <cpy/issues.hpp>
 #include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
 
@@ -14,9 +14,6 @@
 //  ├── symbol/function lookup
 //  ├── type checking
 //  └── diagnostics
-
-static constexpr const auto unresolved_t = BuiltInType::Unknown;
-
 
 void Semantics::process(Script& script)
 {
@@ -123,13 +120,8 @@ void Semantics::process_variable_declarations(Context& ctx)
         else if (init.expr_type() == ExpressionType::Binary)
         {
           const auto& expr = dynamic_cast<const BinaryExpression&>(init);
-          const auto [lhs_type, rhs_type] = process_expression(ctx, decl, expr);
-
-          if (lhs_type != rhs_type) {
-            issue::var_init_binary_differ(ctx.issues, decl);
-          }
-          else if (lhs_type != BuiltInType::Unknown && rhs_type != BuiltInType::Unknown) {
-            m_symbol_table.add_variable(decl.var_name, lhs_type);
+          if (const auto type = process_expression(ctx, decl, expr); type) {
+            m_symbol_table.add_variable(decl.var_name, type);
           }
         }
         else {
@@ -193,13 +185,8 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       else if (arg.is_expr_type(ExpressionType::Binary))
       {
         const auto& expr = dynamic_cast<const BinaryExpression&>(arg);
-        auto [lhs_type, rhs_type] = process_expression(ctx, parent, expr);
-
-        if (lhs_type != rhs_type)
-        {
-          issue::func_arg_binary_differ(ctx.issues, arg);
+        if (!process_expression(ctx, parent, expr))
           return unresolved_t;
-        }
       }
       else if (arg.is_expr_type(ExpressionType::VariableRef))
       {
@@ -240,19 +227,30 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   }
 }
 
-std::pair<VarType,VarType> Semantics::process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr)
+/// This handles binary expressions, including nested binary expressions, i.e:
+///   a := foo1() + foo2() + foo3()
+///
+///  lhs = (foo1() + foo2())
+///  rhs = (foo3())
+/// Then lhs is also a binary expression.
+///
+/// Each binary expression returns two types (for lhs and rhs). The parent decides if those are suitable.
+/// In the example above:
+///
+/// - foo1()+foo2() may return an int
+/// - foo3() may return a str
+/// - result: invalid
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr)
 {
   const auto& lhs = *expr.lhs;
   const auto& rhs = *expr.rhs;
 
-  if (lhs.is_expr_type(ExpressionType::Binary) || rhs.is_expr_type(ExpressionType::Binary)) {
-    issue::unsupported(ctx.issues, expr, "Nested binary expressions");
-    return {unresolved_t, unresolved_t};
-  }
-
   VarType lhs_type, rhs_type;
 
-  if (lhs.is_expr_type(ExpressionType::FuncCall)){
+  if (lhs.is_expr_type(ExpressionType::Binary)) {
+    lhs_type = process_expression(ctx, parent, dynamic_cast<const BinaryExpression&>(lhs));
+  }
+  else if (lhs.is_expr_type(ExpressionType::FuncCall)){
     lhs_type = process_expression(ctx, parent, dynamic_cast<const FunctionCall&>(lhs));
   }
   else if (lhs.is_expr_type(ExpressionType::VariableRef)){
@@ -262,7 +260,10 @@ std::pair<VarType,VarType> Semantics::process_expression(Context& ctx, const Ast
     lhs_type = lhs.get_var_type();
   }
 
-  if (rhs.is_expr_type(ExpressionType::FuncCall)) {
+  if (rhs.is_expr_type(ExpressionType::Binary)) {
+     rhs_type = process_expression(ctx, parent, dynamic_cast<const BinaryExpression&>(rhs));
+  }
+  else if (rhs.is_expr_type(ExpressionType::FuncCall)) {
     rhs_type = process_expression(ctx, parent, dynamic_cast<const FunctionCall&>(rhs));
   }
   else if (rhs.is_expr_type(ExpressionType::VariableRef)){
@@ -272,5 +273,23 @@ std::pair<VarType,VarType> Semantics::process_expression(Context& ctx, const Ast
     rhs_type = rhs.get_var_type();
   }
 
-  return {lhs_type, rhs_type};
+  if (lhs_type == BuiltInType::Void || rhs_type == BuiltInType::Void)
+  {
+    issue::binary_operands_void(ctx.issues, expr);
+    return unresolved_t;
+  }
+
+  // TODO this is ok for now, but it only compares the BuiltInType,
+  //      it doesn't account for the operator, i.e.:
+  //
+  //  OK: 1+2
+  //  BAD: true+false
+  // And there's string concatenation to consider at some point.
+  if (lhs_type != rhs_type)
+  {
+    issue::binary_operands_invalid(ctx.issues, expr);
+    return unresolved_t;
+  }
+
+  return lhs_type;
 }

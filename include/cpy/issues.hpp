@@ -21,14 +21,14 @@ enum class ErrorCode
   FunctionCallArgType,
   FunctionCallArgVoid,
   FunctionCallArgsCount,
-  FunctionCallArgBinaryInvalid,
   UnknownParamType,
   UnknownReturnType,
   UnknownVarType,
   VariableDuplicate,
   VariableInitVoid,
-  VariableInitBinaryInvalid,
   VariableUnknown,
+  BinaryOperandsInvalid,
+  BinaryOperandsVoid,
   Unsupported,
   SyntaxError
 };
@@ -159,11 +159,6 @@ namespace issue
     issues.add_error(std::format("Parameter '{}' in function call is void", arg_name), node.source, ErrorCode::FunctionCallArgVoid);
   }
 
-  inline void func_arg_binary_differ (Issues& issues, const AstNode& node)
-  {
-    issues.add_error("Function argument from binary expression with incompatible types", node.source, ErrorCode::FunctionCallArgBinaryInvalid);
-  }
-
   inline void func_arg_count (Issues& issues, const AstNode& node)
   {
     issues.add_error("Function call with incorrect number of arguments", node.source, ErrorCode::FunctionCallArgsCount);
@@ -179,11 +174,6 @@ namespace issue
     issues.add_error("Cannot intialise variable from void", node.source, ErrorCode::VariableInitVoid);
   }
 
-  inline void var_init_binary_differ (Issues& issues, const AstNode& node)
-  {
-    issues.add_error("Variable initialised from binary expression with incompatible types", node.source, ErrorCode::VariableInitBinaryInvalid);
-  }
-
   inline void var_unknown (Issues& issues, const AstNode& node, const std::string_view var)
   {
     issues.add_error(std::format("Variable not declared: {}", var), node.source, ErrorCode::VariableUnknown);
@@ -192,5 +182,15 @@ namespace issue
   inline void unsupported (Issues& issues, const AstNode& node, const std::string_view feature)
   {
     issues.add_error(std::format("Unsupported feature: {}", feature), node.source, ErrorCode::Unsupported);
+  }
+
+  inline void binary_operands_invalid (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Invalid binary operands", node.source, ErrorCode::BinaryOperandsInvalid);
+  }
+
+  inline void binary_operands_void (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Void operand(s) in binary expression", node.source, ErrorCode::BinaryOperandsVoid);
   }
 }
