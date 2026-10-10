@@ -143,6 +143,44 @@ std::unique_ptr<VariableDecl> parse_variable_decl(Script& script, const TSNode& 
 }
 
 
+std::unique_ptr<AstNode> parse_statement (Script& script, const TSNode& ts_statement)
+{
+  const auto func_call = ts_node_child_by_field_name(ts_statement, "func_call", 9);
+  const auto var_decl = ts_node_child_by_field_name(ts_statement, "variable_declaration", 20);
+
+  std::unique_ptr<AstNode> node;
+
+  if (!ts_node_is_null(func_call)) {
+    node = parse_function_call(script, func_call);
+  }
+  else if (!ts_node_is_null(var_decl)) {
+    node = parse_variable_decl(script, var_decl);
+  }
+
+  return node;
+}
+
+
+std::vector<std::unique_ptr<AstNode>> parse_statements (Script& script, const TSNode& ts_statements)
+{
+  std::vector<std::unique_ptr<AstNode>> statements;
+
+  const auto statement_count = ts_node_named_child_count(ts_statements);
+  statements.reserve(std::min<uint32_t>(statement_count, 30));
+
+  for (uint32_t s = 0; s < statement_count; ++s)
+  {
+    const auto statement = ts_node_named_child(ts_statements, s);
+    auto node = parse_statement(script, statement);
+    if (node) {
+      statements.push_back(std::move(node));
+    }
+  }
+
+  return statements;
+}
+
+
 std::vector<std::unique_ptr<Expression>> parse_function_call_args(Script& script, const TSNode& args_node)
 {
   std::vector<std::unique_ptr<Expression>> args;
@@ -209,21 +247,21 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
 
     for (uint32_t p = 0; p < param_count; ++p)
     {
-        TSNode parameter = ts_node_named_child(parameters, p);
-        TSNode param_name_node = ts_node_child_by_field_name(parameter, "name", 4);
-        TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
+      TSNode parameter = ts_node_named_child(parameters, p);
+      TSNode param_name_node = ts_node_child_by_field_name(parameter, "name", 4);
+      TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
 
-        FunctionParam param;
-        if (!ts_node_is_null(param_name_node)) {
-          param.param_name = from_source(script, param_name_node);
-        }
-        if (!ts_node_is_null(param_type_node)) {
-          param.type_name = from_source(script, param_type_node);
-        }
+      FunctionParam param;
+      if (!ts_node_is_null(param_name_node)) {
+        param.param_name = from_source(script, param_name_node);
+      }
+      if (!ts_node_is_null(param_type_node)) {
+        param.type_name = from_source(script, param_type_node);
+      }
 
-        set_source_region(parameter, param);
+      set_source_region(parameter, param);
 
-        ast_node->params.push_back(std::move(param));
+      ast_node->params.push_back(std::move(param));
     }
   }
 
@@ -231,21 +269,8 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
   auto body = ts_node_child_by_field_name(ts_node, "body", 4);
   if (!ts_node_is_null(body))
   {
-    const auto statement_count = ts_node_named_child_count(body);
-    ast_node->body.nodes.reserve(std::min<uint32_t>(statement_count, 30));
-
-    for (uint32_t s = 0; s < statement_count; ++s)
-    {
-      const auto statement = ts_node_named_child(body, s);
-      const auto func_call = ts_node_child_by_field_name(statement, "func_call", 9);
-      const auto var_decl = ts_node_child_by_field_name(statement, "variable_declaration", 20);
-
-      if (!ts_node_is_null(func_call)) {
-        ast_node->body.add_node(parse_function_call(script, func_call));
-      }
-      else if (!ts_node_is_null(var_decl)) {
-        ast_node->body.add_node(parse_variable_decl(script, var_decl));
-      }
+    if (auto statements = parse_statements(script, body); !statements.empty()) {
+      ast_node->body.nodes = std::move(statements);
     }
   }
 
@@ -253,56 +278,41 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
 }
 
 
-void parse_script(Script& script, TSNode& ts_root)
+void parse_script(Script& script, const TSNode& ts_root)
 {
-  auto process_node = [&](const TSNode& node) -> std::unique_ptr<AstNode>
-  {
-    if (ts_node_is_error(node))
-    {
-      issue::syntax_error(*script.issues, node);
-      return std::make_unique<SyntaxError>();
-    }
-
-    const std::string_view type = ts_node_type(node) ;
-
-    if (type == "function_def") {
-      return parse_function_def(script, node);
-    }
-    else if (type == "statement")
-    {
-      const auto statement_count = ts_node_named_child_count(node);
-
-      for (uint32_t s = 0; s < statement_count; ++s)
-      {
-        const auto statement = ts_node_named_child(node, s);
-
-        const std::string_view type = ts_node_type(statement);
-
-        if (type == "function_call") {
-          return parse_function_call(script, statement);
-        }
-        else if (type == "variable_declaration") {
-          return parse_variable_decl(script, statement);
-        }
-      }
-
-      return nullptr; // probably a ';'
-    }
-    else {
-      throw std::runtime_error{std::format("Uknown node type {}", type)};
-    }
-  };
-
   const auto n_children = ts_node_named_child_count(ts_root);
 
   script.ast = std::make_unique<SourceFile>();
-  script.ast->nodes.reserve(n_children); // TODO set limits
+  script.ast->nodes.reserve(std::min(n_children, 20U));
 
   for (uint32_t i = 0 ; i < n_children ; ++i)
   {
-    auto child = ts_node_named_child(ts_root, i);
-    if (auto node = process_node(child); node) {
-      script.ast->nodes.push_back(std::move(node));
+    auto node = ts_node_named_child(ts_root, i);
+
+    if (ts_node_is_error(node))
+    {
+      issue::syntax_error(*script.issues, node);
+      script.ast->nodes.push_back(std::make_unique<SyntaxError>());
+    }
+    else
+    {
+      const std::string_view type = ts_node_type(node) ;
+
+      if (type == "function_def")
+      {
+        if (auto def = parse_function_def(script, node); def) {
+          script.ast->nodes.push_back(std::move(def));
+        }
+      }
+      else if (type == "statement")
+      {
+        if (auto statement = parse_statement(script, node); statement) {
+          script.ast->nodes.push_back(std::move(statement));
+        }
+      }
+      else {
+        throw std::runtime_error{std::format("Uknown node type {}", type)};
+      }
     }
   }
 }
