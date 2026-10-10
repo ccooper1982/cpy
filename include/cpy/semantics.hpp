@@ -142,6 +142,9 @@ private:
   VarType process_expression(Context& ctx, const AstNode& parent, const VariableRef& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr);
 
+  // operands
+  VarType process_operator(Context& ctx, const VarType& a, const VarType& b, const BinaryExpression& expr);
+
   // utils
   template<typename NodeT, typename Handler>
     requires std::derived_from<NodeT, AstNode> &&

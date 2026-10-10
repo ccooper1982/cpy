@@ -174,6 +174,11 @@ namespace issue
     issues.add_error("Cannot intialise variable from void", node.source, ErrorCode::VariableInitVoid);
   }
 
+  inline void var_init_type_differ (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Variable initialser type different from explicit type", node.source, ErrorCode::VariableUnknown);
+  }
+
   inline void var_unknown (Issues& issues, const AstNode& node, const std::string_view var)
   {
     issues.add_error(std::format("Variable not declared: {}", var), node.source, ErrorCode::VariableUnknown);

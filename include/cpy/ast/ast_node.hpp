@@ -501,14 +501,8 @@ struct VariableDecl : public AstNode
   static VariableDecl create_explicit(std::unique_ptr<Expression>&& init)
   {
     VariableDecl decl;
-    if (init)
-    {
-      decl.decl_type = DeclType::ExplicitInit;
-      decl.initialiser = std::move(init);
-    }
-    else {
-      decl.decl_type = DeclType::ExplicitNoInit;
-    }
+    decl.decl_type = init ? DeclType::ExplicitInit : DeclType::ExplicitNoInit;
+    decl.initialiser = std::move(init);
     return decl;
   }
 
@@ -532,6 +526,11 @@ struct VariableDecl : public AstNode
   bool has_explicit_type() const
   {
     return decl_type == DeclType::ExplicitNoInit || decl_type == DeclType::ExplicitInit;
+  }
+
+  bool has_initialiser() const
+  {
+    return initialiser != nullptr;
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override

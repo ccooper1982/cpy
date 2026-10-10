@@ -93,40 +93,48 @@ void Semantics::process_variable_declarations(Context& ctx)
         return;
       }
 
+      VarType var_type, init_type;
+
       if (decl.has_explicit_type())
       {
         if (const auto type = m_symbol_table.get_type(decl.var_type); !type) {
           issue::unknown_variable_type(ctx.issues, decl);
+          return;
+        }
+        else if (type == BuiltInType::Void) {
+          issue::var_init_void(ctx.issues, decl);
         }
         else {
-          m_symbol_table.add_variable(decl.var_name, *type);
+          var_type = *type;
         }
       }
-      else
+
+      if (decl.has_initialiser())
       {
-        if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall)
-        {
-          const auto& call = dynamic_cast<const FunctionCall&>(init);
-          if (const auto ret_type = process_expression(ctx, decl, call); ret_type)
-          {
-            if (ret_type == BuiltInType::Void) {
-              issue::var_init_void(ctx.issues, decl);
-            }
-            else {
-              m_symbol_table.add_variable(decl.var_name, ret_type);
-            }
-          }
+        if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall) {
+          init_type = process_expression(ctx, decl, dynamic_cast<const FunctionCall&>(init));
         }
-        else if (init.expr_type() == ExpressionType::Binary)
-        {
-          const auto& expr = dynamic_cast<const BinaryExpression&>(init);
-          if (const auto type = process_expression(ctx, decl, expr); type) {
-            m_symbol_table.add_variable(decl.var_name, type);
-          }
+        else if (init.expr_type() == ExpressionType::Binary) {
+          init_type = process_expression(ctx, decl, dynamic_cast<const BinaryExpression&>(init));
         }
         else {
-          m_symbol_table.add_variable(decl.var_name, init.get_var_type());
+          init_type = init.get_var_type(); // literal expression
         }
+
+        if (init_type == BuiltInType::Void) {
+          issue::var_init_void(ctx.issues, decl);
+          return;
+        }
+        else if (init_type == unresolved_t) {
+          return;
+        }
+      }
+
+      if (decl.has_initialiser() && decl.has_explicit_type() && var_type != init_type) {
+        issue::var_init_type_differ(ctx.issues, decl);
+      }
+      else {
+        m_symbol_table.add_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type);
       }
     });
   };
@@ -273,23 +281,61 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     rhs_type = rhs.get_var_type();
   }
 
-  if (lhs_type == BuiltInType::Void || rhs_type == BuiltInType::Void)
-  {
+  return process_operator(ctx, lhs_type, rhs_type, expr);
+}
+
+/// Determines the validity of the BinaryExpression::op on the operands, and returns
+/// the return type (or unresolved_t if invalid).
+VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarType& b, const BinaryExpression& expr)
+{
+  if (a == unresolved_t) {
+    throw std::runtime_error{"process_operator() encountered unresolved VarType"};
+  }
+
+  using enum BinaryOperator;
+  using enum BuiltInType;
+
+  VarType result_type{};
+  bool valid{};
+
+  // check for Void first, to highlight that, rather than differing types
+  if (a == Void || b == Void) {
     issue::binary_operands_void(ctx.issues, expr);
-    return unresolved_t;
   }
-
-  // TODO this is ok for now, but it only compares the BuiltInType,
-  //      it doesn't account for the operator, i.e.:
-  //
-  //  OK: 1+2
-  //  BAD: true+false
-  // And there's string concatenation to consider at some point.
-  if (lhs_type != rhs_type)
-  {
+  else if (a != b) {
     issue::binary_operands_invalid(ctx.issues, expr);
-    return unresolved_t;
+  }
+  else
+  {
+    switch (expr.op)
+    {
+      case Add:
+      case Subtract:
+      case Multiply:
+      case Divide:
+        valid = a == Int || a == Decimal;
+        result_type = a;
+        break;
+
+      case Equal:
+      case NotEqual:
+        valid = true;
+        result_type = Bool;
+        break;
+
+      case Less:
+      case Greater:
+      case LessEqual:
+      case GreaterEqual:
+        valid = !(a == Bool || a == String);
+        result_type = Bool;
+        break;
+    }
+
+    if (!valid) {
+      issue::binary_operands_invalid(ctx.issues, expr);
+    }
   }
 
-  return lhs_type;
+  return valid ? result_type : unresolved_t;
 }

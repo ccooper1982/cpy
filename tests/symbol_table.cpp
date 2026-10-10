@@ -129,6 +129,31 @@ TEST(SymbolTable, VarDecl)
 }
 
 
+TEST(SymbolTable, VarDecl_Operation)
+{
+  const std::string_view src = R"(
+    a := 4 + 1;
+    b := 1 < 5;
+    c: int = "a";
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  Semantics sem;
+  sem.process(script);
+
+  const auto& sym_table = sem.symbol_table();
+
+  ASSERT_TRUE(sym_table.have_variable("a"));
+  ASSERT_TRUE(sym_table.have_variable("b"));
+  ASSERT_FALSE(sym_table.have_variable("c"));
+
+  ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+  ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::Bool});
+}
+
+
 TEST(SymbolTable, VarDecl_NestedFuncCall)
 {
   {
@@ -251,6 +276,7 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
   }
 }
 
+
 TEST(SymbolTable, VarDecl_BinExpr)
 {
   const std::string_view src = R"(
@@ -281,6 +307,7 @@ TEST(SymbolTable, VarDecl_BinExpr)
   ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
   ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
 }
+
 
 TEST(SymbolTable, FuncCall_VarRef)
 {
