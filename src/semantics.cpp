@@ -1,5 +1,5 @@
-#include "cpy/ast/ast_node.hpp"
-#include "cpy/issues.hpp"
+#include <cpy/ast/ast_node.hpp>
+#include <cpy/issues.hpp>
 #include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
 
@@ -25,9 +25,9 @@ void Semantics::process(Script& script)
 
   process_function_defs(ctx);
 
-  process_function_calls(ctx);
-
   process_variable_declarations(ctx);
+
+  process_function_calls(ctx);
 }
 
 void Semantics::process_function_defs(Context& ctx)
@@ -35,9 +35,13 @@ void Semantics::process_function_defs(Context& ctx)
   walk_nodes<FunctionDef>(ctx.ast.nodes, [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
-    if (m_symbol_table.have_function(def.name)) {
+    if (m_symbol_table.have_function(def.name))
+    {
       issue::func_duplicate(ctx.issues, def, def.name);
+      return;
     }
+
+    m_symbol_table.add_function(def.name);
 
     std::vector<ResolvedSymbol> resolved_params;
     bool error{};
@@ -63,7 +67,7 @@ void Semantics::process_function_defs(Context& ctx)
     }
 
     if (!error) {
-      m_symbol_table.add_function(def.name, std::move(resolved_params), *return_type);
+      m_symbol_table.add_resolved_function(def.name, std::move(resolved_params), *return_type);
     }
   });
 }
@@ -75,41 +79,10 @@ void Semantics::process_function_calls(Context& ctx)
     if (!call.module.empty() && !Modules::exist(call.module)) {
       issue::module_not_exist(ctx.issues, call, call.module);
     }
-    else if (!m_symbol_table.have_function(call.name)) {
-      issue::func_not_exist(ctx.issues, call, call.name);
-    }
     else {
-      process_function_call(ctx, call);
+      process_expression(ctx, ctx.ast, call);
     }
   });
-}
-
-bool Semantics::process_function_call(Context& ctx, const FunctionCall& call)
-{
-  const auto& resolved = m_symbol_table.get_function(call.name);
-
-  if (call.args.size() != resolved.params.size())
-  {
-    issue::func_args_count(ctx.issues, call);
-    return false;
-  }
-
-  for (uint8_t i = 0 ; i < call.args.size() ; ++i)
-  {
-    const auto builtin_type = resolved.params[i].type.value_as<BuiltInType>();
-    if (builtin_type)
-    {
-      if (call.args[i]->is_expr_type(ExpressionType::FuncCall)) {
-        issue::unsupported(ctx.issues, *(call.args[i]), "Function call as function argument");
-      }
-      else if (!call.args[i]->is_convertible_to(*builtin_type))
-      {
-        issue::func_args(ctx.issues, *(call.args[i]), call.name, resolved.params[i].name);
-        return false;
-      }
-    }
-  }
-  return true;
 }
 
 void Semantics::process_variable_declarations(Context& ctx)
@@ -118,89 +91,7 @@ void Semantics::process_variable_declarations(Context& ctx)
   {
     walk_nodes<VariableDecl>(nodes, [this, &ctx](const VariableDecl& decl)
     {
-      if (m_symbol_table.have_variable(decl.var_name))
-      {
-        issue::var_duplicate(ctx.issues, decl, decl.var_name);
-        return;
-      }
-
-      if (decl.has_explicit_type())
-      {
-        if (const auto type = m_symbol_table.get_type(decl.var_type); !type) {
-          issue::unknown_variable_type(ctx.issues, decl);
-        }
-        else {
-          m_symbol_table.add_variable(decl.var_name, *type);
-        }
-      }
-      else
-      {
-        auto get_type_from_func_call = [this, &ctx, &decl](const FunctionCall& call) -> std::optional<VarType>
-        {
-          if (!m_symbol_table.have_function(call.name)) {
-            issue::func_not_exist(ctx.issues, decl, call.name);
-          }
-          else if (process_function_call(ctx, call))
-          {
-            const auto& types = m_symbol_table.get_function(call.name);
-            if (types.return_type != BuiltInType::Void) {
-              return types.return_type;
-            }
-            else {
-              issue::var_init_void(ctx.issues, decl, decl.var_name);
-            }
-          }
-
-          return std::nullopt;
-        };
-
-        if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall)
-        {
-          const auto& call = dynamic_cast<const FunctionCall&>(init);
-
-          if (auto type = get_type_from_func_call(call); type) {
-            m_symbol_table.add_variable(decl.var_name, *type);
-          }
-        }
-        else if (init.expr_type() == ExpressionType::Binary)
-        {
-          const auto& expr = dynamic_cast<const BinaryExpression&>(init);
-          const auto& lhs = *expr.lhs;
-          const auto& rhs = *expr.rhs;
-
-          VarType lhs_type, rhs_type;
-
-          if (lhs.is_expr_type(ExpressionType::FuncCall))
-          {
-            if (const auto type = get_type_from_func_call(dynamic_cast<const FunctionCall&>(lhs)); type) {
-              lhs_type = *type;
-            }
-          }
-          else {
-            lhs_type = lhs.get_var_type();
-          }
-
-          if (rhs.is_expr_type(ExpressionType::FuncCall))
-          {
-            if (const auto type = get_type_from_func_call(dynamic_cast<const FunctionCall&>(rhs)); type) {
-              rhs_type = *type;
-            }
-          }
-          else {
-            rhs_type = rhs.get_var_type();
-          }
-
-          if (lhs_type != rhs_type) {
-            issue::var_init_binary_differ(ctx.issues, decl);
-          }
-          else if (lhs_type != BuiltInType::Unknown && rhs_type != BuiltInType::Unknown) {
-            m_symbol_table.add_variable(decl.var_name, lhs_type);
-          }
-        }
-        else {
-          m_symbol_table.add_variable(decl.var_name, init.get_var_type());
-        }
-      }
+      process_variable_declaration(ctx, decl);
     });
   };
 
@@ -212,4 +103,251 @@ void Semantics::process_variable_declarations(Context& ctx)
   {
     check_vars(func_def.body.nodes);
   });
+}
+
+void Semantics::process_variable_declaration(Context& ctx, const VariableDecl& decl)
+{
+  if (m_symbol_table.have_variable(decl.var_name))
+  {
+    issue::var_duplicate(ctx.issues, decl, decl.var_name);
+    return;
+  }
+
+  m_symbol_table.add_variable(decl.var_name);
+
+  VarType var_type, init_type;
+
+  if (decl.has_explicit_type())
+  {
+    if (const auto type = m_symbol_table.get_type(decl.var_type); !type) {
+      issue::unknown_variable_type(ctx.issues, decl);
+      return;
+    }
+    else if (type == BuiltInType::Void) {
+      issue::var_init_void(ctx.issues, decl);
+    }
+    else {
+      var_type = *type;
+    }
+  }
+
+  if (decl.has_initialiser())
+  {
+    if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall) {
+      init_type = process_expression(ctx, decl, dynamic_cast<const FunctionCall&>(init));
+    }
+    else if (init.expr_type() == ExpressionType::Binary) {
+      init_type = process_expression(ctx, decl, dynamic_cast<const BinaryExpression&>(init));
+    }
+    else {
+      init_type = init.get_var_type(); // literal expression
+    }
+
+    if (init_type == BuiltInType::Void) {
+      issue::var_init_void(ctx.issues, decl);
+      return;
+    }
+    else if (init_type == unresolved_t) {
+      return;
+    }
+  }
+
+  if (decl.has_initialiser() && decl.has_explicit_type() && var_type != init_type) {
+    issue::var_init_type_differ(ctx.issues, decl);
+  }
+  else {
+    m_symbol_table.add_resolved_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type);
+  }
+}
+
+
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const FunctionCall& call)
+{
+  if (!m_symbol_table.have_resolved_function(call.name))
+  {
+    issue::func_not_exist(ctx.issues, call, call.name);
+    return unresolved_t;
+  }
+
+  const auto& resolved = m_symbol_table.get_function(call.name);
+
+  if (call.args.size() != resolved.params.size())
+  {
+    issue::func_arg_count(ctx.issues, call);
+    return unresolved_t;
+  }
+
+  for (uint8_t i = 0 ; i < call.args.size() ; ++i)
+  {
+    const auto param_type = resolved.params[i].type.value_as<BuiltInType>();
+    if (param_type)
+    {
+      const auto& arg = *call.args[i];
+
+      if (arg.is_expr_type(ExpressionType::FuncCall))
+      {
+        const auto& func_call = dynamic_cast<const FunctionCall&>(arg);
+
+        if (const auto ret_type = process_expression(ctx, call, func_call); !ret_type) {
+          return unresolved_t;
+        }
+        else if (ret_type == BuiltInType::Void)
+        {
+          issue::func_arg_void(ctx.issues, arg, resolved.params[i].name);
+          return unresolved_t;
+        }
+        else if (ret_type != *param_type)
+        {
+          issue::func_arg(ctx.issues, arg, resolved.params[i].name);
+          return unresolved_t;
+        }
+      }
+      else if (arg.is_expr_type(ExpressionType::Binary))
+      {
+        const auto& expr = dynamic_cast<const BinaryExpression&>(arg);
+        if (!process_expression(ctx, parent, expr))
+          return unresolved_t;
+      }
+      else if (arg.is_expr_type(ExpressionType::VariableRef))
+      {
+        const auto& var = dynamic_cast<const VariableRef&>(arg);
+        const auto var_type = process_expression(ctx, call, var);
+
+        // if the variable is unknown, process_expression() will create an isue and
+        // return unresolved_t
+        if (var_type == unresolved_t) {
+          return unresolved_t;
+        }
+        else if (var_type != *param_type)
+        {
+          issue::func_arg(ctx.issues, call, resolved.params[i].name);
+          return unresolved_t;
+        }
+      }
+      else if (!arg.is_convertible_to(*param_type))
+      {
+        issue::func_arg(ctx.issues, call, resolved.params[i].name);
+        return unresolved_t;
+      }
+    }
+  }
+
+  return resolved.return_type;
+}
+
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const VariableRef& expr)
+{
+  if (!m_symbol_table.have_resolved_variable(expr.name))
+  {
+    issue::var_unknown(ctx.issues, parent, expr.name);
+    return unresolved_t;
+  }
+  else {
+    return m_symbol_table.get_variable(expr.name).type;
+  }
+}
+
+/// Returns the return value type of a binary expressions.
+/// Determines the return type of lhs and rhs then calls process_operator()
+/// which determines if those are valid for the operator.
+///
+/// Nested binary expressions, example:
+///   a := foo1() + foo2() + foo3()
+///
+///  lhs = (foo1() + foo2())
+///  rhs = foo3()
+///
+/// - Calls `process_expression(Context&, const AstNode&, BinaryExpression)` to get the result type of `foo1()+foo2()`
+/// - Calls `process_expression(Context&, const AstNode&, FunctionCall)` to get the result type of `foo3()`
+/// - Calls `process_operator()` with the types
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr)
+{
+  const auto& lhs = *expr.lhs;
+  const auto& rhs = *expr.rhs;
+
+  VarType lhs_type, rhs_type;
+
+  if (lhs.is_expr_type(ExpressionType::Binary)) {
+    lhs_type = process_expression(ctx, parent, dynamic_cast<const BinaryExpression&>(lhs));
+  }
+  else if (lhs.is_expr_type(ExpressionType::FuncCall)){
+    lhs_type = process_expression(ctx, parent, dynamic_cast<const FunctionCall&>(lhs));
+  }
+  else if (lhs.is_expr_type(ExpressionType::VariableRef)){
+    lhs_type = process_expression(ctx, parent, dynamic_cast<const VariableRef&>(lhs));
+  }
+  else {
+    lhs_type = lhs.get_var_type();
+  }
+
+  if (rhs.is_expr_type(ExpressionType::Binary)) {
+     rhs_type = process_expression(ctx, parent, dynamic_cast<const BinaryExpression&>(rhs));
+  }
+  else if (rhs.is_expr_type(ExpressionType::FuncCall)) {
+    rhs_type = process_expression(ctx, parent, dynamic_cast<const FunctionCall&>(rhs));
+  }
+  else if (rhs.is_expr_type(ExpressionType::VariableRef)){
+    rhs_type = process_expression(ctx, parent, dynamic_cast<const VariableRef&>(rhs));
+  }
+  else {
+    rhs_type = rhs.get_var_type();
+  }
+
+  return process_operator(ctx, lhs_type, rhs_type, expr);
+}
+
+/// Determines the validity of the BinaryExpression::op on the operands, and returns
+/// the return type (or unresolved_t if invalid).
+VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarType& b, const BinaryExpression& expr)
+{
+  if (a == unresolved_t) {
+    throw std::runtime_error{"process_operator() encountered unresolved VarType"};
+  }
+
+  using enum BinaryOperator;
+  using enum BuiltInType;
+
+  VarType result_type{};
+  bool valid{};
+
+  // check for Void first, to highlight that, rather than differing types
+  if (a == Void || b == Void) {
+    issue::binary_operands_void(ctx.issues, expr);
+  }
+  else if (a != b) {
+    issue::binary_operands_invalid(ctx.issues, expr);
+  }
+  else
+  {
+    switch (expr.op)
+    {
+      case Add:
+      case Subtract:
+      case Multiply:
+      case Divide:
+        valid = a == Int || a == Decimal;
+        result_type = a;
+        break;
+
+      case Equal:
+      case NotEqual:
+        valid = true;
+        result_type = Bool;
+        break;
+
+      case Less:
+      case Greater:
+      case LessEqual:
+      case GreaterEqual:
+        valid = !(a == Bool || a == String);
+        result_type = Bool;
+        break;
+    }
+
+    if (!valid) {
+      issue::binary_operands_invalid(ctx.issues, expr);
+    }
+  }
+
+  return valid ? result_type : unresolved_t;
 }

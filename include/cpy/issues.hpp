@@ -19,13 +19,16 @@ enum class ErrorCode
   FunctionDuplicate,
   FunctionNotExist,
   FunctionCallArgType,
+  FunctionCallArgVoid,
   FunctionCallArgsCount,
   UnknownParamType,
   UnknownReturnType,
   UnknownVarType,
   VariableDuplicate,
   VariableInitVoid,
-  VariableInitBinaryInvalid,
+  VariableUnknown,
+  BinaryOperandsInvalid,
+  BinaryOperandsVoid,
   Unsupported,
   SyntaxError
 };
@@ -123,7 +126,7 @@ namespace issue
 
   inline void unknown_variable_type (Issues& issues, const AstNode& node)
   {
-    issues.add_error(std::format("Unknown variable type"), node.source, ErrorCode::UnknownVarType);
+    issues.add_error("Unknown variable type", node.source, ErrorCode::UnknownVarType);
   }
 
   inline void unknown_return_type(Issues& issues, const std::string_view func, const std::string_view type)
@@ -146,14 +149,19 @@ namespace issue
     issues.add_error(std::format("Function does not exist: {}", func), node.source, ErrorCode::FunctionNotExist);
   }
 
-  inline void func_args (Issues& issues, const AstNode& node, const std::string_view func, const std::string_view arg_name)
+  inline void func_arg (Issues& issues, const AstNode& node, const std::string_view arg_name)
   {
-    issues.add_error(std::format("Function call '{}' has invalid type for argument: {}", func, arg_name), node.source, ErrorCode::FunctionCallArgType);
+    issues.add_error(std::format("Function call has invalid type for argument: {}", arg_name), node.source, ErrorCode::FunctionCallArgType);
   }
 
-  inline void func_args_count (Issues& issues, const AstNode& node)
+  inline void func_arg_void (Issues& issues, const AstNode& node, const std::string_view arg_name)
   {
-    issues.add_error(std::format("Function call with incorrect number of arguments"), node.source, ErrorCode::FunctionCallArgsCount);
+    issues.add_error(std::format("Parameter '{}' in function call is void", arg_name), node.source, ErrorCode::FunctionCallArgVoid);
+  }
+
+  inline void func_arg_count (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Function call with incorrect number of arguments", node.source, ErrorCode::FunctionCallArgsCount);
   }
 
   inline void var_duplicate (Issues& issues, const AstNode& node, const std::string_view var)
@@ -161,18 +169,33 @@ namespace issue
     issues.add_error(std::format("Variable already defined: {}", var), node.source, ErrorCode::VariableDuplicate);
   }
 
-  inline void var_init_void (Issues& issues, const AstNode& node, const std::string_view var)
+  inline void var_init_void (Issues& issues, const AstNode& node)
   {
-    issues.add_error(std::format("Cannot intialise variable from void: {}", var), node.source, ErrorCode::VariableInitVoid);
+    issues.add_error("Cannot intialise variable from void", node.source, ErrorCode::VariableInitVoid);
   }
 
-  inline void var_init_binary_differ (Issues& issues, const AstNode& node)
+  inline void var_init_type_differ (Issues& issues, const AstNode& node)
   {
-    issues.add_error("Variable initialised from binary expression with incompatible types", node.source, ErrorCode::VariableInitBinaryInvalid);
+    issues.add_error("Variable initialser type different from explicit type", node.source, ErrorCode::VariableUnknown);
+  }
+
+  inline void var_unknown (Issues& issues, const AstNode& node, const std::string_view var)
+  {
+    issues.add_error(std::format("Variable not declared: {}", var), node.source, ErrorCode::VariableUnknown);
   }
 
   inline void unsupported (Issues& issues, const AstNode& node, const std::string_view feature)
   {
     issues.add_error(std::format("Unsupported feature: {}", feature), node.source, ErrorCode::Unsupported);
+  }
+
+  inline void binary_operands_invalid (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Invalid binary operands", node.source, ErrorCode::BinaryOperandsInvalid);
+  }
+
+  inline void binary_operands_void (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Void operand(s) in binary expression", node.source, ErrorCode::BinaryOperandsVoid);
   }
 }

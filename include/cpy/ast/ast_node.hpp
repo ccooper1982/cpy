@@ -27,12 +27,12 @@ enum class NodeType
 
 enum class BuiltInType
 {
+  Unset,
   Int,
   Decimal,
   Bool,
   String,
-  Void,
-  Unknown // or Unset
+  Void
 };
 
 
@@ -43,13 +43,16 @@ struct UserType
 
 struct VarType
 {
-  VarType() : type (BuiltInType::Unknown)
+  VarType() : type (BuiltInType::Unset)
   {}
 
   VarType(const BuiltInType t) : type (t)
   {}
 
-  const auto& value() const { return type; }
+  const auto& value() const
+  {
+    return type;
+  }
 
   template<typename T>
   const std::optional<T> value_as() const
@@ -70,9 +73,16 @@ struct VarType
     return is_type<BuiltInType>() && *(value_as<BuiltInType>()) == t;
   }
 
+  explicit operator bool() const
+  {
+    return !is_type(BuiltInType::Unset);
+  }
+
 private:
   std::variant<BuiltInType, UserType> type;
 };
+
+inline constexpr const auto unresolved_t = BuiltInType::Unset;
 
 
 inline bool operator==([[maybe_unused]] const UserType& a, [[maybe_unused]] const UserType& b)
@@ -126,7 +136,8 @@ enum class ExpressionType
   Dec,
   Bool,
   Binary,
-  FuncCall
+  FuncCall,
+  VariableRef
 };
 
 
@@ -349,6 +360,33 @@ struct FunctionCall : public Expression
 };
 
 
+// Note: not a "ref" like a C++ reference, but "a node which refers to a variable"
+struct VariableRef : public Expression
+{
+  static constexpr ExpressionType ExprType = ExpressionType::VariableRef;
+
+  VariableRef() : Expression(ExprType)
+  {}
+
+  VariableRef(const std::string_view name)
+    : Expression(ExprType)
+    , name(name)
+  {}
+
+  VarType get_var_type() const override
+  {
+    // never called because the type is taken from the type of the variable
+    throw std::runtime_error{"get_var_type() called on VariableRef"};
+  }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << name;
+  }
+
+  std::string_view name;
+};
+
 inline std::string_view to_string(const Expression& expr);
 
 template<typename ExprT> requires (std::derived_from<ExprT, Expression>)
@@ -463,14 +501,8 @@ struct VariableDecl : public AstNode
   static VariableDecl create_explicit(std::unique_ptr<Expression>&& init)
   {
     VariableDecl decl;
-    if (init)
-    {
-      decl.decl_type = DeclType::ExplicitInit;
-      decl.initialiser = std::move(init);
-    }
-    else {
-      decl.decl_type = DeclType::ExplicitNoInit;
-    }
+    decl.decl_type = init ? DeclType::ExplicitInit : DeclType::ExplicitNoInit;
+    decl.initialiser = std::move(init);
     return decl;
   }
 
@@ -496,6 +528,11 @@ struct VariableDecl : public AstNode
     return decl_type == DeclType::ExplicitNoInit || decl_type == DeclType::ExplicitInit;
   }
 
+  bool has_initialiser() const
+  {
+    return initialiser != nullptr;
+  }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     os << var_name << ':';
@@ -515,6 +552,7 @@ struct VariableDecl : public AstNode
   private:
     DeclType decl_type;
 };
+
 
 
 struct SyntaxError : public AstNode
@@ -623,6 +661,9 @@ inline std::string_view to_string(const Expression& expr)
       return "BinaryExpression";
     case FuncCall:
       return "FunctionCall";
+    case VariableRef:
+      return "VariableReference";
   }
+
   std::unreachable();
 }
