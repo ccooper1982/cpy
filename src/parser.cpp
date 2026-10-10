@@ -13,8 +13,7 @@
 #include <utility>
 #include <vector>
 
-
-std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call);
+extern "C" const TSLanguage *tree_sitter_cpy();
 
 
 static BinaryOperator get_binary_operator(const std::string_view op)
@@ -33,25 +32,18 @@ static BinaryOperator get_binary_operator(const std::string_view op)
   std::unreachable();
 }
 
-std::string_view from_source (const Script& script, const TSNode& node)
-{
-  const auto start = ts_node_start_byte(node);
-  const auto length = ts_node_end_byte(node) - start;
-
-  return std::string_view{*script.src}.substr(start, length);
-}
-
-void set_source_region (const TSNode& ts_node, AstNode& ast_node)
+static void set_source_region (const TSNode& ts_node, AstNode& ast_node)
 {
   ast_node.source = SourceRegion{ts_node_start_byte(ts_node), ts_node_end_byte(ts_node)};
 }
 
-void set_source_region (AstNode& ast_node, const uint32_t from, const uint32_t to)
+static void set_source_region (AstNode& ast_node, const uint32_t from, const uint32_t to)
 {
   ast_node.source = SourceRegion{from, to};
 }
 
-std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_node)
+
+std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
 {
   std::unique_ptr<Expression> expr;
 
@@ -60,7 +52,7 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
   if (expr_type.empty())
     return nullptr;
 
-  const std::string_view value = from_source(script, ts_node_named_child(expr_node, 0));
+  const std::string_view value = from_source(ts_node_named_child(expr_node, 0));
 
   if (expr_type == "integer")
   {
@@ -87,30 +79,30 @@ std::unique_ptr<Expression> parse_expression(Script& script, const TSNode& expr_
     const auto op_node = ts_node_child_by_field_name(bin_expr_node, "op", 2);
     const auto rhs_node = ts_node_child_by_field_name(bin_expr_node, "rhs", 3);
 
-    const auto op = get_binary_operator(from_source(script, op_node));
-    expr = std::make_unique<BinaryExpression>(parse_expression(script, lhs_node),
-                                              parse_expression(script, rhs_node),
+    const auto op = get_binary_operator(from_source(op_node));
+    expr = std::make_unique<BinaryExpression>(parse_expression(lhs_node),
+                                              parse_expression(rhs_node),
                                               op);
   }
   else if (expr_type == "function_call") {
-    expr = parse_function_call(script, ts_node_named_child(expr_node, 0));
+    expr = parse_function_call(ts_node_named_child(expr_node, 0));
   }
   else if (expr_type == "identifier") {
-    expr = std::make_unique<VariableRef>(from_source(script, expr_node));
+    expr = std::make_unique<VariableRef>(from_source(expr_node));
   }
 
   if (expr) {
     set_source_region(expr_node, *expr);
   }
   else {
-    throw std::runtime_error{std::format("Unknown expression: {}", from_source(script, expr_node))};
+    throw std::runtime_error{std::format("Unknown expression: {}", from_source(expr_node))};
   }
 
   return expr;
 }
 
 
-std::unique_ptr<VariableDecl> parse_variable_decl(Script& script, const TSNode& ts_node)
+std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
 {
   const auto name_node = ts_node_child_by_field_name(ts_node, "name", 4);
   const auto type_node = ts_node_child_by_field_name(ts_node, "type_name", 9);
@@ -121,7 +113,7 @@ std::unique_ptr<VariableDecl> parse_variable_decl(Script& script, const TSNode& 
   // name always required. If we don't have a type, we must have an initialiser
   if (ts_node_has_error(ts_node) || ts_node_is_null(name_node) || (!have_type && !have_init))
   {
-    issue::syntax_error(*script.issues, ts_node);
+    issue::syntax_error(*m_issues, ts_node);
     return nullptr;
   }
 
@@ -129,21 +121,21 @@ std::unique_ptr<VariableDecl> parse_variable_decl(Script& script, const TSNode& 
 
   if (have_type)
   {
-    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_explicit(have_init ? parse_expression(script, init_node) : nullptr));
-    var_decl->var_type = from_source(script, type_node);
+    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_explicit(have_init ? parse_expression(init_node) : nullptr));
+    var_decl->var_type = from_source(type_node);
   }
   else {
-    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_inferred(parse_expression(script, init_node)));
+    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_inferred(parse_expression(init_node)));
   }
 
-  var_decl->var_name = from_source(script, name_node);
+  var_decl->var_name = from_source(name_node);
 
   set_source_region(ts_node, *var_decl);
   return var_decl;
 }
 
 
-std::unique_ptr<AstNode> parse_statement (Script& script, const TSNode& ts_statement)
+std::unique_ptr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
 {
   const auto func_call = ts_node_child_by_field_name(ts_statement, "func_call", 9);
   const auto var_decl = ts_node_child_by_field_name(ts_statement, "variable_declaration", 20);
@@ -151,17 +143,17 @@ std::unique_ptr<AstNode> parse_statement (Script& script, const TSNode& ts_state
   std::unique_ptr<AstNode> node;
 
   if (!ts_node_is_null(func_call)) {
-    node = parse_function_call(script, func_call);
+    node = parse_function_call(func_call);
   }
   else if (!ts_node_is_null(var_decl)) {
-    node = parse_variable_decl(script, var_decl);
+    node = parse_variable_decl(var_decl);
   }
 
   return node;
 }
 
 
-std::vector<std::unique_ptr<AstNode>> parse_statements (Script& script, const TSNode& ts_statements)
+std::vector<std::unique_ptr<AstNode>> Parser::parse_statements (const TSNode& ts_statements)
 {
   std::vector<std::unique_ptr<AstNode>> statements;
 
@@ -171,7 +163,7 @@ std::vector<std::unique_ptr<AstNode>> parse_statements (Script& script, const TS
   for (uint32_t s = 0; s < statement_count; ++s)
   {
     const auto statement = ts_node_named_child(ts_statements, s);
-    auto node = parse_statement(script, statement);
+    auto node = parse_statement(statement);
     if (node) {
       statements.push_back(std::move(node));
     }
@@ -181,7 +173,7 @@ std::vector<std::unique_ptr<AstNode>> parse_statements (Script& script, const TS
 }
 
 
-std::vector<std::unique_ptr<Expression>> parse_function_call_args(Script& script, const TSNode& args_node)
+std::vector<std::unique_ptr<Expression>> Parser::parse_function_call_args(const TSNode& args_node)
 {
   std::vector<std::unique_ptr<Expression>> args;
   if (!ts_node_is_null(args_node))
@@ -191,20 +183,21 @@ std::vector<std::unique_ptr<Expression>> parse_function_call_args(Script& script
     for (uint32_t arg = 0 ; arg < n_args ; ++arg)
     {
       const auto expr_node = ts_node_named_child(args_node, arg);
-      args.push_back(parse_expression(script, expr_node));
+      args.push_back(parse_expression(expr_node));
     }
   }
   return args;
 }
 
-std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& func_call)
+
+std::unique_ptr<FunctionCall> Parser::parse_function_call(const TSNode& func_call)
 {
   const auto name_node = ts_node_child_by_field_name(func_call, "name", 4);
   const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
 
-  const auto func_name = from_source(script, name_node);
+  const auto func_name = from_source(name_node);
 
-  auto args = parse_function_call_args(script, args_node);
+  auto args = parse_function_call_args(args_node);
 
   auto func_call_node = std::make_unique<FunctionCall>(func_name, std::move(args));
   set_source_region(*func_call_node, ts_node_start_byte(func_call), ts_node_end_byte(func_call));
@@ -216,21 +209,22 @@ std::unique_ptr<FunctionCall> parse_function_call(Script& script, const TSNode& 
   return func_call_node;
 }
 
-std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts_node)
+
+std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
 {
   auto ast_node = std::make_unique<FunctionDef>();
   set_source_region(ts_node, *ast_node);
 
   // name
   TSNode name_node = ts_node_child_by_field_name(ts_node, "name", 4);
-  ast_node->name = from_source(script, name_node);
+  ast_node->name = from_source(name_node);
 
   // return type
   TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
   if (!ts_node_is_null(return_type))
   {
     auto type_node = ts_node_child_by_field_name(return_type, "type_name", 9);
-    ast_node->return_type = from_source(script, type_node);
+    ast_node->return_type = from_source(type_node);
   }
   else {
     ast_node->return_type = "void";
@@ -253,10 +247,10 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
 
       FunctionParam param;
       if (!ts_node_is_null(param_name_node)) {
-        param.param_name = from_source(script, param_name_node);
+        param.param_name = from_source(param_name_node);
       }
       if (!ts_node_is_null(param_type_node)) {
-        param.type_name = from_source(script, param_type_node);
+        param.type_name = from_source(param_type_node);
       }
 
       set_source_region(parameter, param);
@@ -269,7 +263,7 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
   auto body = ts_node_child_by_field_name(ts_node, "body", 4);
   if (!ts_node_is_null(body))
   {
-    if (auto statements = parse_statements(script, body); !statements.empty()) {
+    if (auto statements = parse_statements(body); !statements.empty()) {
       ast_node->body.nodes = std::move(statements);
     }
   }
@@ -278,12 +272,21 @@ std::unique_ptr<FunctionDef> parse_function_def(Script& script, const TSNode& ts
 }
 
 
-void parse_script(Script& script, const TSNode& ts_root)
+std::string_view Parser::from_source (const TSNode& node)
+{
+  const auto start = ts_node_start_byte(node);
+  const auto length = ts_node_end_byte(node) - start;
+
+  return std::string_view{*m_src}.substr(start, length);
+}
+
+
+void Parser::parse_script(const TSNode& ts_root)
 {
   const auto n_children = ts_node_named_child_count(ts_root);
 
-  script.ast = std::make_unique<SourceFile>();
-  script.ast->nodes.reserve(std::min(n_children, 20U));
+  m_ast = std::make_unique<SourceFile>();
+  m_ast->nodes.reserve(std::min(n_children, 20U));
 
   for (uint32_t i = 0 ; i < n_children ; ++i)
   {
@@ -291,8 +294,8 @@ void parse_script(Script& script, const TSNode& ts_root)
 
     if (ts_node_is_error(node))
     {
-      issue::syntax_error(*script.issues, node);
-      script.ast->nodes.push_back(std::make_unique<SyntaxError>());
+      issue::syntax_error(*m_issues, node);
+      m_ast->nodes.push_back(std::make_unique<SyntaxError>());
     }
     else
     {
@@ -300,14 +303,14 @@ void parse_script(Script& script, const TSNode& ts_root)
 
       if (type == "function_def")
       {
-        if (auto def = parse_function_def(script, node); def) {
-          script.ast->nodes.push_back(std::move(def));
+        if (auto def = parse_function_def(node); def) {
+          m_ast->nodes.push_back(std::move(def));
         }
       }
       else if (type == "statement")
       {
-        if (auto statement = parse_statement(script, node); statement) {
-          script.ast->nodes.push_back(std::move(statement));
+        if (auto statement = parse_statement(node); statement) {
+          m_ast->nodes.push_back(std::move(statement));
         }
       }
       else {
@@ -318,56 +321,58 @@ void parse_script(Script& script, const TSNode& ts_root)
 }
 
 
-Parser::~Parser()
+void Parser::parse()
 {
-  if (m_tree)
-    ts_tree_delete(m_tree);
-  if (m_parser)
-    ts_parser_delete(m_parser);
-}
+  m_parser.reset(ts_parser_new());
 
-void Parser::parse(Script& script)
-{
-  m_parser = ts_parser_new();
+  ts_parser_set_language(m_parser.get(), tree_sitter_cpy());
 
-  ts_parser_set_language(m_parser, tree_sitter_cpy());
+  m_tree.reset(ts_parser_parse_string(m_parser.get(), nullptr, m_src->data(), m_src->length()));
 
-  m_tree = ts_parser_parse_string(m_parser, nullptr, script.src->data(), script.src->length());
-
-  TSNode root = ts_tree_root_node(m_tree);
+  TSNode root = ts_tree_root_node(m_tree.get());
 
   if (const std::string_view root_type = ts_node_type(root) ; root_type != "source_file") {
     throw std::runtime_error{"Root is not a source_file"};
   }
 
-  parse_script(script, root);
+  parse_script(root);
 }
 
-Script Parser::parse(const fs::path src_file)
-{
-  Script script;
-  script.file = src_file;
-  script.issues = std::make_unique<Issues>(src_file);
 
-  std::ifstream stream(src_file);
-  if (!stream) {
+Script Parser::parse(const fs::path& src_file)
+{
+  if (std::ifstream stream(src_file); !stream) {
       throw std::runtime_error{"Failed to open source file: " + src_file.string()};
   }
+  else {
+    m_src = std::make_unique<std::string> (std::istreambuf_iterator<char>{stream},
+                                           std::istreambuf_iterator<char>{});
+  }
 
-  script.src = std::make_unique<std::string> (
-    std::istreambuf_iterator<char>{stream},
-    std::istreambuf_iterator<char>{});
+  m_issues = std::make_unique<Issues>(src_file);
 
-  parse(script);
+  parse();
+
+  Script script;
+  script.file = src_file;
+  script.ast = std::move(m_ast);
+  script.issues = std::move(m_issues);
+  script.src = std::move(m_src);
+
   return script;
 }
 
 Script Parser::parse(const std::string_view src)
 {
-  Script script;
-  script.src = std::make_unique<std::string> (src);
-  script.issues = std::make_unique<Issues>();
+  m_src = std::make_unique<std::string> (src);
+  m_issues = std::make_unique<Issues>();
 
-  parse(script);
+  parse();
+
+  Script script;
+  script.ast = std::move(m_ast);
+  script.issues = std::move(m_issues);
+  script.src = std::move(m_src);
+
   return script;
 }
