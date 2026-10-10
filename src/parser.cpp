@@ -42,6 +42,14 @@ static void set_source_region (AstNode& ast_node, const uint32_t from, const uin
   ast_node.source = SourceRegion{from, to};
 }
 
+/// ts_node_child_by_field_name() requires the field name and its length, excluding
+/// the terminating null. This is a wrapper around that.
+template <std::size_t N>
+TSNode child_by_field_name(TSNode node, const char (&name)[N])
+{
+  return ts_node_child_by_field_name(node, name, N - 1);
+}
+
 
 std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
 {
@@ -75,9 +83,9 @@ std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
   else if (expr_type == "binary_expression")
   {
     const auto bin_expr_node = ts_node_named_child(expr_node, 0);
-    const auto lhs_node = ts_node_child_by_field_name(bin_expr_node, "lhs", 3);
-    const auto op_node = ts_node_child_by_field_name(bin_expr_node, "op", 2);
-    const auto rhs_node = ts_node_child_by_field_name(bin_expr_node, "rhs", 3);
+    const auto lhs_node = child_by_field_name(bin_expr_node, "lhs");
+    const auto op_node = child_by_field_name(bin_expr_node, "op");
+    const auto rhs_node = child_by_field_name(bin_expr_node, "rhs");
 
     const auto op = get_binary_operator(from_source(op_node));
     expr = std::make_unique<BinaryExpression>(parse_expression(lhs_node),
@@ -104,9 +112,9 @@ std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
 
 std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
 {
-  const auto name_node = ts_node_child_by_field_name(ts_node, "name", 4);
-  const auto type_node = ts_node_child_by_field_name(ts_node, "type_name", 9);
-  const auto init_node = ts_node_child_by_field_name(ts_node, "initialiser", 11);
+  const auto name_node = child_by_field_name(ts_node, "name");
+  const auto type_node = child_by_field_name(ts_node, "type_name");
+  const auto init_node = child_by_field_name(ts_node, "initialiser");
   const auto have_type = !ts_node_is_null(type_node);
   const auto have_init = !ts_node_is_null(init_node);
 
@@ -137,8 +145,8 @@ std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
 
 std::unique_ptr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
 {
-  const auto func_call = ts_node_child_by_field_name(ts_statement, "func_call", 9);
-  const auto var_decl = ts_node_child_by_field_name(ts_statement, "variable_declaration", 20);
+  const auto func_call = child_by_field_name(ts_statement, "func_call");
+  const auto var_decl = child_by_field_name(ts_statement, "variable_declaration");
 
   std::unique_ptr<AstNode> node;
 
@@ -192,8 +200,8 @@ std::vector<std::unique_ptr<Expression>> Parser::parse_function_call_args(const 
 
 std::unique_ptr<FunctionCall> Parser::parse_function_call(const TSNode& func_call)
 {
-  const auto name_node = ts_node_child_by_field_name(func_call, "name", 4);
-  const auto args_node = ts_node_child_by_field_name(func_call, "args", 4);
+  const auto name_node = child_by_field_name(func_call, "name");
+  const auto args_node = child_by_field_name(func_call, "args");
 
   const auto func_name = from_source(name_node);
 
@@ -216,14 +224,14 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
   set_source_region(ts_node, *ast_node);
 
   // name
-  TSNode name_node = ts_node_child_by_field_name(ts_node, "name", 4);
+  TSNode name_node = child_by_field_name(ts_node, "name");
   ast_node->name = from_source(name_node);
 
   // return type
-  TSNode return_type = ts_node_child_by_field_name(ts_node, "return_type", 11);
+  TSNode return_type = child_by_field_name(ts_node, "return_type");
   if (!ts_node_is_null(return_type))
   {
-    auto type_node = ts_node_child_by_field_name(return_type, "type_name", 9);
+    auto type_node = child_by_field_name(return_type, "type_name");
     ast_node->return_type = from_source(type_node);
   }
   else {
@@ -231,7 +239,7 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
   }
 
   // params
-  TSNode parameters = ts_node_child_by_field_name(ts_node, "parameters", 10);
+  TSNode parameters = child_by_field_name(ts_node, "parameters");
 
   if (!ts_node_is_null(parameters))
   {
@@ -242,8 +250,8 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
     for (uint32_t p = 0; p < param_count; ++p)
     {
       TSNode parameter = ts_node_named_child(parameters, p);
-      TSNode param_name_node = ts_node_child_by_field_name(parameter, "name", 4);
-      TSNode param_type_node = ts_node_child_by_field_name(parameter, "type", 4);
+      TSNode param_name_node = child_by_field_name(parameter, "name");
+      TSNode param_type_node = child_by_field_name(parameter, "type");
 
       FunctionParam param;
       if (!ts_node_is_null(param_name_node)) {
@@ -260,7 +268,7 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
   }
 
   // body
-  auto body = ts_node_child_by_field_name(ts_node, "body", 4);
+  auto body = child_by_field_name(ts_node, "body");
   if (!ts_node_is_null(body))
   {
     if (auto statements = parse_statements(body); !statements.empty()) {
