@@ -15,7 +15,7 @@ export default grammar({
         optional(field("parameters", $.parameters)),
         ")",
         optional(field("return_type", $.return_type)),
-        field("body", $.function_body),
+        field("body", $.block),
       ),
 
     parameters: ($) => seq($.parameter, repeat(seq(",", $.parameter))),
@@ -28,19 +28,22 @@ export default grammar({
     boolean: ($) => choice("true","false",),
     literal_string: ($) => /"([^"\\]|\\.)*"/,
 
-    function_body: ($) => seq(
+    block: ($) => seq(
       "{",
       repeat($.statement),
       "}",
     ),
 
     statement: ($) =>
-      seq(
-        choice(
-          field("func_call", $.function_call),
-          field("variable_declaration", $.variable_declaration),
+      choice(
+        seq(
+          choice(
+            field("func_call", $.function_call),
+            field("variable_declaration", $.variable_declaration),
+          ),
+          ";"
         ),
-        ";"
+      field("condition_if", $.condition_if),
       ),
 
     function_call: ($) => seq(
@@ -49,6 +52,15 @@ export default grammar({
       optional(field("args", $.arguments)),
       ")",
     ),
+
+    condition_if: ($) =>
+      seq(
+        "if",
+        "(",
+        field("condition", $.expression),
+        ")",
+        field("body", $.block),
+      ),
 
     variable_declaration: ($) =>
       seq(

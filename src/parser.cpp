@@ -143,24 +143,6 @@ std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
 }
 
 
-std::unique_ptr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
-{
-  const auto func_call = child_by_field_name(ts_statement, "func_call");
-  const auto var_decl = child_by_field_name(ts_statement, "variable_declaration");
-
-  std::unique_ptr<AstNode> node;
-
-  if (!ts_node_is_null(func_call)) {
-    node = parse_function_call(func_call);
-  }
-  else if (!ts_node_is_null(var_decl)) {
-    node = parse_variable_decl(var_decl);
-  }
-
-  return node;
-}
-
-
 std::vector<std::unique_ptr<AstNode>> Parser::parse_statements (const TSNode& ts_statements)
 {
   std::vector<std::unique_ptr<AstNode>> statements;
@@ -178,6 +160,31 @@ std::vector<std::unique_ptr<AstNode>> Parser::parse_statements (const TSNode& ts
   }
 
   return statements;
+}
+
+
+std::unique_ptr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
+{
+  const auto func_call = child_by_field_name(ts_statement, "func_call");
+  const auto var_decl = child_by_field_name(ts_statement, "variable_declaration");
+  const auto cond_if = child_by_field_name(ts_statement, "condition_if");
+
+  std::unique_ptr<AstNode> node;
+
+  if (ts_node_has_error(ts_statement)) {
+    issue::syntax_error(*m_issues, ts_statement);
+  }
+  else if (!ts_node_is_null(func_call)) {
+    node = parse_function_call(func_call);
+  }
+  else if (!ts_node_is_null(var_decl)) {
+    node = parse_variable_decl(var_decl);
+  }
+  else if(!ts_node_is_null(cond_if)) {
+    node = parse_condition_if (cond_if);
+  }
+
+  return node;
 }
 
 
@@ -280,6 +287,32 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
 }
 
 
+std::unique_ptr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
+{
+  const TSNode cond = child_by_field_name(ts_node, "condition");
+  const TSNode body = child_by_field_name(ts_node, "body");
+
+  if (ts_node_has_error(ts_node))
+  {
+    issue::syntax_error(*m_issues, ts_node);
+    return nullptr;
+  }
+
+  auto node = std::make_unique<ConditionIf>();
+  if (!ts_node_is_null(cond)) {
+    node->if_condition = parse_expression(cond);
+  }
+
+  if (!ts_node_is_null(body)) {
+    node->if_body.nodes = parse_statements(body);
+  }
+
+  set_source_region(ts_node, *node);
+
+  return node;
+}
+
+
 std::string_view Parser::from_source (const TSNode& node)
 {
   const auto start = ts_node_start_byte(node);
@@ -294,7 +327,7 @@ void Parser::parse_script(const TSNode& ts_root)
   const auto n_children = ts_node_named_child_count(ts_root);
 
   m_ast = std::make_unique<SourceFile>();
-  m_ast->nodes.reserve(std::min(n_children, 20U));
+  m_ast->block.nodes.reserve(std::min(n_children, 20U));
 
   for (uint32_t i = 0 ; i < n_children ; ++i)
   {
@@ -303,23 +336,17 @@ void Parser::parse_script(const TSNode& ts_root)
     if (ts_node_is_error(node))
     {
       issue::syntax_error(*m_issues, node);
-      m_ast->nodes.push_back(std::make_unique<SyntaxError>());
+      m_ast->block.add_node(std::make_unique<SyntaxError>());
     }
     else
     {
       const std::string_view type = ts_node_type(node) ;
 
-      if (type == "function_def")
-      {
-        if (auto def = parse_function_def(node); def) {
-          m_ast->nodes.push_back(std::move(def));
-        }
+      if (type == "function_def") {
+        m_ast->block.add_node(parse_function_def(node));
       }
-      else if (type == "statement")
-      {
-        if (auto statement = parse_statement(node); statement) {
-          m_ast->nodes.push_back(std::move(statement));
-        }
+      else if (type == "statement") {
+        m_ast->block.add_node(parse_statement(node));
       }
       else {
         throw std::runtime_error{std::format("Uknown node type {}", type)};

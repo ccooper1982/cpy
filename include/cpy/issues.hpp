@@ -29,6 +29,7 @@ enum class ErrorCode
   VariableUnknown,
   BinaryOperandsInvalid,
   BinaryOperandsVoid,
+  ConditionNotBool,
   Unsupported,
   SyntaxError
 };
@@ -197,5 +198,10 @@ namespace issue
   inline void binary_operands_void (Issues& issues, const AstNode& node)
   {
     issues.add_error("Void operand(s) in binary expression", node.source, ErrorCode::BinaryOperandsVoid);
+  }
+
+  inline void condition_not_bool (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Condition expression is not boolean", node.source, ErrorCode::ConditionNotBool);
   }
 }

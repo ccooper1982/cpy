@@ -17,7 +17,7 @@ TEST(Parser, String)
   Script script;
 
   ASSERT_NO_THROW(script = parser.parse(std::string_view{"hello();"}));
-  ASSERT_FALSE(script.ast->nodes.empty());
+  ASSERT_FALSE(script.ast->block.nodes.empty());
 }
 
 TEST(Parser, File)
@@ -27,7 +27,7 @@ TEST(Parser, File)
     Script script;
 
     ASSERT_NO_THROW(script = parser.parse(TestDataDir / "simple.cpy"));
-    ASSERT_FALSE(script.ast->nodes.empty());
+    ASSERT_FALSE(script.ast->block.nodes.empty());
   }
 
   {

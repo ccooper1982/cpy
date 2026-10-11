@@ -20,9 +20,10 @@ enum class NodeType
   SourceFile,
   FunctionDef,
   FunctionParam,
-  FunctionBody,
+  NodeBlock,
   Expression,
-  VariableDecl
+  VariableDecl,
+  ConditionIf
 };
 
 enum class BuiltInType
@@ -144,6 +145,34 @@ enum class ExpressionType
 inline std::string_view to_string(const BuiltInType t);
 inline std::string_view to_string(const VarType& t);
 inline std::string_view to_string(const BinaryOperator op);
+
+
+struct NodeBlock : public AstNode
+{
+  static constexpr NodeType Type = NodeType::NodeBlock;
+
+  NodeBlock() : AstNode(Type)
+  {}
+
+  void add_node(std::unique_ptr<AstNode>&& node)
+  {
+    if (node) {
+      nodes.push_back(std::move(node));
+    }
+  }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    for (const auto& n : nodes)
+    {
+      os << std::string(tab*2, ' ');
+      n->dump(os);
+      os << '\n';
+    }
+  }
+
+  std::vector<std::unique_ptr<AstNode>> nodes;
+};
 
 
 struct Expression : public AstNode
@@ -319,10 +348,6 @@ struct FunctionCall : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::FuncCall;
 
-  std::string_view module;
-  std::string_view name;
-  std::vector<std::unique_ptr<Expression>> args;
-
   FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
     : Expression(ExprType)
     , name(name)
@@ -357,6 +382,10 @@ struct FunctionCall : public Expression
     }
     os << ')';
   }
+
+  std::string_view module;
+  std::string_view name;
+  std::vector<std::unique_ptr<Expression>> args;
 };
 
 
@@ -389,6 +418,7 @@ struct VariableRef : public Expression
 
 inline std::string_view to_string(const Expression& expr);
 
+
 template<typename ExprT> requires (std::derived_from<ExprT, Expression>)
 const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
 {
@@ -397,6 +427,30 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
   }
   return dynamic_cast<ExprT&>(*expr);
 }
+
+
+// Conditions //
+
+struct ConditionIf : public AstNode
+{
+  ConditionIf() : AstNode(NodeType::ConditionIf)
+  {}
+
+  void dump (std::ostream& os, const uint8_t tab = 0) const override
+  {
+    if (if_condition)
+    {
+      os << "if (" ;
+      if_condition->dump(os, tab);
+      os << ") " << "{\n";
+      if_body.dump(os, tab+1);
+      os << "}\n";
+    }
+  }
+
+  std::unique_ptr<Expression> if_condition;
+  NodeBlock if_body;
+};
 
 
 // Functions Definition //
@@ -427,29 +481,6 @@ public:
 };
 
 
-struct FunctionBody : public AstNode
-{
-  static constexpr NodeType Type = NodeType::FunctionBody;
-
-  FunctionBody() : AstNode(Type)
-  {}
-
-  void add_node(std::unique_ptr<AstNode>&& node)
-  {
-    if (node) {
-      nodes.push_back(std::move(node));
-    }
-  }
-
-  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
-  {
-    for (const auto& n : nodes)
-      n->dump(os);
-  }
-
-  std::vector<std::unique_ptr<AstNode>> nodes;
-};
-
 struct FunctionDef : public AstNode
 {
   static constexpr NodeType Type = NodeType::FunctionDef;
@@ -474,7 +505,7 @@ struct FunctionDef : public AstNode
   std::string name;
   std::vector<FunctionParam> params;
   std::string_view return_type;
-  FunctionBody body;
+  NodeBlock body;
 };
 
 
@@ -576,18 +607,13 @@ struct SourceFile : public AstNode
   SourceFile() : AstNode(Type)
   {}
 
-  std::vector<std::unique_ptr<AstNode>> nodes;
+  NodeBlock block;
   fs::path src_path;
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     os << (src_path.empty() ? "" : src_path.string()) << '\n';
-
-    for (const auto& n : nodes)
-    {
-      n->dump(os) ;
-      os << '\n';
-    }
+    block.dump(os, tab);
   }
 };
 

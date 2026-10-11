@@ -276,3 +276,67 @@ TEST(Semantics, VariableDecl)
     ASSERT_FALSE(script.issues->have_errors());
   }
 }
+
+
+TEST(Semantics, Condition)
+{
+  {
+    const std::string_view src = R"(
+      a: int;
+      b: int;
+
+      if (a > b)
+      {
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
+
+  {
+    const std::string_view src = R"(
+      a: int;
+      b: int;
+
+      if (a)
+      {
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      a: int;
+      b: int;
+
+      if (a > b)
+      {
+        foo();
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionNotExist), 1);
+  }
+}

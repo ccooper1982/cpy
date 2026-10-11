@@ -1,9 +1,13 @@
+#include <algorithm>
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/issues.hpp>
 #include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
 
+#include <iterator>
+#include <memory>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string_view>
 
@@ -24,15 +28,47 @@ void Semantics::process(Script& script)
   Context ctx(*script.ast, *script.issues);
 
   process_function_defs(ctx);
-
-  process_variable_declarations(ctx);
-
-  process_function_calls(ctx);
+  process_block(ctx, ctx.ast.block);
+  process_function_bodies(ctx, ctx.ast.block);
 }
+
+void Semantics::process_block(Context& ctx, const NodeBlock& block)
+{
+  auto is_statement = [](const std::unique_ptr<AstNode>& node)
+  {
+    return  node->node_type() == NodeType::VariableDecl ||
+            node->node_type() == NodeType::ConditionIf ||
+            node->node_type() == NodeType::Expression;
+  };
+
+  for(const auto& node : block.nodes | vw::filter(is_statement))
+  {
+    switch (node->node_type())
+    {
+      case NodeType::VariableDecl:
+        process_variable_declaration(ctx, dynamic_cast<const VariableDecl&>(*node));
+        break;
+
+      case NodeType::ConditionIf:
+        process_condition(ctx, *node, dynamic_cast<const ConditionIf&>(*node));
+        break;
+
+      case NodeType::Expression:
+        handle_expression(ctx, *node, dynamic_cast<const Expression&>(*node));
+        break;
+
+      default:
+        std::unreachable_sentinel_t();
+        break;
+    }
+  }
+}
+
+// Functions //
 
 void Semantics::process_function_defs(Context& ctx)
 {
-  walk_nodes<FunctionDef>(ctx.ast.nodes, [&, this](const FunctionDef& def)
+  walk_nodes<FunctionDef>(ctx.ast.block.nodes, [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
     if (m_symbol_table.have_function(def.name))
@@ -44,8 +80,6 @@ void Semantics::process_function_defs(Context& ctx)
     m_symbol_table.add_function(def.name);
 
     std::vector<ResolvedSymbol> resolved_params;
-    bool error{};
-
     for (const auto& param : def.params)
     {
       if (const auto type = m_symbol_table.get_type(param.type_name); type) {
@@ -54,54 +88,25 @@ void Semantics::process_function_defs(Context& ctx)
       else
       {
         issue::unknown_param_type(ctx.issues, param);
-        error = true;
-        break;
+        return ;
       }
     }
 
     const auto return_type = m_symbol_table.get_type(def.return_type);
-    if (!error && !return_type)
-    {
-      error = true;
+    if (!return_type) {
       issue::unknown_return_type(ctx.issues, def.name, def.return_type);
     }
-
-    if (!error) {
+    else {
       m_symbol_table.add_resolved_function(def.name, std::move(resolved_params), *return_type);
     }
   });
 }
 
-void Semantics::process_function_calls(Context& ctx)
+void Semantics::process_function_bodies(Context& ctx, const NodeBlock& block)
 {
-  walk_expressions<FunctionCall>(ctx.ast, [this, &ctx](const FunctionCall& call)
+  walk_nodes<FunctionDef>(block.nodes, [this, &ctx](const FunctionDef& def)
   {
-    if (!call.module.empty() && !Modules::exist(call.module)) {
-      issue::module_not_exist(ctx.issues, call, call.module);
-    }
-    else {
-      process_expression(ctx, ctx.ast, call);
-    }
-  });
-}
-
-void Semantics::process_variable_declarations(Context& ctx)
-{
-  auto check_vars = [&ctx, this](const std::vector<std::unique_ptr<AstNode>>& nodes)
-  {
-    walk_nodes<VariableDecl>(nodes, [this, &ctx](const VariableDecl& decl)
-    {
-      process_variable_declaration(ctx, decl);
-    });
-  };
-
-  // top level
-  check_vars(ctx.ast.nodes);
-
-  // declarations within functions
-  walk_nodes<FunctionDef>(ctx.ast.nodes, [&check_vars](const FunctionDef& func_def)
-  {
-    check_vars(func_def.body.nodes);
+    process_block(ctx, def.body);
   });
 }
 
@@ -161,8 +166,16 @@ void Semantics::process_variable_declaration(Context& ctx, const VariableDecl& d
 }
 
 
+// Expressions //
+
 VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const FunctionCall& call)
 {
+  if (!call.module.empty() && !Modules::exist(call.module))
+  {
+    issue::module_not_exist(ctx.issues, call, call.module);
+    return unresolved_t;
+  }
+
   if (!m_symbol_table.have_resolved_function(call.name))
   {
     issue::func_not_exist(ctx.issues, call, call.name);
@@ -247,6 +260,8 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   }
 }
 
+/*
+ *
 /// Returns the return value type of a binary expressions.
 /// Determines the return type of lhs and rhs then calls process_operator()
 /// which determines if those are valid for the operator.
@@ -260,6 +275,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 /// - Calls `process_expression(Context&, const AstNode&, BinaryExpression)` to get the result type of `foo1()+foo2()`
 /// - Calls `process_expression(Context&, const AstNode&, FunctionCall)` to get the result type of `foo3()`
 /// - Calls `process_operator()` with the types
+*/
 VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr)
 {
   const auto& lhs = *expr.lhs;
@@ -350,4 +366,19 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
   }
 
   return valid ? result_type : unresolved_t;
+}
+
+
+// Conditions //
+
+void Semantics::process_condition(Context& ctx, const AstNode& parent, const ConditionIf& cond)
+{
+  const auto cond_if_result = handle_expression(ctx, parent, dynamic_cast<const Expression&>(*cond.if_condition));
+
+  if (cond_if_result != BuiltInType::Bool) {
+    issue::condition_not_bool(ctx.issues, *cond.if_condition);
+  }
+  else {
+    process_block(ctx, cond.if_body);
+  }
 }
