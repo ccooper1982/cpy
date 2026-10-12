@@ -1,13 +1,9 @@
-
 fn foo()
 {
-  c: void;
-}
+    a: int;
+    b: int;
 
-a: int;
-b: int;
-
-if (a > b)
-{
-    foo();
+    if (a > b)
+    {
+    }
 }

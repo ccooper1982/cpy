@@ -165,9 +165,9 @@ namespace issue
     issues.add_error("Function call with incorrect number of arguments", node.source, ErrorCode::FunctionCallArgsCount);
   }
 
-  inline void var_duplicate (Issues& issues, const AstNode& node, const std::string_view var)
+  inline void var_duplicate (Issues& issues, const AstNode& node)
   {
-    issues.add_error(std::format("Variable already defined: {}", var), node.source, ErrorCode::VariableDuplicate);
+    issues.add_error("Variable already defined", node.source, ErrorCode::VariableDuplicate);
   }
 
   inline void var_init_void (Issues& issues, const AstNode& node)

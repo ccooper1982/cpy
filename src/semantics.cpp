@@ -10,6 +10,7 @@
 #include <ranges>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 
 // Semantic checker
@@ -27,7 +28,7 @@ void Semantics::process(Script& script)
 
   Context ctx(*script.ast, *script.issues);
 
-  process_function_defs(ctx);
+  process_function_signatures(ctx);
   process_block(ctx, ctx.ast.block);
   process_function_bodies(ctx, ctx.ast.block);
 }
@@ -58,7 +59,7 @@ void Semantics::process_block(Context& ctx, const NodeBlock& block)
         break;
 
       default:
-        std::unreachable_sentinel_t();
+        std::unreachable();
         break;
     }
   }
@@ -66,18 +67,16 @@ void Semantics::process_block(Context& ctx, const NodeBlock& block)
 
 // Functions //
 
-void Semantics::process_function_defs(Context& ctx)
+void Semantics::process_function_signatures(Context& ctx)
 {
   walk_nodes<FunctionDef>(ctx.ast.block.nodes, [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
-    if (m_symbol_table.have_function(def.name))
+    if (m_symbol_table.have_resolved_function(def.name))
     {
       issue::func_duplicate(ctx.issues, def, def.name);
       return;
     }
-
-    m_symbol_table.add_function(def.name);
 
     std::vector<ResolvedSymbol> resolved_params;
     for (const auto& param : def.params)
@@ -106,19 +105,19 @@ void Semantics::process_function_bodies(Context& ctx, const NodeBlock& block)
 {
   walk_nodes<FunctionDef>(block.nodes, [this, &ctx](const FunctionDef& def)
   {
+    m_symbol_table.enter_scope();
     process_block(ctx, def.body);
+    m_symbol_table.exit_scope();
   });
 }
 
 void Semantics::process_variable_declaration(Context& ctx, const VariableDecl& decl)
 {
-  if (m_symbol_table.have_variable(decl.var_name))
+  if (m_symbol_table.scope_has_resolved_variable(decl.var_name))
   {
-    issue::var_duplicate(ctx.issues, decl, decl.var_name);
+    issue::var_duplicate(ctx.issues, decl);
     return;
   }
-
-  m_symbol_table.add_variable(decl.var_name);
 
   VarType var_type, init_type;
 
@@ -309,7 +308,8 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     rhs_type = rhs.get_var_type();
   }
 
-  return process_operator(ctx, lhs_type, rhs_type, expr);
+  const bool have_types = lhs_type != unresolved_t && rhs_type  != unresolved_t;
+  return have_types ? process_operator(ctx, lhs_type, rhs_type, expr) :  unresolved_t ;
 }
 
 /// Determines the validity of the BinaryExpression::op on the operands, and returns

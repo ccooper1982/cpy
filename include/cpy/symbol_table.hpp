@@ -2,9 +2,12 @@
 
 #include <iomanip>
 #include <map>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <set>
+#include <stack>
+#include <stdexcept>
 #include <string_view>
 
 #include <cpy/ast/ast_node.hpp>
@@ -21,6 +24,16 @@ struct ResolvedFunction
   VarType return_type;
 };
 
+struct Scope
+{
+  explicit Scope(Scope * parent)
+    : parent(parent)
+  {}
+
+  Scope * parent{};
+  std::map<std::string_view, const ResolvedSymbol> vars{};
+};
+
 
 class SymbolTable
 {
@@ -33,7 +46,11 @@ class SymbolTable
   };
 
 public:
-  SymbolTable() = default;
+  SymbolTable()
+  {
+    m_scopes.push(std::make_unique<Scope>(nullptr));
+  }
+
   ~SymbolTable() = default;
 
   SymbolTable(const SymbolTable&) = delete;
@@ -47,39 +64,31 @@ public:
     m_resolved_functions.emplace(name, ResolvedFunction{.params = std::move(params), .return_type = return_type});
   }
 
-  void add_resolved_variable(const std::string_view name, VarType type)
-  {
-    m_resolved_vars.emplace(name, ResolvedSymbol{.name = name, .type = type});
-  }
-
-  bool have_resolved_variable(const std::string_view name) const
-  {
-    return m_resolved_vars.contains(name);
-  }
-
   bool have_resolved_function(const std::string_view name) const
   {
     return m_resolved_functions.contains(name);
   }
 
-  void add_function (const std::string_view name)
+  void add_resolved_variable(const std::string_view name, VarType type)
   {
-    m_functions.emplace(name);
+    std::cout << "Add " << name << " to scope: " << m_scopes.size() - 1 << "\n";
+    m_scopes.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type});
   }
 
-  void add_variable (const std::string_view name)
+  // Check the current scope for the variable, if not present, go
+  // to the parent and check again, until we reach root level.
+  bool have_resolved_variable(const std::string_view name) const
   {
-    m_vars.emplace(name);
+    for (auto curr = m_scopes.top().get(); curr; curr = curr->parent) {
+      if (curr->vars.contains(name))
+        return true;
+    }
+    return false;
   }
 
-  bool have_variable(const std::string_view name) const
+  bool scope_has_resolved_variable(const std::string_view name) const
   {
-    return m_vars.contains(name);
-  }
-
-  bool have_function(const std::string_view name) const
-  {
-    return m_functions.contains(name);
+    return m_scopes.top()->vars.contains(name);
   }
 
   std::optional<BuiltInType> get_type(const std::string_view t) const
@@ -96,9 +105,25 @@ public:
     return m_resolved_functions.find(func)->second;
   }
 
-  const ResolvedSymbol& get_variable(const std::string_view var) const
+  const ResolvedSymbol& get_variable(const std::string_view name) const
   {
-    return m_resolved_vars.find(var)->second;
+    for (auto curr = m_scopes.top().get(); curr; curr = curr->parent)
+    {
+      if (const auto it = curr->vars.find(name) ; it != rg::end(curr->vars)) {
+        return it->second;
+      }
+    }
+    throw std::runtime_error{"SymbolTable:;get_variable() - var does not exist"};
+  }
+
+  void enter_scope()
+  {
+    m_scopes.push(std::make_unique<Scope>(m_scopes.top().get()));
+  }
+
+  void exit_scope()
+  {
+    m_scopes.pop();
   }
 
   void dump (std::ostream& os) const
@@ -114,15 +139,21 @@ public:
       }
     }
 
-    os << "\n-- Variables --\n";
-    for(const auto& [name, resolved] : m_resolved_vars) {
-      os << name << std::setw(4) << '|' << to_string(resolved.type) << '\n';
-    }
+    // this can only dump variables at the top level because we use
+    // a stack, so they are popped
+//     os << "\n-- Variables --\n";
+//
+//     auto scope = m_scopes.top().get();
+//     while (scope)
+//     {
+//       for(const auto& [name, resolved] : scope->vars) {
+//         os << name << std::setw(4) << '|' << to_string(resolved.type) << '\n';
+//       }
+//       scope = scope->parent;
+//     }
   }
 
 private:
   std::map<std::string_view, const ResolvedFunction> m_resolved_functions;
-  std::map<std::string_view, const ResolvedSymbol> m_resolved_vars;
-  std::set<std::string_view> m_functions;
-  std::set<std::string_view> m_vars;
+  std::stack<std::unique_ptr<Scope>> m_scopes;
 };

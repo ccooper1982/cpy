@@ -309,6 +309,98 @@ TEST(SymbolTable, VarDecl_BinExpr)
 }
 
 
+TEST(SymbolTable, VariableDecl_Scope)
+{
+  {
+    const std::string_view src = R"(
+      fn foo()
+      {
+        a: int;
+        b: int;
+
+        if (a > b) {
+        }
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
+
+  {
+    const std::string_view src = R"(
+      a: int;
+
+      fn foo()
+      {
+        b: int;
+
+        if (a > b) {
+        }
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo()
+      {
+        b: int;
+      }
+
+      if (b > 5) {
+
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo()
+      {
+        a: int;
+      }
+
+      b: int;
+
+      if (a > b){
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 1);
+  }
+}
+
 TEST(SymbolTable, FuncCall_VarRef)
 {
   {

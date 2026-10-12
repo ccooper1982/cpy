@@ -44,7 +44,7 @@ private:
   void process_block(Context& ctx, const NodeBlock& block);
 
   // functions
-  void process_function_defs(Context& ctx);
+  void process_function_signatures(Context& ctx);
   void process_function_bodies(Context& ctx, const NodeBlock& block);
 
   // variables
