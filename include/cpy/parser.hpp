@@ -53,6 +53,8 @@ private:
   std::unique_ptr<FunctionCall> parse_function_call(const TSNode& func_call);
   std::unique_ptr<FunctionDef> parse_function_def(const TSNode& ts_node);
 
+  std::unique_ptr<ConditionIf> parse_condition_if(const TSNode& ts_node);
+
   std::string_view from_source (const TSNode& node);
 
 private:

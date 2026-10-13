@@ -5,6 +5,7 @@
 #include <cpy/semantics.hpp>
 #include <cpy/parser.hpp>
 
+
 TEST(SymbolTable, FunctionDef)
 {
   const std::string_view src = R"(
@@ -22,9 +23,9 @@ TEST(SymbolTable, FunctionDef)
   const auto& sym_table = sem.symbol_table();
 
   // baz not stored because 'bacon' and 'cheese' are unknown types
-  ASSERT_TRUE(sym_table.have_resolved_function("foo"));
-  ASSERT_TRUE(sym_table.have_resolved_function("bar"));
-  ASSERT_FALSE(sym_table.have_resolved_function("baz"));
+  ASSERT_TRUE(sym_table.has_function("foo"));
+  ASSERT_TRUE(sym_table.has_function("bar"));
+  ASSERT_FALSE(sym_table.has_function("baz"));
 
   const auto& resolved_foo = sym_table.get_function("foo");
   ASSERT_EQ(resolved_foo.params.size(), 1);
@@ -60,14 +61,17 @@ TEST(SymbolTable, VarDecl)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("b"));
+    std::cout << "have variable: " << sym_table.scope_has_variable("a", script.ast->block) << "\n";
+
+    ASSERT_FALSE(script.issues->have_errors());
+    ASSERT_TRUE(sym_table.has_function("foo"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
 
     ASSERT_EQ(sym_table.get_function("foo").return_type, VarType{BuiltInType::Int});
 
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
-    ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::Int});
   }
 
   {
@@ -88,10 +92,10 @@ TEST(SymbolTable, VarDecl)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_FALSE(sym_table.have_resolved_variable("a"));
-    ASSERT_FALSE(sym_table.have_resolved_variable("b"));
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_FALSE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_FALSE(sym_table.scope_has_variable("b", script.ast->block));
 
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitVoid), 2);
   }
@@ -115,14 +119,14 @@ TEST(SymbolTable, VarDecl)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_FALSE(sym_table.have_resolved_variable("b"));
-    ASSERT_FALSE(sym_table.have_resolved_variable("c"));
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_TRUE(sym_table.has_function("foo3"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_FALSE(sym_table.scope_has_variable("b", script.ast->block));
+    ASSERT_FALSE(sym_table.scope_has_variable("c", script.ast->block));
 
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsVoid), 1);
   }
@@ -145,12 +149,12 @@ TEST(SymbolTable, VarDecl_Operation)
 
   const auto& sym_table = sem.symbol_table();
 
-  ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-  ASSERT_TRUE(sym_table.have_resolved_variable("b"));
-  ASSERT_FALSE(sym_table.have_resolved_variable("c"));
+  ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+  ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
+  ASSERT_FALSE(sym_table.scope_has_variable("c", script.ast->block));
 
-  ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
-  ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::Bool});
+  ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+  ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::Bool});
 }
 
 
@@ -172,9 +176,9 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_FALSE(sym_table.have_resolved_variable("a"));
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_FALSE(sym_table.scope_has_variable("a", script.ast->block));
 
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableInitVoid), 1);
   }
@@ -195,10 +199,10 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::String});
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::String});
   }
 
   {
@@ -218,11 +222,11 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_TRUE(sym_table.has_function("foo3"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
   }
 
   {
@@ -242,11 +246,11 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_TRUE(sym_table.has_function("foo3"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
   }
 
   {
@@ -267,12 +271,12 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo4"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_TRUE(sym_table.has_function("foo3"));
+    ASSERT_TRUE(sym_table.has_function("foo4"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
   }
 }
 
@@ -297,15 +301,108 @@ TEST(SymbolTable, VarDecl_BinExpr)
 
   const auto& sym_table = sem.symbol_table();
 
-  ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-  ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-  ASSERT_TRUE(sym_table.have_resolved_function("foo3"));
-  ASSERT_TRUE(sym_table.have_resolved_function("foo4"));
-  ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-  ASSERT_FALSE(sym_table.have_resolved_variable("b"));
+  ASSERT_TRUE(sym_table.has_function("foo1"));
+  ASSERT_TRUE(sym_table.has_function("foo2"));
+  ASSERT_TRUE(sym_table.has_function("foo3"));
+  ASSERT_TRUE(sym_table.has_function("foo4"));
+  ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+  ASSERT_FALSE(sym_table.scope_has_variable("b", script.ast->block));
 
-  ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
+  ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
   ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
+}
+
+
+TEST(SymbolTable, VariableDecl_Scope)
+{
+  {
+    const std::string_view src = R"(
+      fn foo()
+      {
+        a: int;
+        b: int;
+
+        if (a > b) {
+        }
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
+
+  {
+    const std::string_view src = R"(
+      a: int;
+
+      fn foo()
+      {
+        b: int;
+
+        if (a > b) {
+        }
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo()
+      {
+        b: int;
+      }
+
+      if (b > 5) {
+
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo()
+      {
+        a: int;
+      }
+
+      b: int;
+
+      if (a > b){
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 1);
+  }
 }
 
 
@@ -327,8 +424,8 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
   }
 
   {
@@ -348,10 +445,10 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
 
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::String});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgType), 1);
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
   }
@@ -374,12 +471,12 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("b"));
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
 
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
-    ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::String});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgType), 1);
   }
 
@@ -405,14 +502,14 @@ TEST(SymbolTable, FuncCall_VarRef)
 
     const auto& sym_table = sem.symbol_table();
 
-    ASSERT_TRUE(sym_table.have_resolved_function("foo1"));
-    ASSERT_TRUE(sym_table.have_resolved_function("foo2"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("a"));
-    ASSERT_TRUE(sym_table.have_resolved_variable("b"));
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.has_function("foo2"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+    ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
     ASSERT_TRUE(script.issues->have_errors());
 
-    ASSERT_EQ(sym_table.get_variable("a").type, VarType{BuiltInType::Int});
-    ASSERT_EQ(sym_table.get_variable("b").type, VarType{BuiltInType::String});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
   }
 }

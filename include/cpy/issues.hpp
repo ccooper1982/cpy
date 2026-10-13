@@ -29,8 +29,10 @@ enum class ErrorCode
   VariableUnknown,
   BinaryOperandsInvalid,
   BinaryOperandsVoid,
+  ConditionNotBool,
   Unsupported,
-  SyntaxError
+  SyntaxError,
+  Compiler
 };
 
 struct Issue
@@ -119,6 +121,12 @@ namespace issue
     issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::SyntaxError);
   }
 
+  inline void compiler_error (Issues& issues, const AstNode& node)
+  {
+    // TODO get the call site
+    issues.add_error("The compiler fell over: ", node.source, ErrorCode::Compiler);
+  }
+
   inline void unknown_param_type (Issues& issues, const AstNode& node)
   {
     issues.add_error(std::format("Unknown parameter type"), node.source, ErrorCode::UnknownParamType);
@@ -164,9 +172,9 @@ namespace issue
     issues.add_error("Function call with incorrect number of arguments", node.source, ErrorCode::FunctionCallArgsCount);
   }
 
-  inline void var_duplicate (Issues& issues, const AstNode& node, const std::string_view var)
+  inline void var_duplicate (Issues& issues, const AstNode& node)
   {
-    issues.add_error(std::format("Variable already defined: {}", var), node.source, ErrorCode::VariableDuplicate);
+    issues.add_error("Variable already defined", node.source, ErrorCode::VariableDuplicate);
   }
 
   inline void var_init_void (Issues& issues, const AstNode& node)
@@ -197,5 +205,10 @@ namespace issue
   inline void binary_operands_void (Issues& issues, const AstNode& node)
   {
     issues.add_error("Void operand(s) in binary expression", node.source, ErrorCode::BinaryOperandsVoid);
+  }
+
+  inline void condition_not_bool (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Condition expression is not boolean", node.source, ErrorCode::ConditionNotBool);
   }
 }

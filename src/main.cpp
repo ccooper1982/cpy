@@ -49,6 +49,9 @@ int main (int argc, char ** argv)
 
     std::cout << "Sym Table:\n";
     sems.symbol_table().dump(std::cout);
+//
+//     std::cout << sems.symbol_table().have_variable("a");
+//     std::cout << sems.symbol_table().have_variable("b");
   }
 
   std::cout << "Issues:\n";
