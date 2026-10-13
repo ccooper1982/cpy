@@ -5,7 +5,6 @@
 #include <memory>
 #include <optional>
 #include <ostream>
-#include <set>
 #include <stack>
 #include <stdexcept>
 #include <string_view>
@@ -46,11 +45,7 @@ class SymbolTable
   };
 
 public:
-  SymbolTable()
-  {
-    m_scopes.push(std::make_unique<Scope>(nullptr));
-  }
-
+  SymbolTable() = default;
   ~SymbolTable() = default;
 
   SymbolTable(const SymbolTable&) = delete;
@@ -59,36 +54,36 @@ public:
   SymbolTable& operator=(SymbolTable&&) = default;
 
 
-  void add_resolved_function (const std::string_view name, std::vector<ResolvedSymbol> params, VarType return_type)
+  void add_function (const std::string_view name, std::vector<ResolvedSymbol> params, VarType return_type)
   {
     m_resolved_functions.emplace(name, ResolvedFunction{.params = std::move(params), .return_type = return_type});
   }
 
-  bool have_resolved_function(const std::string_view name) const
+  bool has_function(const std::string_view name) const
   {
     return m_resolved_functions.contains(name);
   }
 
-  void add_resolved_variable(const std::string_view name, VarType type)
+  void add_variable(const std::string_view name, VarType type)
   {
-    std::cout << "Add " << name << " to scope: " << m_scopes.size() - 1 << "\n";
-    m_scopes.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type});
+    if (m_scope_tracker.empty())
+      throw std::runtime_error{"SymbolTable::add_variable(): scope tracker is empty"};
+
+    m_scope_tracker.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type});
   }
 
-  // Check the current scope for the variable, if not present, go
-  // to the parent and check again, until we reach root level.
-  bool have_resolved_variable(const std::string_view name) const
+  // Check the current scope for variable. Does not check parents.
+  bool scope_has_variable (const std::string_view name, const NodeBlock& block) const
   {
-    for (auto curr = m_scopes.top().get(); curr; curr = curr->parent) {
-      if (curr->vars.contains(name))
-        return true;
-    }
-    return false;
+    return get_var(name, &block, false) != nullptr;
   }
 
-  bool scope_has_resolved_variable(const std::string_view name) const
+  // Checks if a variable is visible from the given block.
+  // If not present in `block`, checks parents, until the variable is found.
+  // Returns false if not found.
+  bool has_visible_variable(const std::string_view name, const NodeBlock& block) const
   {
-    return m_scopes.top()->vars.contains(name);
+    return get_var(name, &block, true) != nullptr;
   }
 
   std::optional<BuiltInType> get_type(const std::string_view t) const
@@ -105,25 +100,30 @@ public:
     return m_resolved_functions.find(func)->second;
   }
 
-  const ResolvedSymbol& get_variable(const std::string_view name) const
+  const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const
   {
-    for (auto curr = m_scopes.top().get(); curr; curr = curr->parent)
-    {
-      if (const auto it = curr->vars.find(name) ; it != rg::end(curr->vars)) {
-        return it->second;
-      }
-    }
-    throw std::runtime_error{"SymbolTable:;get_variable() - var does not exist"};
+    if (const auto * symbol = get_var(name, &block, true); symbol)
+      return *symbol;
+
+    throw std::runtime_error{"SymbolTable::get_variable() - var does not exist"};
   }
 
-  void enter_scope()
+  void enter_scope(const NodeBlock * node)
   {
-    m_scopes.push(std::make_unique<Scope>(m_scopes.top().get()));
+    const auto parent = m_scope_tracker.empty() ? nullptr : m_scope_tracker.top();
+    auto [it, emplaced] = m_scopes.emplace(node, std::make_unique<Scope>(parent));
+
+    if (!emplaced)
+      std::cout << "Scope already exists for NodeBlock " << node << '\n';
+
+    m_scope_tracker.push(it->second.get());
   }
 
   void exit_scope()
   {
-    m_scopes.pop();
+    if (!m_scope_tracker.empty()) {
+      m_scope_tracker.pop();
+    }
   }
 
   void dump (std::ostream& os) const
@@ -143,7 +143,7 @@ public:
     // a stack, so they are popped
 //     os << "\n-- Variables --\n";
 //
-//     auto scope = m_scopes.top().get();
+//     auto scope = m_scope_tracker.top().get();
 //     while (scope)
 //     {
 //       for(const auto& [name, resolved] : scope->vars) {
@@ -153,7 +153,38 @@ public:
 //     }
   }
 
+
+private:
+  const ResolvedSymbol * get_var(const std::string_view name, const NodeBlock * block, const bool visit_parents) const
+  {
+    auto in_block = [&name, this](const NodeBlock * block) -> const ResolvedSymbol*
+    {
+      if (const auto it_scope = m_scopes.find(block) ; it_scope != m_scopes.cend())
+      {
+        const auto& vars = it_scope->second->vars;
+        if (const auto it_var = vars.find(name); it_var != vars.cend())
+          return &it_var->second;
+      }
+      return nullptr;
+    };
+
+    if (visit_parents)
+    {
+      for (const auto& [block, scope] : m_scopes)
+      {
+        if (const auto resolved = in_block(block)) {
+          return resolved;
+        }
+      }
+      return nullptr;
+    }
+    else {
+      return in_block(block);
+    }
+  }
+
 private:
   std::map<std::string_view, const ResolvedFunction> m_resolved_functions;
-  std::stack<std::unique_ptr<Scope>> m_scopes;
+  std::map<const NodeBlock *, std::unique_ptr<Scope>> m_scopes;
+  std::stack<Scope*> m_scope_tracker;
 };

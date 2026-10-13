@@ -31,7 +31,8 @@ enum class ErrorCode
   BinaryOperandsVoid,
   ConditionNotBool,
   Unsupported,
-  SyntaxError
+  SyntaxError,
+  Compiler
 };
 
 struct Issue
@@ -118,6 +119,12 @@ namespace issue
     const auto end_byte = ts_node_end_byte(node);
 
     issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::SyntaxError);
+  }
+
+  inline void compiler_error (Issues& issues, const AstNode& node)
+  {
+    // TODO get the call site
+    issues.add_error("The compiler fell over: ", node.source, ErrorCode::Compiler);
   }
 
   inline void unknown_param_type (Issues& issues, const AstNode& node)

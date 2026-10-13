@@ -4,6 +4,7 @@
 #include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
 
+#include <exception>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -29,11 +30,16 @@ void Semantics::process(Script& script)
   Context ctx(*script.ast, *script.issues);
 
   process_function_signatures(ctx);
-  process_block(ctx, ctx.ast.block);
-  process_function_bodies(ctx, ctx.ast.block);
+
+  m_symbol_table.enter_scope(&ctx.ast.block);
+
+  process_block(ctx, ctx.ast.block, false);
+  process_function_bodies(ctx, ctx.ast.block);;
+
+  m_symbol_table.exit_scope();
 }
 
-void Semantics::process_block(Context& ctx, const NodeBlock& block)
+void Semantics::process_block(Context& ctx, const NodeBlock& block, const bool add_scope)
 {
   auto is_statement = [](const std::unique_ptr<AstNode>& node)
   {
@@ -42,26 +48,42 @@ void Semantics::process_block(Context& ctx, const NodeBlock& block)
             node->node_type() == NodeType::Expression;
   };
 
-  for(const auto& node : block.nodes | vw::filter(is_statement))
+  try
   {
-    switch (node->node_type())
-    {
-      case NodeType::VariableDecl:
-        process_variable_declaration(ctx, dynamic_cast<const VariableDecl&>(*node));
-        break;
-
-      case NodeType::ConditionIf:
-        process_condition(ctx, *node, dynamic_cast<const ConditionIf&>(*node));
-        break;
-
-      case NodeType::Expression:
-        handle_expression(ctx, *node, dynamic_cast<const Expression&>(*node));
-        break;
-
-      default:
-        std::unreachable();
-        break;
+    if (add_scope) {
+      m_symbol_table.enter_scope(&block);
     }
+
+    for(const auto& node : block.nodes | vw::filter(is_statement))
+    {
+      switch (node->node_type())
+      {
+        case NodeType::VariableDecl:
+          process_variable_declaration(ctx, block, dynamic_cast<const VariableDecl&>(*node));
+          break;
+
+        case NodeType::ConditionIf:
+          process_condition(ctx, *node, block, dynamic_cast<const ConditionIf&>(*node));
+          break;
+
+        case NodeType::Expression:
+          handle_expression(ctx, *node, block, dynamic_cast<const Expression&>(*node));
+          break;
+
+        default:
+          std::unreachable();
+          break;
+      }
+    }
+  }
+  catch (const std::exception& ex)
+  {
+    std::cerr << ex.what();
+    issue::compiler_error(ctx.issues, block);
+  }
+
+  if (add_scope) {
+    m_symbol_table.exit_scope();
   }
 }
 
@@ -72,7 +94,7 @@ void Semantics::process_function_signatures(Context& ctx)
   walk_nodes<FunctionDef>(ctx.ast.block.nodes, [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
-    if (m_symbol_table.have_resolved_function(def.name))
+    if (m_symbol_table.has_function(def.name))
     {
       issue::func_duplicate(ctx.issues, def, def.name);
       return;
@@ -96,7 +118,7 @@ void Semantics::process_function_signatures(Context& ctx)
       issue::unknown_return_type(ctx.issues, def.name, def.return_type);
     }
     else {
-      m_symbol_table.add_resolved_function(def.name, std::move(resolved_params), *return_type);
+      m_symbol_table.add_function(def.name, std::move(resolved_params), *return_type);
     }
   });
 }
@@ -105,15 +127,13 @@ void Semantics::process_function_bodies(Context& ctx, const NodeBlock& block)
 {
   walk_nodes<FunctionDef>(block.nodes, [this, &ctx](const FunctionDef& def)
   {
-    m_symbol_table.enter_scope();
     process_block(ctx, def.body);
-    m_symbol_table.exit_scope();
   });
 }
 
-void Semantics::process_variable_declaration(Context& ctx, const VariableDecl& decl)
+void Semantics::process_variable_declaration(Context& ctx, const NodeBlock& block, const VariableDecl& decl)
 {
-  if (m_symbol_table.scope_has_resolved_variable(decl.var_name))
+  if (m_symbol_table.has_visible_variable(decl.var_name, block))
   {
     issue::var_duplicate(ctx.issues, decl);
     return;
@@ -138,10 +158,10 @@ void Semantics::process_variable_declaration(Context& ctx, const VariableDecl& d
   if (decl.has_initialiser())
   {
     if (const auto& init = *decl.initialiser; init.expr_type() == ExpressionType::FuncCall) {
-      init_type = process_expression(ctx, decl, dynamic_cast<const FunctionCall&>(init));
+      init_type = process_expression(ctx, decl, block, dynamic_cast<const FunctionCall&>(init));
     }
     else if (init.expr_type() == ExpressionType::Binary) {
-      init_type = process_expression(ctx, decl, dynamic_cast<const BinaryExpression&>(init));
+      init_type = process_expression(ctx, decl, block, dynamic_cast<const BinaryExpression&>(init));
     }
     else {
       init_type = init.get_var_type(); // literal expression
@@ -160,14 +180,14 @@ void Semantics::process_variable_declaration(Context& ctx, const VariableDecl& d
     issue::var_init_type_differ(ctx.issues, decl);
   }
   else {
-    m_symbol_table.add_resolved_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type);
+    m_symbol_table.add_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type);
   }
 }
 
 
 // Expressions //
 
-VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const FunctionCall& call)
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const FunctionCall& call)
 {
   if (!call.module.empty() && !Modules::exist(call.module))
   {
@@ -175,7 +195,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_t;
   }
 
-  if (!m_symbol_table.have_resolved_function(call.name))
+  if (!m_symbol_table.has_function(call.name))
   {
     issue::func_not_exist(ctx.issues, call, call.name);
     return unresolved_t;
@@ -200,7 +220,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       {
         const auto& func_call = dynamic_cast<const FunctionCall&>(arg);
 
-        if (const auto ret_type = process_expression(ctx, call, func_call); !ret_type) {
+        if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
           return unresolved_t;
         }
         else if (ret_type == BuiltInType::Void)
@@ -217,13 +237,13 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       else if (arg.is_expr_type(ExpressionType::Binary))
       {
         const auto& expr = dynamic_cast<const BinaryExpression&>(arg);
-        if (!process_expression(ctx, parent, expr))
+        if (!process_expression(ctx, parent, block, expr))
           return unresolved_t;
       }
       else if (arg.is_expr_type(ExpressionType::VariableRef))
       {
         const auto& var = dynamic_cast<const VariableRef&>(arg);
-        const auto var_type = process_expression(ctx, call, var);
+        const auto var_type = process_expression(ctx, call, block, var);
 
         // if the variable is unknown, process_expression() will create an isue and
         // return unresolved_t
@@ -247,15 +267,15 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   return resolved.return_type;
 }
 
-VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const VariableRef& expr)
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableRef& expr)
 {
-  if (!m_symbol_table.have_resolved_variable(expr.name))
+  if (!m_symbol_table.has_visible_variable(expr.name, block))
   {
     issue::var_unknown(ctx.issues, parent, expr.name);
     return unresolved_t;
   }
   else {
-    return m_symbol_table.get_variable(expr.name).type;
+    return m_symbol_table.get_variable(expr.name, block).type;
   }
 }
 
@@ -275,38 +295,13 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 /// - Calls `process_expression(Context&, const AstNode&, FunctionCall)` to get the result type of `foo3()`
 /// - Calls `process_operator()` with the types
 */
-VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const BinaryExpression& expr)
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const BinaryExpression& expr)
 {
   const auto& lhs = *expr.lhs;
   const auto& rhs = *expr.rhs;
 
-  VarType lhs_type, rhs_type;
-
-  if (lhs.is_expr_type(ExpressionType::Binary)) {
-    lhs_type = process_expression(ctx, parent, dynamic_cast<const BinaryExpression&>(lhs));
-  }
-  else if (lhs.is_expr_type(ExpressionType::FuncCall)){
-    lhs_type = process_expression(ctx, parent, dynamic_cast<const FunctionCall&>(lhs));
-  }
-  else if (lhs.is_expr_type(ExpressionType::VariableRef)){
-    lhs_type = process_expression(ctx, parent, dynamic_cast<const VariableRef&>(lhs));
-  }
-  else {
-    lhs_type = lhs.get_var_type();
-  }
-
-  if (rhs.is_expr_type(ExpressionType::Binary)) {
-     rhs_type = process_expression(ctx, parent, dynamic_cast<const BinaryExpression&>(rhs));
-  }
-  else if (rhs.is_expr_type(ExpressionType::FuncCall)) {
-    rhs_type = process_expression(ctx, parent, dynamic_cast<const FunctionCall&>(rhs));
-  }
-  else if (rhs.is_expr_type(ExpressionType::VariableRef)){
-    rhs_type = process_expression(ctx, parent, dynamic_cast<const VariableRef&>(rhs));
-  }
-  else {
-    rhs_type = rhs.get_var_type();
-  }
+  VarType lhs_type = handle_expression(ctx, parent, block, lhs);
+  VarType rhs_type = handle_expression(ctx, parent, block, rhs);
 
   const bool have_types = lhs_type != unresolved_t && rhs_type  != unresolved_t;
   return have_types ? process_operator(ctx, lhs_type, rhs_type, expr) :  unresolved_t ;
@@ -371,9 +366,9 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
 
 // Conditions //
 
-void Semantics::process_condition(Context& ctx, const AstNode& parent, const ConditionIf& cond)
+void Semantics::process_condition(Context& ctx, const AstNode& parent, const NodeBlock& block, const ConditionIf& cond)
 {
-  const auto cond_if_result = handle_expression(ctx, parent, dynamic_cast<const Expression&>(*cond.if_condition));
+  const auto cond_if_result = handle_expression(ctx, parent, block, dynamic_cast<const Expression&>(*cond.if_condition));
 
   if (cond_if_result != BuiltInType::Bool) {
     issue::condition_not_bool(ctx.issues, *cond.if_condition);

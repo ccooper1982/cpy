@@ -107,6 +107,7 @@ struct AstNode
 
   NodeType node_type() const { return type; }
   bool is_node_type(const NodeType t) const { return t == node_type(); }
+  bool is_expression() const { return is_node_type(NodeType::Expression); }
 
   virtual ~AstNode() = default;
   virtual void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const = 0;
