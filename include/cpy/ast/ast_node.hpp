@@ -167,7 +167,7 @@ struct NodeBlock : public AstNode
     for (const auto& n : nodes)
     {
       os << std::string(tab*2, ' ');
-      n->dump(os);
+      n->dump(os, tab);
       os << '\n';
     }
   }
@@ -445,7 +445,7 @@ struct ConditionIf : public AstNode
       if_condition->dump(os, tab);
       os << ") " << "{\n";
       if_body.dump(os, tab+1);
-      os << "}\n";
+      os << std::setw((tab+1)*2) << "}\n";
     }
   }
 

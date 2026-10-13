@@ -278,6 +278,7 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
   auto body = child_by_field_name(ts_node, "body");
   if (!ts_node_is_null(body))
   {
+    set_source_region(body, ast_node->body);
     if (auto statements = parse_statements(body); !statements.empty()) {
       ast_node->body.nodes = std::move(statements);
     }
@@ -307,7 +308,7 @@ std::unique_ptr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
     node->if_body.nodes = parse_statements(body);
   }
 
-  set_source_region(ts_node, *node);
+  set_source_region(ts_node, node->if_body);
 
   return node;
 }
@@ -328,6 +329,7 @@ void Parser::parse_script(const TSNode& ts_root)
 
   m_ast = std::make_unique<SourceFile>();
   m_ast->block.nodes.reserve(std::min(n_children, 20U));
+  set_source_region(ts_root, m_ast->block);
 
   for (uint32_t i = 0 ; i < n_children ; ++i)
   {

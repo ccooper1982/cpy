@@ -141,16 +141,15 @@ public:
 
     // this can only dump variables at the top level because we use
     // a stack, so they are popped
-//     os << "\n-- Variables --\n";
-//
-//     auto scope = m_scope_tracker.top().get();
-//     while (scope)
-//     {
-//       for(const auto& [name, resolved] : scope->vars) {
-//         os << name << std::setw(4) << '|' << to_string(resolved.type) << '\n';
-//       }
-//       scope = scope->parent;
-//     }
+    os << "\n-- Variables --\n";
+
+    for (const auto& [block, scope] : m_scopes)
+    {
+      std::cout << "Block: [" << block->source.start << ", " << block->source.end <<  "]\n";
+      for (const auto& [var, resolved] : scope->vars) {
+        std::cout << resolved.name << ":" << to_string(resolved.type) << "\n";
+      }
+    }
   }
 
 
