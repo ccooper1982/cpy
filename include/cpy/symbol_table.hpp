@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <iomanip>
 #include <map>
 #include <memory>
@@ -31,6 +32,8 @@ struct Scope
 
   Scope * parent{};
   std::map<std::string_view, const ResolvedSymbol> vars{};
+
+  using VarPair = decltype(vars)::value_type;
 };
 
 
@@ -75,7 +78,7 @@ public:
   // Check the current scope for variable. Does not check parents.
   bool scope_has_variable (const std::string_view name, const NodeBlock& block) const
   {
-    return get_var(name, &block, false) != nullptr;
+    return get_resolved_variable(name, &block, false) != nullptr;
   }
 
   // Checks if a variable is visible from the given block.
@@ -83,7 +86,7 @@ public:
   // Returns false if not found.
   bool has_visible_variable(const std::string_view name, const NodeBlock& block) const
   {
-    return get_var(name, &block, true) != nullptr;
+    return get_resolved_variable(name, &block, true) != nullptr;
   }
 
   std::optional<BuiltInType> get_type(const std::string_view t) const
@@ -100,9 +103,13 @@ public:
     return m_resolved_functions.find(func)->second;
   }
 
+  // Gets a resolved variable, checking the NodeBlock's scope, then checking each parent until
+  // it is found.
+  // Should not be called if the variable does not exist (has_visible_variable() should return
+  // true prior to calling this).
   const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const
   {
-    if (const auto * symbol = get_var(name, &block, true); symbol)
+    if (const auto * symbol = get_resolved_variable(name, &block, true); symbol)
       return *symbol;
 
     throw std::runtime_error{"SymbolTable::get_variable() - var does not exist"};
@@ -154,32 +161,33 @@ public:
 
 
 private:
-  const ResolvedSymbol * get_var(const std::string_view name, const NodeBlock * block, const bool visit_parents) const
+  const ResolvedSymbol * get_resolved_variable(const std::string_view name, const NodeBlock * block, const bool visit_parents) const
   {
-    auto in_block = [&name, this](const NodeBlock * block) -> const ResolvedSymbol*
+    auto in_scope = [&name](const Scope * scope) -> const ResolvedSymbol*
     {
-      if (const auto it_scope = m_scopes.find(block) ; it_scope != m_scopes.cend())
-      {
-        const auto& vars = it_scope->second->vars;
-        if (const auto it_var = vars.find(name); it_var != vars.cend())
-          return &it_var->second;
-      }
-      return nullptr;
+      const auto it = scope->vars.find(name);
+      return it == scope->vars.cend() ? nullptr : &it->second;
     };
 
-    if (visit_parents)
-    {
-      for (const auto& [block, scope] : m_scopes)
-      {
-        if (const auto resolved = in_block(block)) {
-          return resolved;
-        }
-      }
+    const auto it_scopes = m_scopes.find(block) ;
+    if (it_scopes == m_scopes.cend()) {
       return nullptr;
     }
-    else {
-      return in_block(block);
+
+    // check NodeBlock's scope
+    const Scope * scope = it_scopes->second.get();
+    const auto resolved = in_scope(scope);
+
+    if (!visit_parents || resolved) {
+      return resolved;
     }
+
+    // travel up parents
+    for (scope = scope->parent; scope ; scope = scope->parent) {
+      if (const auto resolved = in_scope(scope); resolved)
+        return resolved;
+    }
+    return nullptr;
   }
 
 private:

@@ -1,4 +1,4 @@
-a: int;
+a: bool;
 
 fn foo()
 {
@@ -7,7 +7,11 @@ fn foo()
     if (b > 2)
     {
         e: int;
-        if (e > b) {}
+        if (e > b)
+        {
+            f: int;
+            if (a) {}
+        }
     }
 }
 
