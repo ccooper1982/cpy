@@ -1,3 +1,4 @@
+#include "cpy/ast/expressions.hpp"
 #include "tree_sitter/api.h"
 #include <cpy/ast/ast.hpp>
 #include <cpy/issues.hpp>
@@ -13,6 +14,13 @@
 #include <utility>
 
 extern "C" const TSLanguage *tree_sitter_cpy();
+
+
+template<typename NodeT, typename ...Args>
+static std::unique_ptr<NodeT> make_node (Args... args)
+{
+  return std::make_unique<NodeT>(std::forward<Args>(args)...);
+}
 
 
 static BinaryOperator get_binary_operator(const std::string_view op)
@@ -65,19 +73,19 @@ std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
   {
     int64_t i{};
     std::from_chars(value.data(), value.data()+value.size(), i);
-    expr = std::make_unique<IntegerLiteral>(i);
+    expr = make_node<IntegerLiteral>(i);
   }
   else if (expr_type == "literal_string") {
-    expr = std::make_unique<StringLiteral>(value);
+    expr = make_node<StringLiteral>(value);
   }
   else if (expr_type == "decimal")
   {
     double d{};
     std::from_chars(value.data(), value.data()+value.size(), d);
-    expr = std::make_unique<DecimalLiteral>(d);
+    expr = make_node<DecimalLiteral>(d);
   }
   else if (expr_type == "boolean") {
-    expr = std::make_unique<BooleanLiteral>(value == "true");
+    expr = make_node<BooleanLiteral>(value == "true");
   }
   else if (expr_type == "binary_expression")
   {
@@ -87,15 +95,13 @@ std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
     const auto rhs_node = child_by_field_name(bin_expr_node, "rhs");
 
     const auto op = get_binary_operator(from_source(op_node));
-    expr = std::make_unique<BinaryExpression>(parse_expression(lhs_node),
-                                              parse_expression(rhs_node),
-                                              op);
+    expr = make_node<BinaryExpression>(parse_expression(lhs_node), parse_expression(rhs_node), op);
   }
   else if (expr_type == "function_call") {
     expr = parse_function_call(ts_node_named_child(expr_node, 0));
   }
   else if (expr_type == "identifier") {
-    expr = std::make_unique<VariableRef>(from_source(expr_node));
+    expr = make_node<VariableRef>(from_source(expr_node));
   }
 
   if (expr) {
@@ -128,11 +134,11 @@ std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
 
   if (have_type)
   {
-    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_explicit(have_init ? parse_expression(init_node) : nullptr));
+    var_decl = make_node<VariableDecl>(VariableDecl::create_explicit(have_init ? parse_expression(init_node) : nullptr));
     var_decl->var_type = from_source(type_node);
   }
   else {
-    var_decl = std::make_unique<VariableDecl>(VariableDecl::create_inferred(parse_expression(init_node)));
+    var_decl = make_node<VariableDecl>(VariableDecl::create_inferred(parse_expression(init_node)));
   }
 
   var_decl->var_name = from_source(name_node);
@@ -213,7 +219,7 @@ std::unique_ptr<FunctionCall> Parser::parse_function_call(const TSNode& func_cal
 
   auto args = parse_function_call_args(args_node);
 
-  auto func_call_node = std::make_unique<FunctionCall>(func_name, std::move(args));
+  auto func_call_node = make_node<FunctionCall>(func_name, std::move(args));
   set_source_region(*func_call_node, ts_node_start_byte(func_call), ts_node_end_byte(func_call));
 
   if (func_name.contains("::")) {
@@ -226,7 +232,7 @@ std::unique_ptr<FunctionCall> Parser::parse_function_call(const TSNode& func_cal
 
 std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
 {
-  auto ast_node = std::make_unique<FunctionDef>();
+  auto ast_node = make_node<FunctionDef>();
   set_source_region(ts_node, *ast_node);
 
   // name
@@ -310,7 +316,7 @@ std::unique_ptr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
     return result;
   };
 
-  auto node = std::make_unique<ConditionIf>();
+  auto node = make_node<ConditionIf>();
 
   node->if_ = parse_condition_body(ts_node);
   set_source_region(ts_node, node->if_.body);
@@ -349,7 +355,7 @@ void Parser::parse_script(const TSNode& ts_root)
 {
   const auto n_children = ts_node_named_child_count(ts_root);
 
-  m_ast = std::make_unique<SourceFile>();
+  m_ast = make_node<SourceFile>();
   m_ast->block.nodes.reserve(std::min(n_children, 20U));
   set_source_region(ts_root, m_ast->block);
 
@@ -360,7 +366,7 @@ void Parser::parse_script(const TSNode& ts_root)
     if (ts_node_is_error(node))
     {
       issue::syntax_error(*m_issues, node);
-      m_ast->block.add_node(std::make_unique<SyntaxError>());
+      m_ast->block.add_node(make_node<SyntaxError>());
     }
     else
     {
