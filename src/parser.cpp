@@ -17,7 +17,7 @@ extern "C" const TSLanguage *tree_sitter_cpy();
 
 
 template<typename NodeT, typename ...Args>
-static std::unique_ptr<NodeT> make_node (Args... args)
+static std::unique_ptr<NodeT> make_node (Args&&... args)
 {
   return std::make_unique<NodeT>(std::forward<Args>(args)...);
 }
