@@ -7,12 +7,15 @@ d: int;
 if (a == b)
 {
 }
-else if (c > d)
+else if (c == a)
+{
+
+}
+else if (a > b)
 {
 
 }
 else
 {
-    e: int;
-    if (e == "") {}
+
 }
