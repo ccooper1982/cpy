@@ -1,14 +1,14 @@
-a: int;
+a: bool;
 
-fn foo()
-{
-    b: int;
+      if (a)
+      {
+        b: int;
+        c: bool;
 
-    if (b > 2)
-    {
-        e: int;
-        if (e > b) {}
-    }
-}
-
-c: int;
+        if (a) {
+          c: int;
+        }
+        else if (c) {
+          c: str;
+        }
+      }

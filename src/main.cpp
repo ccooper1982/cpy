@@ -9,49 +9,47 @@
 //  - separate into libcpy and cpy executable
 int main (int argc, char ** argv)
 {
-  if (argc != 2) {
+  if (argc != 2)
+  {
+    std::cerr << "Need input source file:\n";
     return 1;
   }
 
-  fs::path file = argv[1];
-
-  Modules::initialise();
-
-  Parser parser;
-  Script script;
+  const fs::path file = argv[1];
 
   if (!fs::exists(file))
   {
     std::cerr << "File does not exist: " << file.string() << '\n';
     return 1;
   }
-  else
+
+  Modules::initialise();
+
+  Parser parser;
+  Script script;
+
+  try
   {
-    try
-    {
-      script = parser.parse(file);
-    }
-    catch (const std::exception& ex)
-    {
-      std::cerr << ex.what() << '\n';
-      return 1;
-    }
+    script = parser.parse(file);
+  }
+  catch (const std::exception& ex)
+  {
+    std::cerr << ex.what() << '\n';
+    return 1;
   }
 
   std::cout << "AST:";
   script.ast->dump(std::cout);
 
+  Semantics sems;
+
   // errors here if tree-sitter found syntax errors
   if (!script.issues->have_errors())
   {
-    Semantics sems;
     sems.process(script);
 
     std::cout << "Sym Table:\n";
     sems.symbol_table().dump(std::cout);
-//
-//     std::cout << sems.symbol_table().have_variable("a");
-//     std::cout << sems.symbol_table().have_variable("b");
   }
 
   std::cout << "Issues:\n";

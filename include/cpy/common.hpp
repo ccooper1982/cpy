@@ -10,9 +10,12 @@ namespace rg = std::ranges;
 namespace vw = std::views;
 
 
+// helper type for the visitor
+template<class... Ts>
+struct overloads : Ts... { using Ts::operator()...; };
+
 struct SourceFile;
 class Issues;
-
 
 struct Script
 {
@@ -23,9 +26,6 @@ struct Script
 };
 
 
-// helper type for the visitor
-template<class... Ts>
-struct overloads : Ts... { using Ts::operator()...; };
 
 struct SourceRegion
 {
@@ -38,7 +38,6 @@ struct SourceRegion
 
   uint32_t start{}, end{};
 };
-
 
 struct CpyError
 {

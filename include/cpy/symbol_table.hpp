@@ -1,15 +1,15 @@
 #pragma once
 
-#include <iomanip>
 #include <map>
-#include <memory>
 #include <optional>
 #include <ostream>
 #include <stack>
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
-#include <cpy/ast/ast_node.hpp>
+#include <cpy/ast/ast.hpp>
+
 
 struct ResolvedSymbol
 {
@@ -31,9 +31,34 @@ struct Scope
 
   Scope * parent{};
   std::map<std::string_view, const ResolvedSymbol> vars{};
+
+  using VarPair = decltype(vars)::value_type;
 };
 
-
+/// Maps function:
+///  return type, param types
+/// Maps variables:
+///   type, scope visibility
+///
+/// Variable scope is essentially parent/child, similar to C++:
+///  ```
+///   a: bool;
+///   b: int;
+///
+///   if (a)
+///   {
+///     c: int;
+///     if (a > b) // a and b are visible from the parent scope
+///     {
+///       c: int;  // this 'c' is a new variable
+///     }
+///   }
+///  ```
+/// A stack is used to manage the parent/child scope tracking.
+/// A new scope is created with enter_scope() (pushes onto the stack), whilst
+/// exit_scope() pops from the stack.
+///
+/// A separate map is used to map between a NodeBlock and the variables available in that scope.
 class SymbolTable
 {
   inline static const std::map<const std::string_view, const BuiltInType> BuiltIntTypes = {
@@ -75,7 +100,7 @@ public:
   // Check the current scope for variable. Does not check parents.
   bool scope_has_variable (const std::string_view name, const NodeBlock& block) const
   {
-    return get_var(name, &block, false) != nullptr;
+    return get_resolved_variable(name, &block, false) != nullptr;
   }
 
   // Checks if a variable is visible from the given block.
@@ -83,7 +108,7 @@ public:
   // Returns false if not found.
   bool has_visible_variable(const std::string_view name, const NodeBlock& block) const
   {
-    return get_var(name, &block, true) != nullptr;
+    return get_resolved_variable(name, &block, true) != nullptr;
   }
 
   std::optional<BuiltInType> get_type(const std::string_view t) const
@@ -100,9 +125,13 @@ public:
     return m_resolved_functions.find(func)->second;
   }
 
+  /// Gets a resolved variable, checking the NodeBlock's scope, then checking each
+  /// parent until it is found.
+  /// Throws if the variable does not exis: has_visible_variable() should return
+  /// true prior to calling get_variable().
   const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const
   {
-    if (const auto * symbol = get_var(name, &block, true); symbol)
+    if (const auto * symbol = get_resolved_variable(name, &block, true); symbol)
       return *symbol;
 
     throw std::runtime_error{"SymbolTable::get_variable() - var does not exist"};
@@ -112,10 +141,6 @@ public:
   {
     const auto parent = m_scope_tracker.empty() ? nullptr : m_scope_tracker.top();
     auto [it, emplaced] = m_scopes.emplace(node, std::make_unique<Scope>(parent));
-
-    if (!emplaced)
-      std::cout << "Scope already exists for NodeBlock " << node << '\n';
-
     m_scope_tracker.push(it->second.get());
   }
 
@@ -154,32 +179,33 @@ public:
 
 
 private:
-  const ResolvedSymbol * get_var(const std::string_view name, const NodeBlock * block, const bool visit_parents) const
+  const ResolvedSymbol * get_resolved_variable(const std::string_view name, const NodeBlock * block, const bool visit_parents) const
   {
-    auto in_block = [&name, this](const NodeBlock * block) -> const ResolvedSymbol*
+    auto in_scope = [&name](const Scope * scope) -> const ResolvedSymbol*
     {
-      if (const auto it_scope = m_scopes.find(block) ; it_scope != m_scopes.cend())
-      {
-        const auto& vars = it_scope->second->vars;
-        if (const auto it_var = vars.find(name); it_var != vars.cend())
-          return &it_var->second;
-      }
-      return nullptr;
+      const auto it = scope->vars.find(name);
+      return it == scope->vars.cend() ? nullptr : &it->second;
     };
 
-    if (visit_parents)
-    {
-      for (const auto& [block, scope] : m_scopes)
-      {
-        if (const auto resolved = in_block(block)) {
-          return resolved;
-        }
-      }
+    const auto it_scopes = m_scopes.find(block) ;
+    if (it_scopes == m_scopes.cend()) {
       return nullptr;
     }
-    else {
-      return in_block(block);
+
+    // check NodeBlock's scope
+    const Scope * scope = it_scopes->second.get();
+    const auto resolved = in_scope(scope);
+
+    if (!visit_parents || resolved) {
+      return resolved;
     }
+
+    // travel up parents
+    for (scope = scope->parent; scope ; scope = scope->parent) {
+      if (const auto resolved = in_scope(scope); resolved)
+        return resolved;
+    }
+    return nullptr;
   }
 
 private:

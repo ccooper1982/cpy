@@ -2,13 +2,12 @@
 
 #include <concepts>
 #include <functional>
-
 #include <ranges>
 
+#include <cpy/ast/ast.hpp>
 #include <cpy/common.hpp>
 #include <cpy/issues.hpp>
 #include <cpy/symbol_table.hpp>
-#include <cpy/ast/ast_node.hpp>
 
 
 ///

@@ -8,7 +8,6 @@
 #include <string_view>
 #include <vector>
 
-#include <cpy/common.hpp>
 #include <cpy/ast/ast_node.hpp>
 
 #include "tree_sitter/api.h"

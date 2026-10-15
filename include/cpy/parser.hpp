@@ -2,7 +2,8 @@
 #include <memory>
 #include <string_view>
 
-#include <cpy/ast/ast_node.hpp>
+#include <cpy/ast/ast.hpp>
+
 #include <cpy/common.hpp>
 #include <cpy/issues.hpp>
 
