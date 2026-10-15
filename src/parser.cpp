@@ -1,5 +1,5 @@
 #include "tree_sitter/api.h"
-#include <cpy/ast/ast_node.hpp>
+#include <cpy/ast/ast.hpp>
 #include <cpy/issues.hpp>
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
@@ -11,7 +11,6 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 extern "C" const TSLanguage *tree_sitter_cpy();
 

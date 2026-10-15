@@ -1,16 +1,15 @@
 #pragma once
 
-#include <algorithm>
-#include <iomanip>
 #include <map>
-#include <memory>
 #include <optional>
 #include <ostream>
 #include <stack>
 #include <stdexcept>
 #include <string_view>
+#include <vector>
 
-#include <cpy/ast/ast_node.hpp>
+#include <cpy/ast/ast.hpp>
+
 
 struct ResolvedSymbol
 {
@@ -36,7 +35,30 @@ struct Scope
   using VarPair = decltype(vars)::value_type;
 };
 
-
+/// Maps function:
+///  return type, param types
+/// Maps variables:
+///   type, scope visibility
+///
+/// Variable scope is essentially parent/child, similar to C++:
+///  ```
+///   a: bool;
+///   b: int;
+///
+///   if (a)
+///   {
+///     c: int;
+///     if (a > b) // a and b are visible from the parent scope
+///     {
+///       c: int;  // this 'c' is a new variable
+///     }
+///   }
+///  ```
+/// A stack is used to manage the parent/child scope tracking.
+/// A new scope is created with enter_scope() (pushes onto the stack), whilst
+/// exit_scope() pops from the stack.
+///
+/// A separate map is used to map between a NodeBlock and the variables available in that scope.
 class SymbolTable
 {
   inline static const std::map<const std::string_view, const BuiltInType> BuiltIntTypes = {
@@ -103,10 +125,10 @@ public:
     return m_resolved_functions.find(func)->second;
   }
 
-  // Gets a resolved variable, checking the NodeBlock's scope, then checking each parent until
-  // it is found.
-  // Should not be called if the variable does not exist (has_visible_variable() should return
-  // true prior to calling this).
+  /// Gets a resolved variable, checking the NodeBlock's scope, then checking each
+  /// parent until it is found.
+  /// Throws if the variable does not exis: has_visible_variable() should return
+  /// true prior to calling get_variable().
   const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const
   {
     if (const auto * symbol = get_resolved_variable(name, &block, true); symbol)
@@ -119,10 +141,6 @@ public:
   {
     const auto parent = m_scope_tracker.empty() ? nullptr : m_scope_tracker.top();
     auto [it, emplaced] = m_scopes.emplace(node, std::make_unique<Scope>(parent));
-
-    if (!emplaced)
-      std::cout << "Scope already exists for NodeBlock " << node << '\n';
-
     m_scope_tracker.push(it->second.get());
   }
 

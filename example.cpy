@@ -1,21 +1,14 @@
+a: bool;
 
-a: str;
-b: str;
-c: int;
-d: int;
+      if (a)
+      {
+        b: int;
+        c: bool;
 
-if (a == b)
-{
-}
-else if (c == a)
-{
-
-}
-else if (a > b)
-{
-
-}
-else
-{
-
-}
+        if (a) {
+          c: int;
+        }
+        else if (c) {
+          c: str;
+        }
+      }

@@ -1,9 +1,10 @@
 #include "cpy/ast/ast_node.hpp"
-#include "cpy/issues.hpp"
 #include <gtest/gtest.h>
 
-#include <cpy/semantics.hpp>
+#include <cpy/ast/ast.hpp>
+#include <cpy/issues.hpp>
 #include <cpy/parser.hpp>
+#include <cpy/semantics.hpp>
 
 
 TEST(SymbolTable, FunctionDef)
@@ -321,10 +322,9 @@ TEST(SymbolTable, VariableDecl_Scope)
       {
         a: int;
         b: int;
-
-        if (a > b) {
-        }
       }
+
+      a: int;
     )";
 
     Parser parser;
@@ -335,7 +335,10 @@ TEST(SymbolTable, VariableDecl_Scope)
 
     ASSERT_FALSE(script.issues->have_errors());
   }
+}
 
+TEST(SymbolTable, VariableDecl_ScopeIf)
+{
   {
     const std::string_view src = R"(
       a: int;
@@ -402,6 +405,120 @@ TEST(SymbolTable, VariableDecl_Scope)
     ASSERT_TRUE(script.issues->have_errors());
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
     ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      a: bool;
+      b: int;
+
+      if (a)
+      {
+        c: int;
+        if (b > c) {
+          a: str;
+        }
+      }
+
+      c: str;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+
+    const auto& root_block = script.ast->block;
+    const auto& first_if = dynamic_cast<ConditionIf&>(*root_block.nodes[2]);
+    const auto& second_if = dynamic_cast<ConditionIf&>(*first_if.if_.body.nodes[1]);
+
+    ASSERT_EQ(sem.symbol_table().get_variable("a", root_block).type, BuiltInType::Bool);
+    ASSERT_EQ(sem.symbol_table().get_variable("b", root_block).type, BuiltInType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", root_block).type, BuiltInType::String);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", first_if.if_.body).type, BuiltInType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("a", second_if.if_.body).type, BuiltInType::String);
+  }
+}
+
+TEST(SymbolTable, VariableDecl_IfElseIf)
+{
+  {
+    const std::string_view src = R"(
+      a: bool;
+      b: int;
+
+      if (a) {
+      }
+      else if (b == 0) {
+      }
+      else if (b == 1) {
+      }
+      else {
+      }
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+
+    const auto& root = script.ast->block;
+
+    const auto& if_ = dynamic_cast<ConditionIf&>(*root.nodes[2]);
+
+    ASSERT_EQ(if_.else_if_count(), 2);
+    ASSERT_TRUE(if_.have_else());
+  }
+}
+
+TEST(SymbolTable, VariableDecl_ScopeIfElseIf)
+{
+  {
+    const std::string_view src = R"(
+      a: bool;
+
+      if (a)
+      {
+        b: int;
+        c: bool;
+
+        if (a) {
+          c: int;
+        }
+        else if (c) {
+          c: str;
+        }
+      }
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+
+    const auto& root = script.ast->block;
+
+    const auto& first_if = dynamic_cast<ConditionIf&>(*root.nodes[1]);
+    ASSERT_EQ(first_if.if_body_node_count(), 3); // b, c and if
+
+    const auto& second_if = dynamic_cast<ConditionIf&>(*first_if.if_body().nodes[2]);
+    ASSERT_EQ(second_if.else_if_count(), 1);
+    ASSERT_EQ(second_if.else_if[0].body.nodes.size(), 1); // c: str
+
+    ASSERT_EQ(sem.symbol_table().get_variable("a", root).type, BuiltInType::Bool);
+    ASSERT_EQ(sem.symbol_table().get_variable("b", first_if.if_.body).type, BuiltInType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", first_if.if_.body).type, BuiltInType::Bool);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", second_if.if_.body).type, BuiltInType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", second_if.else_if[0].body).type, BuiltInType::String);
   }
 }
 

@@ -1,11 +1,9 @@
-#include <algorithm>
-#include <cpy/ast/ast_node.hpp>
+#include <cpy/ast/ast.hpp>
 #include <cpy/issues.hpp>
-#include <cpy/semantics.hpp>
 #include <cpy/modules.hpp>
+#include <cpy/semantics.hpp>
 
 #include <exception>
-#include <iterator>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -133,7 +131,7 @@ void Semantics::process_function_bodies(Context& ctx, const NodeBlock& block)
 
 void Semantics::process_variable_declaration(Context& ctx, const NodeBlock& block, const VariableDecl& decl)
 {
-  if (m_symbol_table.has_visible_variable(decl.var_name, block))
+  if (m_symbol_table.scope_has_variable(decl.var_name, block))
   {
     issue::var_duplicate(ctx.issues, decl);
     return;
