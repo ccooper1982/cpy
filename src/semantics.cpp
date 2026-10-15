@@ -368,12 +368,32 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
 
 void Semantics::process_condition(Context& ctx, const AstNode& parent, const NodeBlock& block, const ConditionIf& cond)
 {
-  const auto cond_if_result = handle_expression(ctx, parent, block, dynamic_cast<const Expression&>(*cond.if_condition));
+  auto handle_condition_body = [&](const ConditionIf::ConditionBody& cb)
+  {
+    const auto cond_if_result = handle_expression(ctx, parent, block, dynamic_cast<const Expression&>(*cb.condition));
 
-  if (cond_if_result != BuiltInType::Bool) {
-    issue::condition_not_bool(ctx.issues, *cond.if_condition);
-  }
-  else {
-    process_block(ctx, cond.if_body);
+    if (cond_if_result != BuiltInType::Bool)
+    {
+      issue::condition_not_bool(ctx.issues, *cb.condition);
+      return false;
+    }
+    else {
+      process_block(ctx, cb.body);
+    }
+    return true;
+  };
+
+  // handle: if (condition) { block }
+  if (handle_condition_body(cond.if_))
+  {
+    // handle each: else if (condition) { block }
+    for (const auto& else_if : cond.else_if) {
+      handle_condition_body(else_if);
+    }
+
+    // handle: else { block }
+    if (cond.else_body) {
+      process_block(ctx, *cond.else_body);
+    }
   }
 }

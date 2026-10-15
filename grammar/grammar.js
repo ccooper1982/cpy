@@ -55,10 +55,25 @@ export default grammar({
 
     condition_if: ($) =>
       seq(
-        "if",
-        "(",
+        "if", "(",
         field("condition", $.expression),
         ")",
+        field("body", $.block),
+        repeat($.else_if_clause),
+        optional($.else_clause),
+      ),
+
+    else_if_clause: ($) =>
+      seq(
+        "else", "if", "(",
+        field("condition", $.expression),
+        ")",
+        field("body", $.block),
+      ),
+
+    else_clause: ($) =>
+      seq(
+        "else",
         field("body", $.block),
       ),
 

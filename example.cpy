@@ -1,18 +1,18 @@
-a: bool;
 
-fn foo()
-{
-    b: int;
-
-    if (b > 2)
-    {
-        e: int;
-        if (e > b)
-        {
-            f: int;
-            if (a) {}
-        }
-    }
-}
-
+a: str;
+b: str;
 c: int;
+d: int;
+
+if (a == b)
+{
+}
+else if (c > d)
+{
+
+}
+else
+{
+    e: int;
+    if (e == "") {}
+}

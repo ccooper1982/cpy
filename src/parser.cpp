@@ -290,25 +290,48 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
 
 std::unique_ptr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
 {
-  const TSNode cond = child_by_field_name(ts_node, "condition");
-  const TSNode body = child_by_field_name(ts_node, "body");
-
   if (ts_node_has_error(ts_node))
   {
     issue::syntax_error(*m_issues, ts_node);
     return nullptr;
   }
 
+  auto parse_condition_body = [this](const TSNode& ts_node) -> ConditionIf::ConditionBody
+  {
+    const TSNode cond = child_by_field_name(ts_node, "condition");
+    const TSNode body = child_by_field_name(ts_node, "body");
+
+    ConditionIf::ConditionBody result;
+
+    if (!ts_node_is_null(cond)) {
+      result.condition = parse_expression(cond);
+    }
+
+    result.body.nodes = parse_statements(body);
+    return result;
+  };
+
   auto node = std::make_unique<ConditionIf>();
-  if (!ts_node_is_null(cond)) {
-    node->if_condition = parse_expression(cond);
-  }
 
-  if (!ts_node_is_null(body)) {
-    node->if_body.nodes = parse_statements(body);
-  }
+  node->if_ = parse_condition_body(ts_node);
+  set_source_region(ts_node, node->if_.body);
 
-  set_source_region(ts_node, node->if_body);
+  for (uint32_t i = 0; i < ts_node_named_child_count(ts_node); ++i)
+  {
+    const TSNode child = ts_node_named_child(ts_node, i);
+    const std::string_view type = ts_node_type(child);
+
+    if (type == "else_if_clause")
+    {
+      node->else_if.push_back(parse_condition_body(child));
+      set_source_region(child, node->else_if.back().body);
+    }
+    else if (type == "else_clause")
+    {
+      node->else_body = parse_condition_body(child).body;
+      set_source_region(child, *node->else_body);
+    }
+  }
 
   return node;
 }

@@ -434,23 +434,53 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
 
 struct ConditionIf : public AstNode
 {
+  struct ConditionBody
+  {
+    std::unique_ptr<Expression> condition;
+    NodeBlock body;
+  };
+
   ConditionIf() : AstNode(NodeType::ConditionIf)
   {}
 
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
-    if (if_condition)
+    auto dump_condition = [&os, tab](const std::string_view type, const std::unique_ptr<Expression>& condition)
     {
-      os << "if (" ;
-      if_condition->dump(os, tab);
-      os << ") " << "{\n";
-      if_body.dump(os, tab+1);
+      if (condition)
+      {
+        os << type << " (" ;
+        condition->dump(os, tab);
+        os << ") ";
+      }
+    };
+
+    auto dump_body = [&os, tab](const std::string_view type, const NodeBlock& block)
+    {
+      os << type << "{\n";
+      block.dump(os, tab+1);
       os << std::setw((tab+1)*2) << "}\n";
+    };
+
+    dump_condition("if", if_.condition);
+    dump_body("", if_.body);
+
+    for (const auto& cb : else_if)
+    {
+      dump_condition("else if", cb.condition);
+      dump_body("", cb.body);
+    }
+
+    if (else_body) {
+      dump_body("else", *else_body);
     }
   }
 
-  std::unique_ptr<Expression> if_condition;
-  NodeBlock if_body;
+
+
+  ConditionBody if_;
+  std::vector<ConditionBody> else_if;
+  std::optional<NodeBlock> else_body;
 };
 
 
@@ -584,7 +614,6 @@ struct VariableDecl : public AstNode
   private:
     DeclType decl_type;
 };
-
 
 
 struct SyntaxError : public AstNode

@@ -402,9 +402,9 @@ TEST(Ast, Condition)
   ASSERT_EQ(ast.block.nodes[2]->node_type(), NodeType::ConditionIf);
 
   const auto& cond = dynamic_cast<ConditionIf&>(*ast.block.nodes[2]);
-  ASSERT_TRUE(cond.if_condition->is_expr_type(ExpressionType::Binary));
-  ASSERT_EQ(cond.if_body.nodes.size(), 1);
-  ASSERT_TRUE(cond.if_body.nodes[0]->is_node_type(NodeType::Expression));
+  ASSERT_TRUE(cond.if_.condition->is_expr_type(ExpressionType::Binary));
+  ASSERT_EQ(cond.if_.body.nodes.size(), 1);
+  ASSERT_TRUE(cond.if_.body.nodes[0]->is_node_type(NodeType::Expression));
 }
 
 
