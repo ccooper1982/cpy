@@ -200,9 +200,9 @@ struct BinaryExpression : public Expression
     rhs->dump(os, tab);
   }
 
-  std::unique_ptr<Expression> lhs;
+  NodePtr<Expression> lhs;
   BinaryOperator op;
-  std::unique_ptr<Expression> rhs;
+  NodePtr<Expression> rhs;
 
 };
 
@@ -248,7 +248,7 @@ struct FunctionCall : public Expression
 
   std::string_view module;
   std::string_view name;
-  std::vector<std::unique_ptr<Expression>> args;
+  std::vector<NodePtr<Expression>> args;
 };
 
 

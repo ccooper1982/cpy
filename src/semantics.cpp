@@ -42,6 +42,7 @@ void Semantics::process_block(Context& ctx, const NodeBlock& block, const bool a
   auto is_statement = [](const std::unique_ptr<AstNode>& node)
   {
     return  node->node_type() == NodeType::VariableDecl ||
+            node->node_type() == NodeType::VariableAssign ||
             node->node_type() == NodeType::ConditionIf ||
             node->node_type() == NodeType::Expression;
   };
@@ -60,12 +61,20 @@ void Semantics::process_block(Context& ctx, const NodeBlock& block, const bool a
           process_variable_declaration(ctx, block, dynamic_cast<const VariableDecl&>(*node));
           break;
 
+        case NodeType::VariableAssign:
+          process_variable_assign(ctx, block, dynamic_cast<const VariableAssign&>(*node));
+          break;
+
         case NodeType::ConditionIf:
           process_condition(ctx, *node, block, dynamic_cast<const ConditionIf&>(*node));
           break;
 
         case NodeType::Expression:
           handle_expression(ctx, *node, block, dynamic_cast<const Expression&>(*node));
+          break;
+
+        case NodeType::NodeBlock:
+          process_block(ctx, dynamic_cast<const NodeBlock&>(*node));
           break;
 
         default:
@@ -182,6 +191,22 @@ void Semantics::process_variable_declaration(Context& ctx, const NodeBlock& bloc
   }
 }
 
+void Semantics::process_variable_assign(Context& ctx, const NodeBlock& block, const VariableAssign& assign)
+{
+  if (!m_symbol_table.has_visible_variable(assign.name, block))
+  {
+    issue::var_unknown(ctx.issues, assign, assign.name);
+    return;
+  }
+
+  const auto var_type = m_symbol_table.get_variable(assign.name, block).type;
+  const auto assign_type = handle_expression(ctx, assign, block, *assign.expr);
+
+  if (assign_type != var_type)
+  {
+    issue::var_assign_type_differ(ctx.issues, assign);
+  }
+}
 
 // Expressions //
 

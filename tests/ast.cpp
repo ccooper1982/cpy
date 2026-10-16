@@ -1,3 +1,5 @@
+#include "cpy/ast/expressions.hpp"
+#include <algorithm>
 #include <gtest/gtest.h>
 
 #include <cpy/ast/ast_node.hpp>
@@ -407,6 +409,57 @@ TEST(Ast, Condition)
   ASSERT_TRUE(cond.if_.body.nodes[0]->is_node_type(NodeType::Expression));
 }
 
+TEST(Ast, VarAssign)
+{
+  const std::string_view src = R"(
+    a = 5;
+    b = "str";
+    c = true;
+    d = 1.5;
+    e = 4 + 5;
+    f = foo() + foo();
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  const auto& ast = *script.ast;
+
+  ASSERT_EQ(ast.block.nodes.size(), 6);
+
+  const auto is_variable_assign = [](const NodePtr<AstNode>& node) {
+      return node->is_node_type(NodeType::VariableAssign);
+    };
+  ASSERT_TRUE(rg::all_of(ast.block.nodes, is_variable_assign));
+
+  static const std::array expected = {
+      std::pair{"a", ExpressionType::Int},
+      std::pair{"b", ExpressionType::String},
+      std::pair{"c", ExpressionType::Bool},
+      std::pair{"d", ExpressionType::Dec},
+      std::pair{"e", ExpressionType::Binary},
+      std::pair{"f", ExpressionType::Binary},
+  };
+
+  ASSERT_EQ(ast.block.nodes.size(), expected.size());
+
+  for (std::size_t i = 0; i < expected.size(); ++i)
+  {
+      const auto& assign =
+          dynamic_cast<const VariableAssign&>(*ast.block.nodes[i]);
+
+      EXPECT_EQ(assign.name, expected[i].first);
+      ASSERT_TRUE(assign.expr->is_expr_type(expected[i].second));
+  }
+
+  const auto& var_f = dynamic_cast<VariableAssign&>(*ast.block.nodes[5]);
+  ASSERT_EQ(var_f.name, "f");
+  ASSERT_TRUE(var_f.expr->is_expr_type(ExpressionType::Binary));
+
+  const auto& var_f_bin = dynamic_cast<BinaryExpression&>(*var_f.expr);
+  ASSERT_TRUE(var_f_bin.lhs->is_expr_type(ExpressionType::FuncCall));
+  ASSERT_TRUE(var_f_bin.rhs->is_expr_type(ExpressionType::FuncCall));
+}
 
 // Syntax Errors //
 TEST(Ast, SyntaxError)

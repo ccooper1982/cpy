@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
@@ -18,6 +19,7 @@ enum class NodeType
   NodeBlock,
   Expression,
   VariableDecl,
+  VariableAssign,
   ConditionIf
 };
 
@@ -142,3 +144,6 @@ struct AstNode
 private:
   NodeType type;
 };
+
+template<typename NodeT>
+using NodePtr = std::unique_ptr<NodeT>;

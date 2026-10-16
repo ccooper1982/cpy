@@ -48,6 +48,7 @@ private:
 
   // variables
   void process_variable_declaration(Context& ctx, const NodeBlock& block, const VariableDecl& decl);
+  void process_variable_assign(Context& ctx, const NodeBlock& block, const VariableAssign& assign);
 
   // TODO what's the parent param actually used for?
   // expressions

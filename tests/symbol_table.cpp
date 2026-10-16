@@ -1,4 +1,5 @@
 #include "cpy/ast/ast_node.hpp"
+#include "cpy/ast/expressions.hpp"
 #include <gtest/gtest.h>
 
 #include <cpy/ast/ast.hpp>
@@ -61,8 +62,6 @@ TEST(SymbolTable, VarDecl)
     sem.process(script);
 
     const auto& sym_table = sem.symbol_table();
-
-    std::cout << "have variable: " << sym_table.scope_has_variable("a", script.ast->block) << "\n";
 
     ASSERT_FALSE(script.issues->have_errors());
     ASSERT_TRUE(sym_table.has_function("foo"));
@@ -628,5 +627,70 @@ TEST(SymbolTable, FuncCall_VarRef)
     ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
     ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
+  }
+}
+
+
+TEST(SymbolTable, FuncCall_VarAssign)
+{
+  // not much to do here: variable assignment is mostly dealt with by
+  // the AST and Semantics tests.
+  {
+    const std::string_view src = R"(
+      fn foo1(a: int) -> int {}
+
+      a: int;
+      a = 5;
+      a = foo1(1);
+      a = foo1(1) + foo1(2);
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+
+    ASSERT_TRUE(sym_table.has_function("foo1"));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
+  }
+
+  {
+    const std::string_view src = R"(
+      a: int;
+      b: int;
+
+      a = 1;
+
+      if (a > b)
+      {
+        a: bool;
+        a = true;
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    const auto& sym_table = sem.symbol_table();
+    const auto& root = script.ast->block;
+    const auto& if_ = dynamic_cast<const ConditionIf&>(*root.nodes[3]).if_body();
+
+    ASSERT_TRUE(sym_table.scope_has_variable("a", root));
+    ASSERT_TRUE(sym_table.scope_has_variable("a", if_));
+
+    ASSERT_EQ(sym_table.get_variable("a", root).type, BuiltInType::Int);
+    ASSERT_EQ(sym_table.get_variable("a", if_).type, BuiltInType::Bool);
+
+    const auto& assign_root = dynamic_cast<const VariableAssign&>(*root.nodes[2]);
+    ASSERT_TRUE(assign_root.expr->is_expr_type(ExpressionType::Int));
+
+    const auto& assign_if = dynamic_cast<const VariableAssign&>(*if_.nodes[1]);
+    ASSERT_TRUE(assign_if.expr->is_expr_type(ExpressionType::Bool));
   }
 }

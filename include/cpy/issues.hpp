@@ -25,7 +25,9 @@ enum class ErrorCode
   UnknownVarType,
   VariableDuplicate,
   VariableInitVoid,
+  VariableInitType,
   VariableUnknown,
+  VariableAssignType,
   BinaryOperandsInvalid,
   BinaryOperandsVoid,
   ConditionNotBool,
@@ -183,9 +185,15 @@ namespace issue
 
   inline void var_init_type_differ (Issues& issues, const AstNode& node)
   {
-    issues.add_error("Variable initialser type different from explicit type", node.source, ErrorCode::VariableUnknown);
+    issues.add_error("Variable initialised type incompatible from explicit type", node.source, ErrorCode::VariableInitType);
   }
 
+  inline void var_assign_type_differ (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Variable assign type incompatible with expression", node.source, ErrorCode::VariableAssignType);
+  }
+
+  // TODO decide: don't think we need the 'var' param since displayed from node.source
   inline void var_unknown (Issues& issues, const AstNode& node, const std::string_view var)
   {
     issues.add_error(std::format("Variable not declared: {}", var), node.source, ErrorCode::VariableUnknown);
@@ -198,7 +206,7 @@ namespace issue
 
   inline void binary_operands_invalid (Issues& issues, const AstNode& node)
   {
-    issues.add_error("Invalid binary operands", node.source, ErrorCode::BinaryOperandsInvalid);
+    issues.add_error("Binary expression operands have incompatible types", node.source, ErrorCode::BinaryOperandsInvalid);
   }
 
   inline void binary_operands_void (Issues& issues, const AstNode& node)
