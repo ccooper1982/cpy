@@ -39,7 +39,8 @@ export default grammar({
         seq(
           choice(
             field("func_call", $.function_call),
-            field("variable_declaration", $.variable_declaration),
+            field("var_decl", $.var_decl),
+            field("var_assign", $.var_assign),
           ),
           ";"
         ),
@@ -77,7 +78,7 @@ export default grammar({
         field("body", $.block),
       ),
 
-    variable_declaration: ($) =>
+    var_decl: ($) =>
       seq(
         field("name", $.identifier),
         choice(
@@ -95,6 +96,13 @@ export default grammar({
           ),
         ),
       ),
+
+    var_assign: ($) =>
+      seq(
+        field("name", $.identifier),
+        "=",
+        field("value", $.expression),
+    ),
 
     qualified_name: ($) => seq(
       optional(seq($.identifier, "::")),

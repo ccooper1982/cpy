@@ -44,17 +44,19 @@ private:
 
   void parse_script(const TSNode& ts_root);
 
-  std::unique_ptr<Expression> parse_expression(const TSNode& expr_node);
-  std::unique_ptr<VariableDecl> parse_variable_decl(const TSNode& ts_node);
+  NodePtr<Expression> parse_expression(const TSNode& expr_node);
 
-  std::unique_ptr<AstNode> parse_statement (const TSNode& ts_statement);
-  std::vector<std::unique_ptr<AstNode>> parse_statements (const TSNode& ts_statements);
+  NodePtr<VariableDecl> parse_variable_decl(const TSNode& ts_node);
+  NodePtr<VariableAssign> parse_variable_assign(const TSNode& ts_node);
 
-  std::vector<std::unique_ptr<Expression>> parse_function_call_args(const TSNode& args_node);
-  std::unique_ptr<FunctionCall> parse_function_call(const TSNode& func_call);
-  std::unique_ptr<FunctionDef> parse_function_def(const TSNode& ts_node);
+  NodePtr<AstNode> parse_statement (const TSNode& ts_statement);
+  std::vector<NodePtr<AstNode>> parse_statements (const TSNode& ts_statements);
 
-  std::unique_ptr<ConditionIf> parse_condition_if(const TSNode& ts_node);
+  std::vector<NodePtr<Expression>> parse_function_call_args(const TSNode& args_node);
+  NodePtr<FunctionCall> parse_function_call(const TSNode& func_call);
+  NodePtr<FunctionDef> parse_function_def(const TSNode& ts_node);
+
+  NodePtr<ConditionIf> parse_condition_if(const TSNode& ts_node);
 
   std::string_view from_source (const TSNode& node);
 
@@ -62,7 +64,7 @@ private:
   TSParserPtr m_parser;
   TSTreePtr m_tree;
 
-  std::unique_ptr<SourceFile> m_ast;
+  NodePtr<SourceFile> m_ast;
   std::unique_ptr<std::string> m_src;
   std::unique_ptr<Issues> m_issues;
 };

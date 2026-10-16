@@ -341,3 +341,42 @@ TEST(Semantics, Condition)
     ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionNotExist), 1);
   }
 }
+
+
+TEST(Semantics, VarAssign)
+{
+  {
+    const std::string_view src = R"(
+      a: int;
+      a = 5;
+      a = "asda";
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableAssignType), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo() {}
+
+      a: int;
+      a = foo();
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableAssignType), 1);
+  }
+}

@@ -17,7 +17,7 @@ extern "C" const TSLanguage *tree_sitter_cpy();
 
 
 template<typename NodeT, typename ...Args>
-static std::unique_ptr<NodeT> make_node (Args... args)
+static NodePtr<NodeT> make_node (Args&&... args)
 {
   return std::make_unique<NodeT>(std::forward<Args>(args)...);
 }
@@ -58,9 +58,17 @@ TSNode child_by_field_name(TSNode node, const char (&name)[N])
 }
 
 
-std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
+std::string_view Parser::from_source (const TSNode& node)
 {
-  std::unique_ptr<Expression> expr;
+  const auto start = ts_node_start_byte(node);
+  const auto length = ts_node_end_byte(node) - start;
+
+  return std::string_view{*m_src}.substr(start, length);
+}
+
+NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
+{
+  NodePtr<Expression> expr;
 
   const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0));
 
@@ -115,7 +123,7 @@ std::unique_ptr<Expression> Parser::parse_expression(const TSNode& expr_node)
 }
 
 
-std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
+NodePtr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
 {
   const auto name_node = child_by_field_name(ts_node, "name");
   const auto type_node = child_by_field_name(ts_node, "type_name");
@@ -130,7 +138,7 @@ std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
     return nullptr;
   }
 
-  std::unique_ptr<VariableDecl> var_decl;
+  NodePtr<VariableDecl> var_decl;
 
   if (have_type)
   {
@@ -148,9 +156,28 @@ std::unique_ptr<VariableDecl> Parser::parse_variable_decl(const TSNode& ts_node)
 }
 
 
-std::vector<std::unique_ptr<AstNode>> Parser::parse_statements (const TSNode& ts_statements)
+NodePtr<VariableAssign> Parser::parse_variable_assign(const TSNode& ts_node)
 {
-  std::vector<std::unique_ptr<AstNode>> statements;
+  if (ts_node_has_error(ts_node))
+  {
+    issue::syntax_error(*m_issues, ts_node);
+    return nullptr;
+  }
+
+  const auto name = child_by_field_name(ts_node, "name");
+  const auto expr = child_by_field_name(ts_node, "value");
+
+  auto assign_node = make_node<VariableAssign>() ;
+  assign_node->name = from_source(name);
+  assign_node->expr = parse_expression(expr);
+  set_source_region(ts_node, *assign_node);
+  return assign_node;
+}
+
+
+std::vector<NodePtr<AstNode>> Parser::parse_statements (const TSNode& ts_statements)
+{
+  std::vector<NodePtr<AstNode>> statements;
 
   const auto statement_count = ts_node_named_child_count(ts_statements);
   statements.reserve(std::min<uint32_t>(statement_count, 30));
@@ -168,13 +195,14 @@ std::vector<std::unique_ptr<AstNode>> Parser::parse_statements (const TSNode& ts
 }
 
 
-std::unique_ptr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
+NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
 {
   const auto func_call = child_by_field_name(ts_statement, "func_call");
-  const auto var_decl = child_by_field_name(ts_statement, "variable_declaration");
+  const auto var_decl = child_by_field_name(ts_statement, "var_decl");
   const auto cond_if = child_by_field_name(ts_statement, "condition_if");
+  const auto var_assign = child_by_field_name(ts_statement, "var_assign");
 
-  std::unique_ptr<AstNode> node;
+  NodePtr<AstNode> node;
 
   if (ts_node_has_error(ts_statement)) {
     issue::syntax_error(*m_issues, ts_statement);
@@ -187,6 +215,9 @@ std::unique_ptr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
   }
   else if(!ts_node_is_null(cond_if)) {
     node = parse_condition_if (cond_if);
+  }
+  else if(!ts_node_is_null(var_assign)) {
+    node = parse_variable_assign (var_assign);
   }
 
   return node;
@@ -210,7 +241,7 @@ std::vector<std::unique_ptr<Expression>> Parser::parse_function_call_args(const 
 }
 
 
-std::unique_ptr<FunctionCall> Parser::parse_function_call(const TSNode& func_call)
+NodePtr<FunctionCall> Parser::parse_function_call(const TSNode& func_call)
 {
   const auto name_node = child_by_field_name(func_call, "name");
   const auto args_node = child_by_field_name(func_call, "args");
@@ -230,7 +261,7 @@ std::unique_ptr<FunctionCall> Parser::parse_function_call(const TSNode& func_cal
 }
 
 
-std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
+NodePtr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
 {
   auto ast_node = make_node<FunctionDef>();
   set_source_region(ts_node, *ast_node);
@@ -293,7 +324,7 @@ std::unique_ptr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
 }
 
 
-std::unique_ptr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
+NodePtr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
 {
   if (ts_node_has_error(ts_node))
   {
@@ -342,15 +373,6 @@ std::unique_ptr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
 }
 
 
-std::string_view Parser::from_source (const TSNode& node)
-{
-  const auto start = ts_node_start_byte(node);
-  const auto length = ts_node_end_byte(node) - start;
-
-  return std::string_view{*m_src}.substr(start, length);
-}
-
-
 void Parser::parse_script(const TSNode& ts_root)
 {
   const auto n_children = ts_node_named_child_count(ts_root);
@@ -361,7 +383,7 @@ void Parser::parse_script(const TSNode& ts_root)
 
   for (uint32_t i = 0 ; i < n_children ; ++i)
   {
-    auto node = ts_node_named_child(ts_root, i);
+    const auto node = ts_node_named_child(ts_root, i);
 
     if (ts_node_is_error(node))
     {

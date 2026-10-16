@@ -21,7 +21,7 @@ struct NodeBlock : public AstNode
   NodeBlock() : AstNode(Type)
   {}
 
-  void add_node(std::unique_ptr<AstNode>&& node)
+  void add_node(NodePtr<AstNode>&& node)
   {
     if (node) {
       nodes.push_back(std::move(node));
@@ -38,7 +38,7 @@ struct NodeBlock : public AstNode
     }
   }
 
-  std::vector<std::unique_ptr<AstNode>> nodes;
+  std::vector<NodePtr<AstNode>> nodes;
 };
 
 
@@ -156,6 +156,8 @@ struct FunctionDef : public AstNode
 };
 
 
+//  Variables //
+
 // <var_name>: <var_type>;                  // explicit type
 // <var_name>: <var_type> = <init_expr>;    // explicit type, initialised
 // <var_name> := <init_expr>;               // inferred type, initialised
@@ -229,6 +231,24 @@ struct VariableDecl : public AstNode
 
   private:
     DeclType decl_type;
+};
+
+
+struct VariableAssign : public AstNode
+{
+  static constexpr NodeType Type = NodeType::VariableAssign;
+
+  VariableAssign() : AstNode(Type)
+  {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << name << '=';
+    expr->dump(os, tab);
+  }
+
+  std::string_view name;
+  NodePtr<Expression> expr;
 };
 
 
