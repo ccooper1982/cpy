@@ -1,3 +1,4 @@
+#include "cpy/ast/ast_node.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/issues.hpp>
 #include <cpy/modules.hpp>
@@ -125,7 +126,7 @@ void Semantics::process_function_signatures(Context& ctx)
       issue::unknown_return_type(ctx.issues, def.name, def.return_type);
     }
     else {
-      m_symbol_table.add_function(def.name, std::move(resolved_params), *return_type);
+      m_symbol_table.add_function(def, std::move(resolved_params), *return_type);
     }
   });
 }
@@ -359,7 +360,7 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
       case Subtract:
       case Multiply:
       case Divide:
-        valid = a == Int || a == Decimal;
+        valid = a == Int || a == Decimal || a == String;
         result_type = a;
         break;
 

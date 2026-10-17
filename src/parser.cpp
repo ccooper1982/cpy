@@ -1,4 +1,5 @@
 #include "cpy/ast/expressions.hpp"
+#include "cpy/common.hpp"
 #include "tree_sitter/api.h"
 #include <cpy/ast/ast.hpp>
 #include <cpy/issues.hpp>
@@ -79,7 +80,7 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
 
   if (expr_type == "integer")
   {
-    int64_t i{};
+    CpyInt i{};
     std::from_chars(value.data(), value.data()+value.size(), i);
     expr = make_node<IntegerLiteral>(i);
   }
@@ -88,7 +89,7 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
   }
   else if (expr_type == "decimal")
   {
-    double d{};
+    CpyDec d{};
     std::from_chars(value.data(), value.data()+value.size(), d);
     expr = make_node<DecimalLiteral>(d);
   }

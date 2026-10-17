@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <memory>
@@ -109,7 +110,6 @@ struct FunctionParam : public AstNode
   std::string_view param_name;
   std::string_view type_name;
 
-
   FunctionParam() : AstNode(NodeType::FunctionParam)
   {}
 
@@ -211,6 +211,11 @@ struct VariableDecl : public AstNode
   bool has_initialiser() const
   {
     return initialiser != nullptr;
+  }
+
+  bool is_literal_initialised() const
+  {
+    return has_initialiser() && initialiser->is_literal();
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override

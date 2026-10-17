@@ -10,6 +10,12 @@ namespace rg = std::ranges;
 namespace vw = std::views;
 
 
+using CpyInt = int64_t;
+using CpyDec = double;
+using CpyBool = bool;
+using CpyString = std::string;
+
+
 // helper type for the visitor
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
@@ -24,7 +30,6 @@ struct Script
   std::unique_ptr<Issues> issues{};
   fs::path file{};
 };
-
 
 
 struct SourceRegion
