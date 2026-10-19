@@ -1,5 +1,5 @@
-#include "cpy/ast/ast_node.hpp"
-#include "cpy/ast/expressions.hpp"
+#include <cpy/ast/ast_node.hpp>
+#include <cpy/ast/expressions.hpp>
 #include <gtest/gtest.h>
 
 #include <cpy/ast/ast.hpp>

@@ -61,7 +61,7 @@ int main (int argc, char ** argv)
 
     if (!script.issues->have_errors())
     {
-      Executor exec {sems.symbol_table(), *script.ast};
+      Executor exec {sems.symbol_table()};
       exec.execute(script.ast->block);
     }
   }

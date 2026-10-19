@@ -18,6 +18,7 @@ gtest = dependency('gtest')
 gtest_main = dependency('gtest_main')
 
 cpy_sources = files(
+  'src/execute.cpp',
   'src/main.cpp',
   'src/parser.cpp',
   'src/semantics.cpp',
@@ -35,15 +36,18 @@ executable('cpy', cpy_sources,
 cpy_tests = executable(
   'cpy_tests',
   files('tests/ast.cpp',
+        'tests/execute.cpp',
         'tests/parser.cpp',
         'tests/semantics.cpp',
         'tests/symbol_table.cpp',
         'src/parser.cpp',
         'src/semantics.cpp',
+        'src/execute.cpp',
         'grammar/src/parser.c'
   ),
   include_directories: include_dirs,
   dependencies: [tree_sitter, gtest, gtest_main],
+  cpp_args: ['-DCPY_UNIT_TESTS'],
 )
 
 test('cpy tests', cpy_tests, workdir: meson.project_source_root())

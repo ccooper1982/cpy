@@ -354,7 +354,7 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
   if (!expr->is_expr_type(ExprT::ExprType)) {
     throw std::runtime_error{"get_expression() called with expr and ExprT mismatch"};
   }
-  return dynamic_cast<ExprT&>(*expr);
+  return static_cast<ExprT&>(*expr);
 }
 
 
@@ -397,6 +397,8 @@ inline std::string_view to_string(const Expression& expr)
       return "FunctionCall";
     case VariableRef:
       return "VariableReference";
+    case Return:
+      return "Return";
   }
 
   std::unreachable();

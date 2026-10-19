@@ -42,7 +42,7 @@ void Semantics::process(Script& script)
 
 void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlock& block, const bool add_scope)
 {
-  auto is_statement = [](const std::unique_ptr<AstNode>& node)
+  auto executable = [](const std::unique_ptr<AstNode>& node)
   {
     return  node->node_type() == NodeType::VariableDecl ||
             node->node_type() == NodeType::VariableAssign ||
@@ -56,30 +56,49 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
       m_symbol_table.enter_scope(&block);
     }
 
-    for(const auto& node : block.nodes | vw::filter(is_statement))
+    // if inside a function def:
+    // - check a non-void return type has a return statement
+    // - add function defintions params to scope
+    if (parent.is_node_type(NodeType::FunctionDef))
+    {
+      const auto& def = static_cast<const FunctionDef&>(parent);
+
+      if (m_symbol_table.has_function(def.name))
+      {
+        const auto& resolved_func = m_symbol_table.get_function(def.name);
+        const bool expect_return_expr = resolved_func.return_type != BuiltInType::Void &&
+                                        resolved_func.return_type != unresolved_type;
+
+        if (expect_return_expr && expression_count<Return>(def.body) == 0) {
+          issue::func_return_val_expected(ctx.issues, def);
+        }
+
+        // if param type is invalid, the function will not be in the symbol table
+        for(const auto& param : def.params) {
+          m_symbol_table.add_variable(param.param_name, *m_symbol_table.get_type(param.type_name));
+        }
+      }
+    }
+
+    for(const auto& node : block.nodes | vw::filter(executable))
     {
       switch (node->node_type())
       {
         case NodeType::VariableDecl:
-          process_variable_declaration(ctx, block, dynamic_cast<const VariableDecl&>(*node));
+          process_variable_declaration(ctx, block, static_cast<const VariableDecl&>(*node));
           break;
-
         case NodeType::VariableAssign:
-          process_variable_assign(ctx, block, dynamic_cast<const VariableAssign&>(*node));
+          process_variable_assign(ctx, block, static_cast<const VariableAssign&>(*node));
           break;
-
         case NodeType::ConditionIf:
-          process_condition(ctx, parent, block, dynamic_cast<const ConditionIf&>(*node));
+          process_condition(ctx, parent, block, static_cast<const ConditionIf&>(*node));
           break;
-
         case NodeType::NodeBlock:
-          process_block(ctx, parent, dynamic_cast<const NodeBlock&>(*node));
+          process_block(ctx, parent, static_cast<const NodeBlock&>(*node));
           break;
-
         case NodeType::Expression:
-          handle_expression(ctx, parent, block, dynamic_cast<const Expression&>(*node));
+          handle_expression(ctx, parent, block, static_cast<const Expression&>(*node));
           break;
-
         default:
           std::unreachable();
           break;
@@ -138,16 +157,6 @@ void Semantics::process_function_bodies(Context& ctx, const NodeBlock& block)
   walk_nodes<FunctionDef>(block.nodes, [this, &ctx](const FunctionDef& def)
   {
     process_block(ctx, def, def.body);
-
-    if (m_symbol_table.has_function(def.name))
-    {
-      const auto& resolved_func = m_symbol_table.get_function(def.name);
-      const bool expect_return_expr = resolved_func.return_type != BuiltInType::Void &&
-                                      resolved_func.return_type != unresolved_type;
-      if (expect_return_expr && expression_count<Return>(def.body) == 0) {
-        issue::func_return_val_expected(ctx.issues, def);
-      }
-    }
   });
 }
 
@@ -246,7 +255,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 
       if (arg.is_expr_type(ExpressionType::FuncCall))
       {
-        const auto& func_call = dynamic_cast<const FunctionCall&>(arg);
+        const auto& func_call = static_cast<const FunctionCall&>(arg);
 
         if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
           return unresolved_type;
@@ -264,13 +273,13 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       }
       else if (arg.is_expr_type(ExpressionType::Binary))
       {
-        const auto& expr = dynamic_cast<const BinaryExpression&>(arg);
+        const auto& expr = static_cast<const BinaryExpression&>(arg);
         if (!process_expression(ctx, parent, block, expr))
           return unresolved_type;
       }
       else if (arg.is_expr_type(ExpressionType::VariableRef))
       {
-        const auto& var = dynamic_cast<const VariableRef&>(arg);
+        const auto& var = static_cast<const VariableRef&>(arg);
         const auto var_type = process_expression(ctx, call, block, var);
 
         // if the variable is unknown, process_expression() will create an isue and
@@ -338,7 +347,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 
 VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& expr)
 {
-  if (&block == &ctx.ast.block)
+  if (std::addressof(block) == std::addressof(ctx.ast.block))
   {
     issue::return_from_root(ctx.issues, expr);
     return unresolved_type;
@@ -353,7 +362,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   }
   else
   {
-    const auto& func_def = dynamic_cast<const FunctionDef&>(parent);
+    const auto& func_def = static_cast<const FunctionDef&>(parent);
     const auto& resolved_func = m_symbol_table.get_function(func_def.name);
 
     const auto expr_ret_type = handle_expression(ctx, parent, block, *expr.return_expr);
@@ -430,7 +439,7 @@ void Semantics::process_condition(Context& ctx, const AstNode& parent, const Nod
 {
   auto handle_condition_body = [&](const ConditionIf::ConditionBody& cb)
   {
-    const auto cond_if_result = handle_expression(ctx, parent, block, dynamic_cast<const Expression&>(*cb.condition));
+    const auto cond_if_result = handle_expression(ctx, parent, block, static_cast<const Expression&>(*cb.condition));
 
     if (cond_if_result != BuiltInType::Bool)
     {

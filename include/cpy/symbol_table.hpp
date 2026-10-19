@@ -64,7 +64,7 @@ struct Scope
 /// A separate map is used to map between a NodeBlock and the variables available in that scope.
 class SymbolTable
 {
-  inline static const std::map<const std::string_view, const BuiltInType> BuiltIntTypes = {
+  inline static const std::map<const std::string_view, const BuiltInType> BuiltInTypes = {
     {"int",   BuiltInType::Int},
     {"dec",   BuiltInType::Decimal},
     {"bool",  BuiltInType::Bool},
@@ -119,10 +119,11 @@ public:
     return get_resolved_variable(name, &block, true) != nullptr;
   }
 
+  // TODO: this should return unresolved_type rather than std::optional
   std::optional<BuiltInType> get_type(const std::string_view t) const
   {
-    const auto it = BuiltIntTypes.find(t) ;
-    if (it == rg::end(BuiltIntTypes))
+    const auto it = BuiltInTypes.find(t) ;
+    if (it == rg::end(BuiltInTypes))
      return std::nullopt;
 
     return it->second;

@@ -133,7 +133,7 @@ namespace issue
 
   inline void unknown_param_type (Issues& issues, const AstNode& node)
   {
-    issues.add_error(std::format("Unknown parameter type"), node.source, ErrorCode::UnknownParamType);
+    issues.add_error("Unknown parameter type", node.source, ErrorCode::UnknownParamType);
   }
 
   inline void unknown_variable_type (Issues& issues, const AstNode& node)

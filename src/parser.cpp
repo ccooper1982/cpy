@@ -87,8 +87,13 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
     std::from_chars(value.data(), value.data()+value.size(), i);
     expr = make_node<IntegerLiteral>(i);
   }
-  else if (expr_type == "literal_string") {
-    expr = make_node<StringLiteral>(value);
+  else if (expr_type == "string")
+  {
+    // from_source() returns the string including the start and end '"' chars,
+    // we don't want those:
+    //  "foo" -> foo
+    //  "" -> empty string
+    expr = make_node<StringLiteral>(value.substr(1, value.size()-2));
   }
   else if (expr_type == "decimal")
   {

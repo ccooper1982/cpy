@@ -15,6 +15,7 @@ using CpyDec = double;
 using CpyBool = bool;
 using CpyString = std::string;
 
+using VarName = std::string_view;
 
 // helper type for the visitor
 template<class... Ts>

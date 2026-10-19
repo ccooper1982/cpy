@@ -3,22 +3,18 @@
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/ast/ast.hpp>
-#include <cpy/exec/operators.hpp>
 #include <cpy/common.hpp>
+#include <cpy/exec/operators.hpp>
 #include <cpy/symbol_table.hpp>
 #include <cstdint>
-#include <exception>
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <string_view>
 #include <utility>
 
 
-using VarName = std::string_view;
 
-
-static VarValue value_from_type (const VarType type)
+inline static VarValue value_from_type (const VarType type)
 {
   if (!type.is_type<BuiltInType>()) {
     throw std::runtime_error{"Unsupported VarType"};
@@ -49,30 +45,6 @@ static VarValue value_from_type (const VarType type)
       break;
   }
 }
-
-
-static VarValue value_from_literal_expr(const Expression& expr)
-{
-  switch (expr.expr_type())
-  {
-    using enum ExpressionType;
-
-    case Int:
-      return dynamic_cast<const IntegerLiteral&>(expr).value();
-    case Bool:
-      return dynamic_cast<const BooleanLiteral&>(expr).value();
-    case Dec:
-      return dynamic_cast<const DecimalLiteral&>(expr).value();
-    case String:
-      return dynamic_cast<const StringLiteral&>(expr).value();
-    default:
-      throw std::runtime_error{"Expression type is not literal"};
-  }
-
-  std::unreachable();
-}
-
-
 
 struct Variable
 {
@@ -105,6 +77,11 @@ public:
   bool has_parent() const { return m_parent != nullptr; }
   StackEntry * get_parent() const { return m_parent; }
 
+  std::map<VarName, Variable> get_vars() const
+  {
+    return m_vars;
+  }
+
 private:
   void init()
   {
@@ -129,218 +106,85 @@ private:
 class Executor
 {
 public:
-  Executor(const SymbolTable& sym_table, const SourceFile& ast)
-    : m_sym_table(sym_table)
-    , m_ast(ast)
-  {}
+  Executor(const SymbolTable& sym_table);
 
-  VarValue execute(const NodeBlock& block)
-  {
-    auto is_executable = [](const std::unique_ptr<AstNode>& node)
-    {
-      return  node->node_type() == NodeType::VariableDecl ||
-              node->node_type() == NodeType::VariableAssign ||
-              node->node_type() == NodeType::ConditionIf ||
-              node->node_type() == NodeType::Expression;
-    };
+  #ifdef CPY_UNIT_TESTS
+    virtual ~Executor(){}
+  #else
+    ~Executor() = default;
+  #endif
 
-    VarValue result;
-
-    push_stack(block);
-
-    try
-    {
-      for(const auto& node : block.nodes | vw::filter(is_executable))
-      {
-        switch (node->node_type())
-        {
-          case NodeType::VariableDecl:
-            execute(block, dynamic_cast<const VariableDecl&>(*node));
-            break;
-          case NodeType::VariableAssign:
-            execute(block, dynamic_cast<const VariableAssign&>(*node));
-            break;
-          case NodeType::Expression:
-            result = execute(block, dynamic_cast<const Expression&>(*node));
-            break;
-
-          /*
-          case NodeType::ConditionIf:
-            process_condition(ctx, *node, block, dynamic_cast<const ConditionIf&>(*node));
-            break;
-          case NodeType::NodeBlock:
-            process_block(ctx, dynamic_cast<const NodeBlock&>(*node));
-            break;
-          */
-
-          default:
-            //std::unreachable();
-            std::cerr << "TODO\n";
-            break;
-        }
-      }
-    }
-    catch (const std::exception& ex)
-    {
-      std::cerr << ex.what();
-    }
-
-    pop_stack();
-
-    return result;
-  }
-
-  void execute (const NodeBlock& block, const VariableDecl& decl)
-  {
-    auto& var = get_variable(decl.var_name);
-
-    if (decl.is_literal_initialised()) {
-      var.value = value_from_literal_expr(*decl.initialiser);
-    }
-    else {
-      var.value = execute(block, *decl.initialiser);
-    }
-  }
-
-  void execute (const NodeBlock& block, const VariableAssign& assign)
-  {
-    auto& var = get_variable(assign.name);
-
-    if (assign.expr->is_literal()) {
-      var.value = value_from_literal_expr(*assign.expr);
-    }
-    else {
-      var.value = execute(block, *assign.expr);
-    }
-  }
-
-  VarValue execute (const NodeBlock& block, const Expression& expr)
-  {
-    VarValue result;
-
-    if (expr.is_expr_type(ExpressionType::FuncCall))
-    {
-      const auto& call = dynamic_cast<const FunctionCall&>(expr);
-      const auto& def = m_sym_table.get_function(call.name);
-      result = execute(def.ast->body);
-    }
-    else if (expr.is_expr_type(ExpressionType::Binary))
-    {
-      const auto& bin_expr = dynamic_cast<const BinaryExpression&>(expr);
-      result = apply_operator(block, *bin_expr.lhs, *bin_expr.rhs, bin_expr.op);
-    }
-    else if (expr.is_expr_type(ExpressionType::Return))
-    {
-      const auto& ret = dynamic_cast<const Return&>(expr);
-      if (ret.has_expression())
-      {
-        if (ret.return_expr->is_literal()) {
-          result = value_from_literal_expr(*ret.return_expr);
-        }
-        else {
-          result = execute(block, *ret.return_expr);
-        }
-      }
-    }
-    else if (expr.is_expr_type(ExpressionType::VariableRef))
-    {
-      const auto& ref = dynamic_cast<const VariableRef&>(expr);
-      auto& variable = get_variable(ref.name);
-      result = variable.value;
-    }
-
-    return result;
-  }
+  VarValue execute(const NodeBlock& block, const std::map<VarName, VarValue>&& func_args = {});
+  void execute (const NodeBlock& block, const VariableAssign& assign);
+  void execute (const NodeBlock& block, const VariableDecl& decl);
+  VarValue execute (const NodeBlock& block, const Expression& expr);
 
 private:
-
-  // variable stack //
-  void push_stack (const NodeBlock& block)
-  {
-    const auto parent = m_stack.empty() ? nullptr : m_stack.top().get();
-
-    if (const auto vars = m_sym_table.get_variables(block); vars) {
-      m_stack.emplace(std::make_unique<StackEntry>(*vars, parent));
-    }
-  }
-
-  void pop_stack ()
-  {
-    if (!m_stack.empty()) {
-      m_stack.pop();
-    }
-  }
-
-  Variable& get_variable (const VarName name)
-  {
-    StackEntry * entry = m_stack.empty() ? nullptr : m_stack.top().get();
-
-    while (entry)
-    {
-      if (!entry->have_var(name))
-        entry = entry->get_parent();
-      else
-        break;
-    }
-
-    if (!entry) {
-      throw std::runtime_error{std::format("get_variable(): failed to find resolved variable: {}", name)};
-    }
-
-    return entry->get_var(name);
-  }
-
+  Variable& get_variable (const VarName name);
 
   // operators //
-  VarValue apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op)
-  {
-    VarValue lhs_val, rhs_val;
+  VarValue apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op);
 
-    if (lhs.is_literal()) {
-      lhs_val = value_from_literal_expr(lhs);
-    }
-    else {
-      lhs_val = execute(block, lhs);
-    }
+  // variable stack //
+#ifdef CPY_UNIT_TESTS
+// this for the child class TestExecutor
+protected:
+  virtual void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {});
+  virtual void pop_stack ();
 
-    if (rhs.is_literal()) {
-      rhs_val = value_from_literal_expr(rhs);
-    }
-    else {
-      rhs_val = execute(block, rhs);
-    }
+  std::stack<std::unique_ptr<StackEntry>> m_stack;
+#else
+private:
+  void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {});
+  void pop_stack ();
 
-    switch (op)
-    {
-      using enum BinaryOperator;
-
-      case Add:
-        return lhs_val + rhs_val;
-      case Subtract:
-        return lhs_val - rhs_val;
-      case Divide:
-        return lhs_val / rhs_val;
-      case Multiply:
-        return lhs_val * rhs_val;
-      case Less:
-        return lhs_val < rhs_val;
-      case LessEqual:
-        return lhs_val <= rhs_val;
-      case Greater:
-        return lhs_val > rhs_val;
-      case GreaterEqual:
-        return lhs_val >= rhs_val;
-      case Equal:
-        return lhs_val == rhs_val;
-      case NotEqual:
-        return lhs_val != rhs_val;
-    }
-
-    std::unreachable();
-  }
+  std::stack<std::unique_ptr<StackEntry>> m_stack;
+#endif
 
 private:
   const SymbolTable& m_sym_table;
-  const SourceFile& m_ast;
-  std::stack<std::unique_ptr<StackEntry>> m_stack;
 };
+
+
+#ifdef CPY_UNIT_TESTS
+
+using OnStackPush = std::function<void(const std::map<VarName, Variable>, const size_t)>;
+using OnStackPop = std::function<void(const std::map<VarName, Variable>, const size_t)>;
+
+class TestExecutor : public Executor
+{
+public:
+  TestExecutor(const SymbolTable& sym_table, OnStackPush on_push, OnStackPop on_pop)
+    : Executor(sym_table)
+    , m_on_push(on_push)
+    , m_on_pop(on_pop)
+    {
+    }
+
+    TestExecutor(const SymbolTable& sym_table, OnStackPop on_pop)
+      : Executor(sym_table)
+      , m_on_push()
+      , m_on_pop(on_pop)
+      {
+      }
+
+    void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {}) override
+    {
+      Executor::push_stack(block, std::move(vals));
+      if (m_on_push) {
+        m_on_push(m_stack.top()->get_vars(), m_stack.size());
+      }
+    }
+
+    void pop_stack () override
+    {
+      m_on_pop(m_stack.top()->get_vars(), m_stack.size());
+      Executor::pop_stack();
+    }
+
+private:
+  OnStackPop m_on_push, m_on_pop;
+};
+
+
+#endif
