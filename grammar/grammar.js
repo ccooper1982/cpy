@@ -41,10 +41,11 @@ export default grammar({
             field("func_call", $.function_call),
             field("var_decl", $.var_decl),
             field("var_assign", $.var_assign),
+            field("return", $.return),
           ),
           ";"
         ),
-      field("condition_if", $.condition_if),
+        field("condition_if", $.condition_if),
       ),
 
     function_call: ($) => seq(
@@ -63,6 +64,13 @@ export default grammar({
         repeat($.else_if_clause),
         optional($.else_clause),
       ),
+
+    return: ($) =>
+      seq("return",
+        optional(
+          field("expression", $.expression)
+        )
+        ),
 
     else_if_clause: ($) =>
       seq(

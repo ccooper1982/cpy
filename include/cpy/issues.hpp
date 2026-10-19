@@ -20,6 +20,8 @@ enum class ErrorCode
   FunctionCallArgType,
   FunctionCallArgVoid,
   FunctionCallArgsCount,
+  FunctionReturnExpression,
+  FunctionReturnExprExpected,
   UnknownParamType,
   UnknownReturnType,
   UnknownVarType,
@@ -31,6 +33,7 @@ enum class ErrorCode
   BinaryOperandsInvalid,
   BinaryOperandsVoid,
   ConditionNotBool,
+  ReturnFromRoot,
   Unsupported,
   SyntaxError,
   Compiler
@@ -122,10 +125,10 @@ namespace issue
     issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::SyntaxError);
   }
 
-  inline void compiler_error (Issues& issues, const AstNode& node)
+  inline void compiler_error (Issues& issues, const AstNode& node, const std::string_view msg = "")
   {
     // TODO get the call site
-    issues.add_error("The compiler fell over: ", node.source, ErrorCode::Compiler);
+    issues.add_error(std::format("The compiler fell over: {}", msg), node.source, ErrorCode::Compiler);
   }
 
   inline void unknown_param_type (Issues& issues, const AstNode& node)
@@ -173,6 +176,16 @@ namespace issue
     issues.add_error("Function call with incorrect number of arguments", node.source, ErrorCode::FunctionCallArgsCount);
   }
 
+  inline void return_type_from_func (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Return type of expression incompatible with function", node.source, ErrorCode::FunctionReturnExpression);
+  }
+
+  inline void func_return_val_expected(Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Function does not return value", node.source, ErrorCode::FunctionReturnExprExpected);
+  }
+
   inline void var_duplicate (Issues& issues, const AstNode& node)
   {
     issues.add_error("Variable already defined", node.source, ErrorCode::VariableDuplicate);
@@ -217,5 +230,10 @@ namespace issue
   inline void condition_not_bool (Issues& issues, const AstNode& node)
   {
     issues.add_error("Condition expression is not boolean", node.source, ErrorCode::ConditionNotBool);
+  }
+
+  inline void return_from_root (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Cannot return from script root", node.source, ErrorCode::ReturnFromRoot);
   }
 }

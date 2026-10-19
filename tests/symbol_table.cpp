@@ -49,7 +49,7 @@ TEST(SymbolTable, VarDecl)
 {
   {
     const std::string_view src = R"(
-      fn foo() -> int {}
+      fn foo() -> int { return 1; }
 
       a := 5;
       b := foo();

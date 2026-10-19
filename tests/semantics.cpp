@@ -190,6 +190,40 @@ TEST(Semantics, FuncCall)
 }
 
 
+TEST(Semantics, Func_Return)
+{
+  {
+    const std::string_view src = R"(
+      fn foo1() -> int {}
+      fn foo2() {}
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionReturnExprExpected), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo1() -> int { return "one"; }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionReturnExpression), 1);
+  }
+}
+
 TEST(Semantics, VariableDecl)
 {
   {
@@ -247,7 +281,7 @@ TEST(Semantics, VariableDecl)
 
   {
     const std::string_view src = R"(
-      fn foo() -> int {}
+      fn foo() -> int { return 1; }
       a := foo();
     )";
 
@@ -262,7 +296,7 @@ TEST(Semantics, VariableDecl)
 
   {
     const std::string_view src = R"(
-      fn foo1(a: int) -> int {}
+      fn foo1(a: int) -> int { return 1; }
 
       a: int;
       foo1(a);

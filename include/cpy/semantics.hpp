@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cpy/ast/expressions.hpp"
 #include <concepts>
 #include <functional>
 #include <ranges>
@@ -40,7 +41,7 @@ private:
   template<typename NodeT>
   using NodeHandler = std::function<void(const NodeT&)>;
 
-  void process_block(Context& ctx, const NodeBlock& block, const bool add_scope = true);
+  void process_block(Context& ctx, const AstNode& parent, const NodeBlock& block, const bool add_scope = true);
 
   // functions
   void process_function_signatures(Context& ctx);
@@ -55,6 +56,7 @@ private:
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const FunctionCall& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableRef& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const BinaryExpression& expr);
+  VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& expr);
 
   // operators
   VarType process_operator(Context& ctx, const VarType& a, const VarType& b, const BinaryExpression& expr);
@@ -94,6 +96,16 @@ private:
     });
   }
 
+  template<typename ExprT>
+    requires std::derived_from<ExprT, Expression> &&
+             std::convertible_to<decltype(ExprT::ExprType), ExpressionType>
+  size_t expression_count (const NodeBlock& block)
+  {
+    size_t count{};
+    walk_expressions<Return>(block, [&]([[maybe_unused]] const ExprT& expr){ ++count; });
+    return count;
+  }
+
   VarType handle_expression (Context& ctx, const AstNode& parent, const NodeBlock& block, const Expression& expr)
   {
     switch (expr.expr_type())
@@ -102,6 +114,8 @@ private:
         return process_expression(ctx, parent, block, dynamic_cast<const FunctionCall&>(expr));
       case ExpressionType::VariableRef:
         return process_expression(ctx, parent, block, dynamic_cast<const VariableRef&>(expr));
+      case ExpressionType::Return:
+        return process_expression(ctx, parent, block, dynamic_cast<const Return&>(expr));
       case ExpressionType::Binary:
         return process_expression(ctx, parent, block, dynamic_cast<const BinaryExpression&>(expr));
       default:

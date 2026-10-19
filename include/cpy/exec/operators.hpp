@@ -1,11 +1,10 @@
 #pragma once
 
 #include <functional>
-#include <stdexcept>
 #include <variant>
 #include <cpy/common.hpp>
 
-using VarValue = std::variant<CpyString, CpyInt, CpyDec, CpyBool>;
+using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool>;
 
 template<typename T>
 concept IsCpyArithmetic = std::is_same_v<T, CpyInt> || std::is_same_v<T, CpyDec>;
@@ -24,7 +23,7 @@ inline VarValue do_operator (const VarValue& lhs, const VarValue& rhs, OpF&& op)
           return op(val_l, val_r);
         }
         else {
-          throw std::logic_error{"wtf"};
+          throw std::logic_error{"Called do_operator() on unsupported type"};
         }
       }
     , lhs, rhs);

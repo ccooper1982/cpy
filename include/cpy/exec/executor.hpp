@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
@@ -133,7 +134,7 @@ public:
     , m_ast(ast)
   {}
 
-  void execute(const NodeBlock& block)
+  VarValue execute(const NodeBlock& block)
   {
     auto is_executable = [](const std::unique_ptr<AstNode>& node)
     {
@@ -142,6 +143,8 @@ public:
               node->node_type() == NodeType::ConditionIf ||
               node->node_type() == NodeType::Expression;
     };
+
+    VarValue result;
 
     push_stack(block);
 
@@ -152,13 +155,13 @@ public:
         switch (node->node_type())
         {
           case NodeType::VariableDecl:
-            execute(dynamic_cast<const VariableDecl&>(*node));
+            execute(block, dynamic_cast<const VariableDecl&>(*node));
             break;
           case NodeType::VariableAssign:
-            execute(dynamic_cast<const VariableAssign&>(*node));
+            execute(block, dynamic_cast<const VariableAssign&>(*node));
             break;
           case NodeType::Expression:
-            execute(dynamic_cast<const Expression&>(*node));
+            result = execute(block, dynamic_cast<const Expression&>(*node));
             break;
 
           /*
@@ -183,18 +186,23 @@ public:
     }
 
     pop_stack();
+
+    return result;
   }
 
-  void execute (const VariableDecl& decl)
+  void execute (const NodeBlock& block, const VariableDecl& decl)
   {
     auto& var = get_variable(decl.var_name);
 
     if (decl.is_literal_initialised()) {
       var.value = value_from_literal_expr(*decl.initialiser);
     }
+    else {
+      var.value = execute(block, *decl.initialiser);
+    }
   }
 
-  void execute (const VariableAssign& assign)
+  void execute (const NodeBlock& block, const VariableAssign& assign)
   {
     auto& var = get_variable(assign.name);
 
@@ -202,28 +210,43 @@ public:
       var.value = value_from_literal_expr(*assign.expr);
     }
     else {
-      var.value = execute(*assign.expr);
+      var.value = execute(block, *assign.expr);
     }
   }
 
-  VarValue execute (const Expression& expr)
+  VarValue execute (const NodeBlock& block, const Expression& expr)
   {
     VarValue result;
 
     if (expr.is_expr_type(ExpressionType::FuncCall))
     {
       const auto& call = dynamic_cast<const FunctionCall&>(expr);
-
       const auto& def = m_sym_table.get_function(call.name);
-      execute(def.ast->body);
+      result = execute(def.ast->body);
     }
     else if (expr.is_expr_type(ExpressionType::Binary))
     {
       const auto& bin_expr = dynamic_cast<const BinaryExpression&>(expr);
-      const auto& lhs = *bin_expr.lhs;
-      const auto& rhs = *bin_expr.rhs;
-
-      result = apply_operator(lhs, rhs, bin_expr.op);
+      result = apply_operator(block, *bin_expr.lhs, *bin_expr.rhs, bin_expr.op);
+    }
+    else if (expr.is_expr_type(ExpressionType::Return))
+    {
+      const auto& ret = dynamic_cast<const Return&>(expr);
+      if (ret.has_expression())
+      {
+        if (ret.return_expr->is_literal()) {
+          result = value_from_literal_expr(*ret.return_expr);
+        }
+        else {
+          result = execute(block, *ret.return_expr);
+        }
+      }
+    }
+    else if (expr.is_expr_type(ExpressionType::VariableRef))
+    {
+      const auto& ref = dynamic_cast<const VariableRef&>(expr);
+      auto& variable = get_variable(ref.name);
+      result = variable.value;
     }
 
     return result;
@@ -269,18 +292,22 @@ private:
 
 
   // operators //
-  VarValue apply_operator(const Expression& lhs, const Expression& rhs, const BinaryOperator op)
+  VarValue apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op)
   {
-    VarValue lhs_val;
-    VarValue rhs_val;
+    VarValue lhs_val, rhs_val;
 
     if (lhs.is_literal()) {
       lhs_val = value_from_literal_expr(lhs);
     }
-
+    else {
+      lhs_val = execute(block, lhs);
+    }
 
     if (rhs.is_literal()) {
       rhs_val = value_from_literal_expr(rhs);
+    }
+    else {
+      rhs_val = execute(block, rhs);
     }
 
     switch (op)

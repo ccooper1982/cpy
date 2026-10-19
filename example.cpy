@@ -1,7 +1,12 @@
-a: int;
-a = foo();
+a: int = 10;
 
-fn foo() -> int
+foo1();
+
+fn foo1()
 {
-    return 1;
+}
+
+fn foo2() -> int
+{
+    return 20;
 }

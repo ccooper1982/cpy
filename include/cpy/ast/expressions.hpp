@@ -2,6 +2,7 @@
 
 #include "cpy/common.hpp"
 #include <cpy/ast/ast_node.hpp>
+#include <memory>
 #include <vector>
 
 // Expressions //
@@ -27,7 +28,8 @@ enum class ExpressionType
   Bool,
   Binary,
   FuncCall,
-  VariableRef
+  VariableRef,
+  Return
 };
 
 
@@ -62,6 +64,38 @@ private:
 
 inline std::string_view to_string(const Expression& expr);
 inline std::string_view to_string(const BinaryOperator op);
+
+
+struct Return : public Expression
+{
+  static constexpr ExpressionType ExprType = ExpressionType::Return;
+
+  explicit Return() : Expression(ExprType, false)
+  {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "return ";
+    if (return_expr) {
+      return_expr->dump(os, tab);
+    }
+  }
+
+  VarType get_var_type() const override
+  {
+    // if return_expr is a FunctionCall, the type is taken from the function's definition,
+    // FunctionCall::get_var_type() will throw if called. Allow this path so it highlights
+    // errors
+    return return_expr ? return_expr->get_var_type() : BuiltInType::Void;
+  }
+
+  bool has_expression() const
+  {
+    return return_expr != nullptr;
+  }
+
+  NodePtr<Expression> return_expr;
+};
 
 
 struct IntegerLiteral : public Expression
@@ -251,8 +285,8 @@ struct FunctionCall : public Expression
 
   VarType get_var_type() const override
   {
-    // never called because the type is taken from the return type of
-    // the function being called
+    // the type is taken from the return type of
+    // the function definition of the callee
     throw std::runtime_error{"get_var_type() called on FunctionCall"};
   }
 

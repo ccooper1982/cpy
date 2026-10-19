@@ -43,7 +43,6 @@ struct NodeBlock : public AstNode
 };
 
 
-
 // Conditions //
 
 struct ConditionIf : public AstNode

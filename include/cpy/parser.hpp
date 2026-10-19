@@ -58,6 +58,8 @@ private:
 
   NodePtr<ConditionIf> parse_condition_if(const TSNode& ts_node);
 
+  NodePtr<Return> parse_return(const TSNode& ts_node);
+
   std::string_view from_source (const TSNode& node);
 
 private:
