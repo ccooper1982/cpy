@@ -1,3 +1,4 @@
+#include "cpy/ast/ast.hpp"
 #include "cpy/ast/expressions.hpp"
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -21,7 +22,6 @@ TEST(Ast, ZeroNodes)
 }
 
 // Function Definition //
-
 TEST(Ast, FuncDef_NoArgs)
 {
   const std::string_view src = R"(
@@ -104,6 +104,7 @@ TEST(Ast, FuncDef_1Arg_InvalidType)
   ASSERT_EQ(def.params.size(), 1);
   ASSERT_EQ(def.params[0].param_name, "a");
 }
+
 
 // Function Call //
 TEST(Ast, FuncCall_NotExist)
@@ -278,7 +279,6 @@ TEST(Ast, Expr_BinaryExprLiterals)
   ASSERT_TRUE(bin_expr_fail.rhs->is_expr_type(ExpressionType::String));
 }
 
-
 TEST(Ast, Expr_BinaryExprFuncs)
 {
   const std::string_view src = R"(
@@ -310,6 +310,62 @@ TEST(Ast, Expr_BinaryExprFuncs)
   const auto& expr = dynamic_cast<BinaryExpression&>(*call_foo.args[0]);
   ASSERT_TRUE(expr.lhs->is_expr_type(ExpressionType::FuncCall));
   ASSERT_TRUE(expr.rhs->is_expr_type(ExpressionType::FuncCall));
+}
+
+TEST(Ast, FuncCall_Return)
+{
+  {
+    const std::string_view src = R"(
+      fn ret_void() { }
+
+      fn ret_int() -> int {
+        return 4;
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    ASSERT_EQ(script.ast->block.nodes.size(), 2);
+    ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
+    ASSERT_TRUE(script.ast->block.nodes[1]->is_node_type(NodeType::FunctionDef));
+
+    const auto& ret_none = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+    const auto& ret_int = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[1]);
+
+    ASSERT_EQ(ret_none.body.nodes.size(), 0);
+    ASSERT_EQ(ret_int.body.nodes.size(), 1);
+
+    ASSERT_TRUE(ret_int.body.nodes[0]->is_expression());
+    const auto& ret_node = dynamic_cast<const Return&>(*ret_int.body.nodes[0]);
+    ASSERT_TRUE(ret_node.has_expression());
+    ASSERT_TRUE(ret_node.return_expr->is_literal());
+    ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Int));
+  }
+
+  {
+    // it doesn't matter that abc() and def() don't exist, the AST
+    // doesn't care about that
+    const std::string_view src = R"(
+      fn foo() -> int {
+        return abc() + def();
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    ASSERT_EQ(script.ast->block.nodes.size(), 1);
+    ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
+
+    const auto& foo_def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+    ASSERT_EQ(foo_def.body.nodes.size(), 1);
+    ASSERT_TRUE(foo_def.body.nodes[0]->is_expression());
+
+    const auto& ret_node = dynamic_cast<const Return&>(*foo_def.body.nodes[0]);
+    ASSERT_TRUE(ret_node.has_expression());
+    ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Binary));
+  }
 }
 
 

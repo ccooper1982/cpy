@@ -1,9 +1,17 @@
+#include <cpy/exec/executor.hpp>
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
 #include <cpy/semantics.hpp>
 #include <filesystem>
 #include <iostream>
+
+int a{};
+void f()
+{
+  a = 5;
+}
+
 
 // TODO
 //  - separate into libcpy and cpy executable
@@ -50,6 +58,12 @@ int main (int argc, char ** argv)
 
     std::cout << "Sym Table:\n";
     sems.symbol_table().dump(std::cout);
+
+    if (!script.issues->have_errors())
+    {
+      Executor exec {sems.symbol_table()};
+      exec.execute(script.ast->block);
+    }
   }
 
   std::cout << "Issues:\n";

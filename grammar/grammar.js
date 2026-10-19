@@ -26,7 +26,7 @@ export default grammar({
     integer: ($) => /[0-9]+/,
     decimal: ($) => /[0-9]+\.[0-9]+/,
     boolean: ($) => choice("true","false",),
-    literal_string: ($) => /"([^"\\]|\\.)*"/,
+    string: ($) => /"([^"\\]|\\.)*"/,
 
     block: ($) => seq(
       "{",
@@ -41,10 +41,11 @@ export default grammar({
             field("func_call", $.function_call),
             field("var_decl", $.var_decl),
             field("var_assign", $.var_assign),
+            field("return", $.return),
           ),
           ";"
         ),
-      field("condition_if", $.condition_if),
+        field("condition_if", $.condition_if),
       ),
 
     function_call: ($) => seq(
@@ -63,6 +64,13 @@ export default grammar({
         repeat($.else_if_clause),
         optional($.else_clause),
       ),
+
+    return: ($) =>
+      seq("return",
+        optional(
+          field("expression", $.expression)
+        )
+        ),
 
     else_if_clause: ($) =>
       seq(
@@ -117,7 +125,7 @@ export default grammar({
     expression: ($) => choice(
       $.decimal,
       $.integer,
-      $.literal_string,
+      $.string,
       $.boolean,
       $.function_call,
       $.identifier,

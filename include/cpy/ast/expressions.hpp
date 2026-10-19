@@ -1,6 +1,8 @@
 #pragma once
 
+#include "cpy/common.hpp"
 #include <cpy/ast/ast_node.hpp>
+#include <memory>
 #include <vector>
 
 // Expressions //
@@ -26,7 +28,8 @@ enum class ExpressionType
   Bool,
   Binary,
   FuncCall,
-  VariableRef
+  VariableRef,
+  Return
 };
 
 
@@ -36,21 +39,25 @@ struct Expression : public AstNode
 {
   static constexpr NodeType Type = NodeType::Expression;
 
-  Expression(const ExpressionType t)
+  Expression(const ExpressionType t, const bool is_literal)
     : AstNode(Type)
-    , ex_type(t)
+    , m_ex_type(t)
+    , m_is_literal(is_literal)
   {}
 
   virtual ~Expression() = default;
 
-  virtual bool is_expr_type(const ExpressionType t) const { return t == expr_type(); }
+  bool is_expr_type(const ExpressionType t) const { return t == expr_type(); }
+  bool is_literal () const { return m_is_literal; };
+
   virtual bool is_convertible_to([[maybe_unused]] const BuiltInType t) const { return false; }
   virtual VarType get_var_type() const = 0;
 
-  ExpressionType expr_type() const { return ex_type; }
+  ExpressionType expr_type() const { return m_ex_type; }
 
 private:
-  ExpressionType ex_type;
+  ExpressionType m_ex_type;
+  bool m_is_literal{};
 };
 
 
@@ -59,11 +66,43 @@ inline std::string_view to_string(const Expression& expr);
 inline std::string_view to_string(const BinaryOperator op);
 
 
+struct Return : public Expression
+{
+  static constexpr ExpressionType ExprType = ExpressionType::Return;
+
+  explicit Return() : Expression(ExprType, false)
+  {}
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << "return ";
+    if (return_expr) {
+      return_expr->dump(os, tab);
+    }
+  }
+
+  VarType get_var_type() const override
+  {
+    // if return_expr is a FunctionCall, the type is taken from the function's definition,
+    // FunctionCall::get_var_type() will throw if called. Allow this path so it highlights
+    // errors
+    return return_expr ? return_expr->get_var_type() : BuiltInType::Void;
+  }
+
+  bool has_expression() const
+  {
+    return return_expr != nullptr;
+  }
+
+  NodePtr<Expression> return_expr;
+};
+
+
 struct IntegerLiteral : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::Int;
 
-  explicit IntegerLiteral(const int64_t val) : Expression(ExprType), v(val)
+  explicit IntegerLiteral(const CpyInt val) : Expression(ExprType, true), v(val)
   {}
 
   bool is_convertible_to(const BuiltInType t) const override
@@ -81,14 +120,19 @@ struct IntegerLiteral : public Expression
     os << "int = " << v;
   }
 
-  int64_t v;
+  int64_t value() const
+  {
+    return v;
+  }
+
+  CpyInt v;
 };
 
 struct StringLiteral : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::String;
 
-  explicit StringLiteral(const std::string_view val) : Expression(ExprType), v(val)
+  explicit StringLiteral(const std::string_view val) : Expression(ExprType, true), v(val)
   {}
 
   bool is_convertible_to(const BuiltInType t) const override
@@ -106,6 +150,11 @@ struct StringLiteral : public Expression
     os << "str = " << v;
   }
 
+  CpyString value() const
+  {
+    return CpyString{v};
+  }
+
   std::string_view v;
 };
 
@@ -113,7 +162,7 @@ struct DecimalLiteral : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::Dec;
 
-  explicit DecimalLiteral(const double val) : Expression(ExprType), v(val)
+  explicit DecimalLiteral(const double val) : Expression(ExprType, true), v(val)
   {}
 
   bool is_convertible_to(const BuiltInType t) const override
@@ -131,14 +180,19 @@ struct DecimalLiteral : public Expression
     os << "dec = " << v;
   }
 
-  double v;
+  CpyDec value() const
+  {
+    return v;
+  }
+
+  CpyDec v;
 };
 
 struct BooleanLiteral : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::Bool;
 
-  explicit BooleanLiteral(const bool val) : Expression(ExprType), v(val)
+  explicit BooleanLiteral(const bool val) : Expression(ExprType, true), v(val)
   {}
 
   bool is_convertible_to(const BuiltInType t) const override
@@ -156,7 +210,12 @@ struct BooleanLiteral : public Expression
     os << "bool = " << std::boolalpha << v;
   }
 
-  bool v;
+  CpyBool value() const
+  {
+    return v;
+  }
+
+  CpyBool v;
 };
 
 
@@ -164,11 +223,11 @@ struct BinaryExpression : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::Binary;
 
-  explicit BinaryExpression() : Expression(ExprType)
+  explicit BinaryExpression() : Expression(ExprType, false)
   {}
 
   explicit BinaryExpression(std::unique_ptr<Expression>&& lhs, std::unique_ptr<Expression>&& rhs, const BinaryOperator op)
-  : Expression(ExprType)
+  : Expression(ExprType, false)
   , lhs(std::move(lhs))
   , op(op)
   , rhs(std::move(rhs))
@@ -212,13 +271,13 @@ struct FunctionCall : public Expression
   static constexpr ExpressionType ExprType = ExpressionType::FuncCall;
 
   FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
-    : Expression(ExprType)
+    : Expression(ExprType, false)
     , name(name)
     , args(std::move(args))
   {}
 
   FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args, const std::string_view module)
-    : Expression(ExprType)
+    : Expression(ExprType, false)
     , module(module)
     , name(name)
     , args(std::move(args))
@@ -226,8 +285,8 @@ struct FunctionCall : public Expression
 
   VarType get_var_type() const override
   {
-    // never called because the type is taken from the return type of
-    // the function being called
+    // the type is taken from the return type of
+    // the function definition of the callee
     throw std::runtime_error{"get_var_type() called on FunctionCall"};
   }
 
@@ -253,15 +312,21 @@ struct FunctionCall : public Expression
 
 
 // Note: not a "ref" like a C++ reference, but "a node which refers to a variable"
+// i.e.:
+//  ```
+//  a: int;
+//  foo(a);
+// ```
+// the `a` is a VariableRef
 struct VariableRef : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::VariableRef;
 
-  VariableRef() : Expression(ExprType)
+  VariableRef() : Expression(ExprType, false)
   {}
 
   VariableRef(const std::string_view name)
-    : Expression(ExprType)
+    : Expression(ExprType, false)
     , name(name)
   {}
 
@@ -279,6 +344,7 @@ struct VariableRef : public Expression
   std::string_view name;
 };
 
+
 inline std::string_view to_string(const Expression& expr);
 
 
@@ -288,8 +354,9 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
   if (!expr->is_expr_type(ExprT::ExprType)) {
     throw std::runtime_error{"get_expression() called with expr and ExprT mismatch"};
   }
-  return dynamic_cast<ExprT&>(*expr);
+  return static_cast<ExprT&>(*expr);
 }
+
 
 inline std::string_view to_string(const BinaryOperator op)
 {
@@ -330,6 +397,8 @@ inline std::string_view to_string(const Expression& expr)
       return "FunctionCall";
     case VariableRef:
       return "VariableReference";
+    case Return:
+      return "Return";
   }
 
   std::unreachable();

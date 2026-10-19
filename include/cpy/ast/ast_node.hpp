@@ -33,7 +33,7 @@ enum class BuiltInType
   Void
 };
 
-inline constexpr const auto unresolved_t = BuiltInType::Unset;
+inline constexpr const auto unresolved_type = BuiltInType::Unset;
 
 
 struct UserType

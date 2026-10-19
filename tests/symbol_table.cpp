@@ -1,5 +1,5 @@
-#include "cpy/ast/ast_node.hpp"
-#include "cpy/ast/expressions.hpp"
+#include <cpy/ast/ast_node.hpp>
+#include <cpy/ast/expressions.hpp>
 #include <gtest/gtest.h>
 
 #include <cpy/ast/ast.hpp>
@@ -49,7 +49,7 @@ TEST(SymbolTable, VarDecl)
 {
   {
     const std::string_view src = R"(
-      fn foo() -> int {}
+      fn foo() -> int { return 1; }
 
       a := 5;
       b := foo();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cpy/ast/ast_node.hpp"
 #include <map>
 #include <optional>
 #include <ostream>
@@ -9,6 +10,7 @@
 #include <vector>
 
 #include <cpy/ast/ast.hpp>
+
 
 
 struct ResolvedSymbol
@@ -21,7 +23,10 @@ struct ResolvedFunction
 {
   std::vector<ResolvedSymbol> params;
   VarType return_type;
+  const FunctionDef * ast{};
 };
+
+using VariableMap = std::map<std::string_view, const ResolvedSymbol>;
 
 struct Scope
 {
@@ -30,9 +35,7 @@ struct Scope
   {}
 
   Scope * parent{};
-  std::map<std::string_view, const ResolvedSymbol> vars{};
-
-  using VarPair = decltype(vars)::value_type;
+  VariableMap vars{};
 };
 
 /// Maps function:
@@ -61,7 +64,7 @@ struct Scope
 /// A separate map is used to map between a NodeBlock and the variables available in that scope.
 class SymbolTable
 {
-  inline static const std::map<const std::string_view, const BuiltInType> BuiltIntTypes = {
+  inline static const std::map<const std::string_view, const BuiltInType> BuiltInTypes = {
     {"int",   BuiltInType::Int},
     {"dec",   BuiltInType::Decimal},
     {"bool",  BuiltInType::Bool},
@@ -79,9 +82,14 @@ public:
   SymbolTable& operator=(SymbolTable&&) = default;
 
 
-  void add_function (const std::string_view name, std::vector<ResolvedSymbol> params, VarType return_type)
+  void add_function (const FunctionDef& def, std::vector<ResolvedSymbol> params, VarType return_type)
   {
-    m_resolved_functions.emplace(name, ResolvedFunction{.params = std::move(params), .return_type = return_type});
+    m_resolved_functions.emplace(def.name,
+                                 ResolvedFunction{
+                                   .params = std::move(params),
+                                   .return_type = return_type,
+                                   .ast = &def
+                                 });
   }
 
   bool has_function(const std::string_view name) const
@@ -111,10 +119,11 @@ public:
     return get_resolved_variable(name, &block, true) != nullptr;
   }
 
+  // TODO: this should return unresolved_type rather than std::optional
   std::optional<BuiltInType> get_type(const std::string_view t) const
   {
-    const auto it = BuiltIntTypes.find(t) ;
-    if (it == rg::end(BuiltIntTypes))
+    const auto it = BuiltInTypes.find(t) ;
+    if (it == rg::end(BuiltInTypes))
      return std::nullopt;
 
     return it->second;
@@ -135,6 +144,16 @@ public:
       return *symbol;
 
     throw std::runtime_error{"SymbolTable::get_variable() - var does not exist"};
+  }
+
+  std::optional<VariableMap> get_variables (const NodeBlock& block) const
+  {
+    std::optional<VariableMap> result;
+
+    if (const auto it = m_scopes.find(&block); it != m_scopes.cend())
+      result = it->second->vars;
+
+    return result;
   }
 
   void enter_scope(const NodeBlock * node)

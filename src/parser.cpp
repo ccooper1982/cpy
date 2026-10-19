@@ -1,9 +1,12 @@
-#include "cpy/ast/expressions.hpp"
-#include "tree_sitter/api.h"
 #include <cpy/ast/ast.hpp>
+#include <cpy/ast/expressions.hpp>
+#include <cpy/common.hpp>
 #include <cpy/issues.hpp>
-#include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
+#include <cpy/parser.hpp>
+
+#include "tree_sitter/api.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
@@ -12,6 +15,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+
 
 extern "C" const TSLanguage *tree_sitter_cpy();
 
@@ -79,16 +83,21 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
 
   if (expr_type == "integer")
   {
-    int64_t i{};
+    CpyInt i{};
     std::from_chars(value.data(), value.data()+value.size(), i);
     expr = make_node<IntegerLiteral>(i);
   }
-  else if (expr_type == "literal_string") {
-    expr = make_node<StringLiteral>(value);
+  else if (expr_type == "string")
+  {
+    // from_source() returns the string including the start and end '"' chars,
+    // we don't want those:
+    //  "foo" -> foo
+    //  "" -> empty string
+    expr = make_node<StringLiteral>(value.substr(1, value.size()-2));
   }
   else if (expr_type == "decimal")
   {
-    double d{};
+    CpyDec d{};
     std::from_chars(value.data(), value.data()+value.size(), d);
     expr = make_node<DecimalLiteral>(d);
   }
@@ -175,6 +184,22 @@ NodePtr<VariableAssign> Parser::parse_variable_assign(const TSNode& ts_node)
 }
 
 
+NodePtr<Return> Parser::parse_return(const TSNode& ts_node)
+{
+  const auto ret_expr = child_by_field_name(ts_node, "expression");
+
+  auto node = make_node<Return>();
+
+  if (!ts_node_is_null(ret_expr)) {
+    node->return_expr = parse_expression(ret_expr);
+  }
+
+  set_source_region(ts_node, *node);
+
+  return node;
+}
+
+
 std::vector<NodePtr<AstNode>> Parser::parse_statements (const TSNode& ts_statements)
 {
   std::vector<NodePtr<AstNode>> statements;
@@ -201,6 +226,7 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
   const auto var_decl = child_by_field_name(ts_statement, "var_decl");
   const auto cond_if = child_by_field_name(ts_statement, "condition_if");
   const auto var_assign = child_by_field_name(ts_statement, "var_assign");
+  const auto return_ = child_by_field_name(ts_statement, "return");
 
   NodePtr<AstNode> node;
 
@@ -219,14 +245,17 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
   else if(!ts_node_is_null(var_assign)) {
     node = parse_variable_assign (var_assign);
   }
+  else if(!ts_node_is_null(return_)) {
+    node = parse_return (return_);
+  }
 
   return node;
 }
 
 
-std::vector<std::unique_ptr<Expression>> Parser::parse_function_call_args(const TSNode& args_node)
+std::vector<NodePtr<Expression>> Parser::parse_function_call_args(const TSNode& args_node)
 {
-  std::vector<std::unique_ptr<Expression>> args;
+  std::vector<NodePtr<Expression>> args;
   if (!ts_node_is_null(args_node))
   {
     const auto n_args = ts_node_named_child_count(args_node);
