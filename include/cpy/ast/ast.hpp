@@ -55,6 +55,11 @@ struct ConditionIf : public AstNode
   ConditionIf() : AstNode(NodeType::ConditionIf)
   {}
 
+  const NodeBlock& if_body () const { return if_.body; }
+  size_t if_body_node_count() const { return if_body().nodes.size() ; }
+  size_t else_if_count () const { return else_if.size(); }
+  bool have_else() const { return else_body.has_value(); }
+
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
     auto dump_condition = [&os, tab](const std::string_view type, const std::unique_ptr<Expression>& condition)
@@ -87,11 +92,6 @@ struct ConditionIf : public AstNode
       dump_body("else", *else_body);
     }
   }
-
-  const NodeBlock& if_body () const { return if_.body; }
-  size_t if_body_node_count() const { return if_body().nodes.size() ; }
-  size_t else_if_count () const { return else_if.size(); }
-  bool have_else() const { return else_body.has_value(); }
 
   ConditionBody if_;
   std::vector<ConditionBody> else_if;

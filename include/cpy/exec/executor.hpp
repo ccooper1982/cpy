@@ -118,6 +118,7 @@ public:
   void execute (const NodeBlock& block, const VariableAssign& assign);
   void execute (const NodeBlock& block, const VariableDecl& decl);
   VarValue execute (const NodeBlock& block, const Expression& expr);
+  VarValue execute (const NodeBlock& block, const ConditionIf& cond);
 
 private:
   Variable& get_variable (const VarName name);
@@ -148,8 +149,8 @@ private:
 
 #ifdef CPY_UNIT_TESTS
 
-using OnStackPush = std::function<void(const std::map<VarName, Variable>, const size_t)>;
-using OnStackPop = std::function<void(const std::map<VarName, Variable>, const size_t)>;
+using OnStackPush = std::function<void(std::map<VarName, Variable>, const size_t)>;
+using OnStackPop = std::function<void(std::vector<std::map<VarName, Variable>>)>;
 
 class TestExecutor : public Executor
 {
@@ -178,12 +179,24 @@ public:
 
     void pop_stack () override
     {
-      m_on_pop(m_stack.top()->get_vars(), m_stack.size());
+      std::vector<std::map<VarName, Variable>> vars;
+      vars.reserve(m_stack.size());
+
+      StackEntry * entry = m_stack.top().get();
+
+      while (entry)
+      {
+        vars.insert(vars.begin(), entry->get_vars());
+        entry = entry->get_parent();
+      }
+
+      m_on_pop(std::move(vars));
       Executor::pop_stack();
     }
 
 private:
-  OnStackPop m_on_push, m_on_pop;
+  OnStackPush m_on_push;
+  OnStackPop m_on_pop;
 };
 
 

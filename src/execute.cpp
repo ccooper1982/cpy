@@ -1,3 +1,5 @@
+#include "cpy/common.hpp"
+#include "cpy/exec/operators.hpp"
 #include <cpy/exec/executor.hpp>
 #include <utility>
 
@@ -19,8 +21,13 @@ static VarValue value_from_literal_expr(const Expression& expr)
     default:
       throw std::runtime_error{"Expression type is not literal"};
   }
+}
 
-  std::unreachable();
+
+[[nodiscard]] static bool is_true(const VarValue& value)
+{
+    const auto * b = std::get_if<CpyBool>(&value);
+    return b != nullptr && *b;
 }
 
 
@@ -59,11 +66,10 @@ VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarVa
         case NodeType::Expression:
           result = execute(block, static_cast<const Expression&>(*node));
           break;
-
-        /*
         case NodeType::ConditionIf:
-          process_condition(ctx, *node, block, static_cast<const ConditionIf&>(*node));
+          result = execute(block, static_cast<const ConditionIf&>(*node));
           break;
+        /*
         case NodeType::NodeBlock:
           process_block(ctx, static_cast<const NodeBlock&>(*node));
           break;
@@ -87,6 +93,35 @@ VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarVa
 }
 
 
+VarValue Executor::execute (const NodeBlock& block, const ConditionIf& cond)
+{
+  VarValue result;
+
+  auto cond_result = execute(block, *cond.if_.condition);
+
+  if (is_true(cond_result)) {
+    result = execute(cond.if_body());
+  }
+  else
+  {
+    for(const auto& [cond, body] : cond.else_if)
+    {
+      if (cond_result = execute(block, *cond); is_true(cond_result))
+      {
+        result = execute(body);
+        break;
+      }
+    }
+
+    if (!is_true(cond_result) && cond.have_else()) {
+      result = execute(*cond.else_body);
+    }
+  }
+
+  return result;
+}
+
+
 void Executor::execute (const NodeBlock& block, const VariableDecl& decl)
 {
   auto& var = get_variable(decl.var_name);
@@ -98,6 +133,7 @@ void Executor::execute (const NodeBlock& block, const VariableDecl& decl)
     var.value = execute(block, *decl.initialiser);
   }
 }
+
 
 void Executor::execute (const NodeBlock& block, const VariableAssign& assign)
 {

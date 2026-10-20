@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cpy/ast/ast_node.hpp"
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <ostream>
@@ -17,6 +18,7 @@ struct ResolvedSymbol
 {
   std::string_view name;
   VarType type;
+  uint32_t position{};
 };
 
 struct ResolvedFunction
@@ -97,12 +99,12 @@ public:
     return m_resolved_functions.contains(name);
   }
 
-  void add_variable(const std::string_view name, VarType type)
+  void add_variable(const std::string_view name, const VarType type, const uint32_t position)
   {
     if (m_scope_tracker.empty())
       throw std::runtime_error{"SymbolTable::add_variable(): scope tracker is empty"};
 
-    m_scope_tracker.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type});
+    m_scope_tracker.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type, .position = position});
   }
 
   // Check the current scope for variable. Does not check parents.
@@ -114,9 +116,10 @@ public:
   // Checks if a variable is visible from the given block.
   // If not present in `block`, checks parents, until the variable is found.
   // Returns false if not found.
-  bool has_visible_variable(const std::string_view name, const NodeBlock& block) const
+  bool has_visible_variable(const std::string_view name, const NodeBlock& block, const uint32_t position) const
   {
-    return get_resolved_variable(name, &block, true) != nullptr;
+    const auto resolved = get_resolved_variable(name, &block, true);
+    return resolved != nullptr && resolved->position < position;
   }
 
   // TODO: this should return unresolved_type rather than std::optional
@@ -136,7 +139,7 @@ public:
 
   /// Gets a resolved variable, checking the NodeBlock's scope, then checking each
   /// parent until it is found.
-  /// Throws if the variable does not exis: has_visible_variable() should return
+  /// Throws if the variable does not exist: has_visible_variable() should return
   /// true prior to calling get_variable().
   const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const
   {

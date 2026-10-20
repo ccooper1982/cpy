@@ -377,9 +377,9 @@ NodePtr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
   };
 
   auto node = make_node<ConditionIf>();
+  set_source_region(ts_node, *node);
 
   node->if_ = parse_condition_body(ts_node);
-  set_source_region(ts_node, node->if_.body);
 
   for (uint32_t i = 0; i < ts_node_named_child_count(ts_node); ++i)
   {

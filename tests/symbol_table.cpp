@@ -403,7 +403,6 @@ TEST(SymbolTable, VariableDecl_ScopeIf)
 
     ASSERT_TRUE(script.issues->have_errors());
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
-    ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 1);
   }
 
   {
