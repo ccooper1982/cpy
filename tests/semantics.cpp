@@ -48,6 +48,44 @@ TEST(Semantics, Ok)
   }
 }
 
+TEST(Semantics, VarUndeclared)
+{
+  {
+    const std::string_view src = R"(
+      a = 5;
+      a: int;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn hello()
+      {
+        a = 5;
+      }
+
+      a: int;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+  }
+}
+
+
 TEST(Semantics, FuncDef)
 {
   {

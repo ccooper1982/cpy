@@ -1,8 +1,5 @@
 # TODO
 
-## Execute Conditions
-Not handled, need to be.
-
 ## Parameter Semantics
 ```
 fn foo (x: int)

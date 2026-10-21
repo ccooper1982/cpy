@@ -312,60 +312,59 @@ TEST(Ast, Expr_BinaryExprFuncs)
   ASSERT_TRUE(expr.rhs->is_expr_type(ExpressionType::FuncCall));
 }
 
-TEST(Ast, FuncCall_Return)
+TEST(Ast, FuncCall_ReturnLiteral)
 {
-  {
-    const std::string_view src = R"(
-      fn ret_void() { }
+  const std::string_view src = R"(
+    fn ret_void() { }
 
-      fn ret_int() -> int {
-        return 4;
-      }
-    )";
+    fn ret_int() -> int {
+      return 4;
+    }
+  )";
 
-    Parser parser;
-    auto script = parser.parse(src);
+  Parser parser;
+  auto script = parser.parse(src);
 
-    ASSERT_EQ(script.ast->block.nodes.size(), 2);
-    ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
-    ASSERT_TRUE(script.ast->block.nodes[1]->is_node_type(NodeType::FunctionDef));
+  ASSERT_EQ(script.ast->block.nodes.size(), 2);
+  ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
+  ASSERT_TRUE(script.ast->block.nodes[1]->is_node_type(NodeType::FunctionDef));
 
-    const auto& ret_none = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
-    const auto& ret_int = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[1]);
+  const auto& ret_none = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+  const auto& ret_int = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[1]);
 
-    ASSERT_EQ(ret_none.body.nodes.size(), 0);
-    ASSERT_EQ(ret_int.body.nodes.size(), 1);
+  ASSERT_EQ(ret_none.body.nodes.size(), 0);
+  ASSERT_EQ(ret_int.body.nodes.size(), 1);
 
-    ASSERT_TRUE(ret_int.body.nodes[0]->is_expression());
-    const auto& ret_node = dynamic_cast<const Return&>(*ret_int.body.nodes[0]);
-    ASSERT_TRUE(ret_node.has_expression());
-    ASSERT_TRUE(ret_node.return_expr->is_literal());
-    ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Int));
-  }
+  ASSERT_TRUE(ret_int.body.nodes[0]->is_expression());
+  const auto& ret_node = dynamic_cast<const Return&>(*ret_int.body.nodes[0]);
+  ASSERT_TRUE(ret_node.has_expression());
+  ASSERT_TRUE(ret_node.return_expr->is_literal());
+  ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Int));
+}
 
-  {
-    // it doesn't matter that abc() and def() don't exist, the AST
-    // doesn't care about that
-    const std::string_view src = R"(
-      fn foo() -> int {
-        return abc() + def();
-      }
-    )";
+TEST(Ast, FuncCall_ReturnBinaryExpr)
+{
+  // it doesn't matter that abc() and def() don't exist, the AST
+  // doesn't care about that
+  const std::string_view src = R"(
+    fn foo() -> int {
+      return abc() + def();
+    }
+  )";
 
-    Parser parser;
-    auto script = parser.parse(src);
+  Parser parser;
+  auto script = parser.parse(src);
 
-    ASSERT_EQ(script.ast->block.nodes.size(), 1);
-    ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
+  ASSERT_EQ(script.ast->block.nodes.size(), 1);
+  ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
 
-    const auto& foo_def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
-    ASSERT_EQ(foo_def.body.nodes.size(), 1);
-    ASSERT_TRUE(foo_def.body.nodes[0]->is_expression());
+  const auto& foo_def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+  ASSERT_EQ(foo_def.body.nodes.size(), 1);
+  ASSERT_TRUE(foo_def.body.nodes[0]->is_expression());
 
-    const auto& ret_node = dynamic_cast<const Return&>(*foo_def.body.nodes[0]);
-    ASSERT_TRUE(ret_node.has_expression());
-    ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Binary));
-  }
+  const auto& ret_node = dynamic_cast<const Return&>(*foo_def.body.nodes[0]);
+  ASSERT_TRUE(ret_node.has_expression());
+  ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Binary));
 }
 
 
@@ -488,33 +487,47 @@ TEST(Ast, VarAssign)
     };
   ASSERT_TRUE(rg::all_of(ast.block.nodes, is_variable_assign));
 
-  static const std::array expected = {
-      std::pair{"a", ExpressionType::Int},
-      std::pair{"b", ExpressionType::String},
-      std::pair{"c", ExpressionType::Bool},
-      std::pair{"d", ExpressionType::Dec},
-      std::pair{"e", ExpressionType::Binary},
-      std::pair{"f", ExpressionType::Binary},
+  static const std::array expected =
+  {
+    std::pair{"a", ExpressionType::Int},
+    std::pair{"b", ExpressionType::String},
+    std::pair{"c", ExpressionType::Bool},
+    std::pair{"d", ExpressionType::Dec},
+    std::pair{"e", ExpressionType::Binary},
+    std::pair{"f", ExpressionType::Binary},
   };
 
   ASSERT_EQ(ast.block.nodes.size(), expected.size());
 
   for (std::size_t i = 0; i < expected.size(); ++i)
   {
-      const auto& assign =
-          dynamic_cast<const VariableAssign&>(*ast.block.nodes[i]);
+    const auto& assign = static_cast<const VariableAssign&>(*ast.block.nodes[i]);
 
-      EXPECT_EQ(assign.name, expected[i].first);
-      ASSERT_TRUE(assign.expr->is_expr_type(expected[i].second));
+    EXPECT_EQ(assign.name, expected[i].first);
+    ASSERT_TRUE(assign.expr->is_expr_type(expected[i].second));
   }
 
-  const auto& var_f = dynamic_cast<VariableAssign&>(*ast.block.nodes[5]);
-  ASSERT_EQ(var_f.name, "f");
-  ASSERT_TRUE(var_f.expr->is_expr_type(ExpressionType::Binary));
+  // `e` is assigned from a binary expression of two literals
+  {
+    const auto& var_e = static_cast<VariableAssign&>(*ast.block.nodes[4]);
+    ASSERT_EQ(var_e.name, "e");
+    ASSERT_TRUE(var_e.expr->is_expr_type(ExpressionType::Binary));
 
-  const auto& var_f_bin = dynamic_cast<BinaryExpression&>(*var_f.expr);
-  ASSERT_TRUE(var_f_bin.lhs->is_expr_type(ExpressionType::FuncCall));
-  ASSERT_TRUE(var_f_bin.rhs->is_expr_type(ExpressionType::FuncCall));
+    const auto& var_e_bin = static_cast<BinaryExpression&>(*var_e.expr);
+    ASSERT_TRUE(var_e_bin.lhs->is_expr_type(ExpressionType::Int));
+    ASSERT_TRUE(var_e_bin.rhs->is_expr_type(ExpressionType::Int));
+  }
+
+  // `f` is assigned from a binary expression of two function calls
+  {
+    const auto& var_f = static_cast<VariableAssign&>(*ast.block.nodes[5]);
+    ASSERT_EQ(var_f.name, "f");
+    ASSERT_TRUE(var_f.expr->is_expr_type(ExpressionType::Binary));
+
+    const auto& var_f_bin = static_cast<BinaryExpression&>(*var_f.expr);
+    ASSERT_TRUE(var_f_bin.lhs->is_expr_type(ExpressionType::FuncCall));
+    ASSERT_TRUE(var_f_bin.rhs->is_expr_type(ExpressionType::FuncCall));
+  }
 }
 
 // Syntax Errors //

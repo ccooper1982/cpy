@@ -476,8 +476,6 @@ TEST(Exec, FuncCall_IfLocal)
 }
 
 
-
-
 TEST(Exec, FuncCall_ConditionVarious)
 {
   // not pretty because we must escape formatting '{' and '}' placeholders
@@ -629,46 +627,82 @@ TEST(Exec, FuncCall_ReturnFromIf)
 }
 
 
-TEST(Exec, FuncCall_MoreInteresting)
+TEST(Exec, FuncCall_ConditionDelcVarInIf)
 {
-//   const std::string_view src = R"(
-//     fn foo(flag: bool) -> int
-//     {
-//       if (flag) {
-//
-//         return 5;
-//       }
-//       else {
-//         return 10;
-//       }
-//     }
-//
-//     a := foo();
-//     b := foo() + foo();
-//
-//
-//   )";
-//
-//   Parser parser;
-//   auto script = parser.parse(src);
-//
-//   Semantics sem;
-//   sem.process(script);
-//
-//   auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
-//   {
-//     // if (a)
-//     if (stack.size() == 2)
-//     {
-//       ASSERT_EQ(stack[0].size(), 1);
-//       ASSERT_EQ(stack[1].size(), 0);
-//     }
-//     // end of script/return from foo() call
-//     else if (stack.size() == 1) {
-//       ASSERT_EQ(stack[0].at("a").value, VarValue{CpyInt{5}});
-//     }
-//   };
-//
-//   TestExecutor exec(sem.symbol_table(), on_pop);
-//   exec.execute(script.ast->block);
+  const std::string_view src = R"(
+    a := true;
+
+    if (a) {
+      b := 1;
+    }
+
+    a = false;
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  Semantics sem;
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+  {
+    if (stack.size() == 2)
+    {
+      ASSERT_EQ(stack[0].size(), 1);
+      ASSERT_EQ(stack[1].size(), 1);
+      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{true}});
+      ASSERT_EQ(stack[1].at("b").value, VarValue{CpyInt{1}});
+    }
+    else if (stack.size() == 1) {
+      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{false}});
+    }
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  exec.execute(script.ast->block);
+}
+
+TEST(Exec, FuncCall_ConditionDelcVarInNestedIf)
+{
+  const std::string_view src = R"(
+    a := true;
+
+    if (a)
+    {
+      if (false) {
+
+      }
+      else {
+        b := true;
+      }
+    }
+
+    a = false;
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  Semantics sem;
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+  {
+    if (stack.size() == 3) {
+      ASSERT_EQ(stack[2].at("b").value, VarValue{CpyBool{true}});
+    }
+    else if (stack.size() == 2)
+    {
+      ASSERT_EQ(stack[0].size(), 1);
+      ASSERT_EQ(stack[1].size(), 0);
+      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{true}});
+    }
+    else if (stack.size() == 1) {
+      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{false}});
+    }
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  exec.execute(script.ast->block);
 }
