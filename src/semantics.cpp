@@ -1,3 +1,4 @@
+#include "cpy/ast/ast_node.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
@@ -73,7 +74,7 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
 
         // if param type is invalid, the function will not be in the symbol table
         for(const auto& param : def.params) {
-          m_symbol_table.add_variable(param.param_name, *m_symbol_table.get_type(param.type_name), def.source.start);
+          m_symbol_table.add_variable(param, def.source.start);
         }
       }
     }
@@ -131,7 +132,7 @@ void Semantics::process_function_signatures(Context& ctx)
     for (const auto& param : def.params)
     {
       if (const auto type = m_symbol_table.get_type(param.type_name); type) {
-        resolved_params.emplace_back(param.param_name, *type);
+        resolved_params.emplace_back(param.param_name, *type, param.is_ref);
       }
       else
       {
@@ -245,58 +246,80 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_type;
   }
 
+  // TODO extract loop body to:
+  // bool handle_function_call_argument(Context& ctx, const ResolvedFunction& resolved_function, const FunctionArgument& arg)
   for (uint8_t i = 0 ; i < call.args.size() ; ++i)
   {
-    const auto param_type = resolved_func.params[i].type.value_as<BuiltInType>();
-    if (param_type)
+    const auto resolved_type = resolved_func.params[i].type.value_as<BuiltInType>();
+    const auto arg_is_ref = call.args[i].is_ref;
+    const auto& arg_expr = *call.args[i].expr;
+
+    if (!resolved_type) {
+      return unresolved_type;
+    }
+
+    if (!arg_is_ref && resolved_func.params[i].is_ref)
     {
-      const auto& arg = *call.args[i];
+      issue::func_arg_ref_required(ctx.issues, *call.args[i].expr);
+      return unresolved_type;
+    }
 
-      if (arg.is_expr_type(ExpressionType::FuncCall))
-      {
-        const auto& func_call = static_cast<const FunctionCall&>(arg);
+    if (arg_is_ref && !resolved_func.params[i].is_ref)
+    {
+      issue::func_arg_not_ref(ctx.issues, *call.args[i].expr);
+      return unresolved_type;
+    }
 
-        if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
-          return unresolved_type;
-        }
-        else if (ret_type == BuiltInType::Void)
-        {
-          issue::func_arg_void(ctx.issues, arg, resolved_func.params[i].name);
-          return unresolved_type;
-        }
-        else if (ret_type != *param_type)
-        {
-          issue::func_arg(ctx.issues, arg, resolved_func.params[i].name);
-          return unresolved_type;
-        }
-      }
-      else if (arg.is_expr_type(ExpressionType::Binary))
-      {
-        const auto& expr = static_cast<const BinaryExpression&>(arg);
-        if (!process_expression(ctx, parent, block, expr))
-          return unresolved_type;
-      }
-      else if (arg.is_expr_type(ExpressionType::VariableRef))
-      {
-        const auto& var = static_cast<const VariableRef&>(arg);
-        const auto var_type = process_expression(ctx, call, block, var);
+    if (arg_is_ref && !arg_expr.is_expr_type(ExpressionType::VariableRef))
+    {
+      issue::func_arg_ref_type(ctx.issues, *call.args[i].expr);
+      return unresolved_type;
+    }
 
-        // if the variable is unknown, process_expression() will create an isue and
-        // return unresolved_type
-        if (var_type == unresolved_type) {
-          return unresolved_type;
-        }
-        else if (var_type != *param_type)
-        {
-          issue::func_arg(ctx.issues, call, resolved_func.params[i].name);
-          return unresolved_type;
-        }
+    if (arg_expr.is_expr_type(ExpressionType::FuncCall))
+    {
+      const auto& func_call = static_cast<const FunctionCall&>(arg_expr);
+
+      if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
+        return unresolved_type;
       }
-      else if (!arg.is_convertible_to(*param_type))
+      else if (ret_type == BuiltInType::Void)
+      {
+        issue::func_arg_void(ctx.issues, arg_expr, resolved_func.params[i].name);
+        return unresolved_type;
+      }
+      else if (ret_type != *resolved_type)
+      {
+        issue::func_arg(ctx.issues, arg_expr, resolved_func.params[i].name);
+        return unresolved_type;
+      }
+    }
+    else if (arg_expr.is_expr_type(ExpressionType::Binary))
+    {
+      const auto& expr = static_cast<const BinaryExpression&>(arg_expr);
+      if (!process_expression(ctx, parent, block, expr))
+        return unresolved_type;
+    }
+    else if (arg_expr.is_expr_type(ExpressionType::VariableRef))
+    {
+      const auto& var = static_cast<const VariableRef&>(arg_expr);
+      const auto var_type = process_expression(ctx, call, block, var);
+
+      // if the variable is unknown, process_expression() will create an issue and
+      // return unresolved_type
+      if (var_type == unresolved_type) {
+        return unresolved_type;
+      }
+      else if (var_type != *resolved_type)
       {
         issue::func_arg(ctx.issues, call, resolved_func.params[i].name);
         return unresolved_type;
       }
+    }
+    else if (!arg_expr.is_convertible_to(*resolved_type))
+    {
+      issue::func_arg(ctx.issues, call, resolved_func.params[i].name);
+      return unresolved_type;
     }
   }
 

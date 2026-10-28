@@ -18,6 +18,7 @@ struct ResolvedSymbol
 {
   std::string_view name;
   VarType type;
+  bool is_ref{};
   uint32_t position{};
 };
 
@@ -53,9 +54,9 @@ struct Scope
 ///   if (a)
 ///   {
 ///     c: int;
-///     if (a > b) // a and b are visible from the parent scope
+///     if (a > b) # a and b are visible from the parent scope
 ///     {
-///       c: int;  // this 'c' is a new variable
+///       c: str;  # a new 'c' variable
 ///     }
 ///   }
 ///  ```
@@ -105,6 +106,11 @@ public:
       throw std::runtime_error{"SymbolTable::add_variable(): scope tracker is empty"};
 
     m_scope_tracker.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type, .position = position});
+  }
+
+  void add_variable(const FunctionParam& param, const uint32_t position)
+  {
+    add_variable(param.param_name, *get_type(param.type_name), position);
   }
 
   // Check the current scope for variable. Does not check parents.
@@ -182,7 +188,7 @@ public:
       os << "  - return: "<< to_string(resolved.return_type) << '\n' ;
       os << "  - params:\n";
       for(const auto& symbol : resolved.params) {
-        os << std::setw(8) << symbol.name << " : " << to_string(symbol.type) << '\n';
+        os << std::setw(8) << symbol.name << " : " << (symbol.is_ref ? "ref " : "") << to_string(symbol.type) << '\n';
       }
     }
 
@@ -194,7 +200,7 @@ public:
     {
       std::cout << "Block: [" << block->source.start << ", " << block->source.end <<  "]\n";
       for (const auto& [var, resolved] : scope->vars) {
-        std::cout << resolved.name << ":" << to_string(resolved.type) << "\n";
+        std::cout << resolved.name << ":" << (resolved.is_ref ? "ref" : "") << to_string(resolved.type) << "\n";
       }
     }
   }
@@ -223,7 +229,8 @@ private:
     }
 
     // travel up parents
-    for (scope = scope->parent; scope ; scope = scope->parent) {
+    for (scope = scope->parent; scope ; scope = scope->parent)
+    {
       if (const auto resolved = in_scope(scope); resolved)
         return resolved;
     }

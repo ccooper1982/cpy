@@ -52,7 +52,7 @@ private:
   NodePtr<AstNode> parse_statement (const TSNode& ts_statement);
   std::vector<NodePtr<AstNode>> parse_statements (const TSNode& ts_statements);
 
-  std::vector<NodePtr<Expression>> parse_function_call_args(const TSNode& args_node);
+  std::vector<FunctionArgument> parse_function_call_args(const TSNode& args_node);
   NodePtr<FunctionCall> parse_function_call(const TSNode& func_call);
   NodePtr<FunctionDef> parse_function_def(const TSNode& ts_node);
 

@@ -105,9 +105,6 @@ struct FunctionParam : public AstNode
 {
   static constexpr NodeType Type = NodeType::FunctionParam;
 
-  std::string_view param_name;
-  std::string_view type_name;
-
   FunctionParam() : AstNode(NodeType::FunctionParam)
   {}
 
@@ -117,12 +114,14 @@ struct FunctionParam : public AstNode
     , type_name(type)
   {}
 
-public:
-
   void dump (std::ostream& os, const uint8_t tab = 0) const override
   {
     os << std::string(tab*2, ' ') << param_name << ":" << type_name << '\n';
   }
+
+  std::string_view param_name;
+  std::string_view type_name;
+  bool is_ref{};
 };
 
 

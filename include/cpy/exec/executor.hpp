@@ -48,10 +48,13 @@ inline static VarValue value_from_type (const VarType type)
 
 struct Variable
 {
+  Variable() = default;
+
   Variable(const VarValue& v) : value(v)
   {}
 
   VarValue value;
+  Variable * ref{nullptr};
 };
 
 class StackEntry
@@ -85,14 +88,13 @@ public:
 private:
   void init()
   {
-    for (const auto& [var, type] : m_var_syms)
+    for (const auto& [var, resolved] : m_var_syms)
     {
-      if (!type.type.is_type<BuiltInType>()) {
+      if (!resolved.type.is_type<BuiltInType>()) {
         throw std::runtime_error{"Only BuiltInType is supported"};
       }
-      else {
-        m_vars.emplace(var, value_from_type(type.type));
-      }
+
+      m_vars.emplace(var, value_from_type(resolved.type));
     }
   }
 
@@ -114,7 +116,7 @@ public:
     ~Executor() = default;
   #endif
 
-  VarValue execute(const NodeBlock& block, const std::map<VarName, VarValue>&& func_args = {});
+  VarValue execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {});
   void execute (const NodeBlock& block, const VariableAssign& assign);
   void execute (const NodeBlock& block, const VariableDecl& decl);
   VarValue execute (const NodeBlock& block, const Expression& expr);
@@ -128,18 +130,18 @@ private:
 
   // variable stack //
 #ifdef CPY_UNIT_TESTS
-// this for the child class TestExecutor
-protected:
-  virtual void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {});
-  virtual void pop_stack ();
+  // this for the child class TestExecutor
+  protected:
+    virtual void push_stack (const NodeBlock& block, std::map<VarName, Variable> args = {});
+    virtual void pop_stack ();
 
-  std::stack<std::unique_ptr<StackEntry>> m_stack;
+    std::stack<std::unique_ptr<StackEntry>> m_stack;
 #else
-private:
-  void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {});
-  void pop_stack ();
+  private:
+    void push_stack (const NodeBlock& block, std::map<VarName, Variable> args = {});
+    void pop_stack ();
 
-  std::stack<std::unique_ptr<StackEntry>> m_stack;
+    std::stack<std::unique_ptr<StackEntry>> m_stack;
 #endif
 
 private:
@@ -169,9 +171,9 @@ public:
       {
       }
 
-    void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {}) override
+    void push_stack (const NodeBlock& block, std::map<VarName, Variable> args = {}) override
     {
-      Executor::push_stack(block, std::move(vals));
+      Executor::push_stack(block, std::move(args));
       if (m_on_push) {
         m_on_push(m_stack.top()->get_vars(), m_stack.size());
       }

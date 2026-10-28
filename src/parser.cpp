@@ -253,17 +253,24 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
 }
 
 
-std::vector<NodePtr<Expression>> Parser::parse_function_call_args(const TSNode& args_node)
+std::vector<FunctionArgument> Parser::parse_function_call_args(const TSNode& args_node)
 {
-  std::vector<NodePtr<Expression>> args;
+  std::vector<FunctionArgument> args;
   if (!ts_node_is_null(args_node))
   {
     const auto n_args = ts_node_named_child_count(args_node);
 
-    for (uint32_t arg = 0 ; arg < n_args ; ++arg)
+    for (uint32_t i = 0 ; i < n_args ; ++i)
     {
-      const auto expr_node = ts_node_named_child(args_node, arg);
-      args.push_back(parse_expression(expr_node));
+      const auto arg_node = ts_node_named_child(args_node, i);
+      const auto ref_node = child_by_field_name(arg_node, "ref");
+      const auto expr_node = child_by_field_name(arg_node, "expression");
+
+      FunctionArgument arg;
+      arg.expr = parse_expression(expr_node);
+      arg.is_ref = !ts_node_is_null(ref_node);
+
+      args.push_back(std::move(arg));
     }
   }
   return args;
@@ -324,6 +331,7 @@ NodePtr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
       TSNode parameter = ts_node_named_child(parameters, p);
       TSNode param_name_node = child_by_field_name(parameter, "name");
       TSNode param_type_node = child_by_field_name(parameter, "type");
+      TSNode ref_node = child_by_field_name(parameter, "ref");
 
       FunctionParam param;
       if (!ts_node_is_null(param_name_node)) {
@@ -332,6 +340,8 @@ NodePtr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
       if (!ts_node_is_null(param_type_node)) {
         param.type_name = from_source(param_type_node);
       }
+
+      param.is_ref = !ts_node_is_null(ref_node);
 
       set_source_region(parameter, param);
 

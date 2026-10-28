@@ -20,6 +20,9 @@ enum class ErrorCode
   FunctionCallArgType,
   FunctionCallArgVoid,
   FunctionCallArgsCount,
+  FunctionCallRefRequired,
+  FunctionCallParamNotRef,
+  FunctionCallParamRefTypeInvalid,
   FunctionReturnExpression,
   FunctionReturnExprExpected,
   UnknownParamType,
@@ -114,6 +117,11 @@ private:
   std::vector<Issue> m_errors;
 };
 
+// TODO review these:
+// - each function have param `std::string_view additional=""`
+// - add specific parameters to include important information
+//
+// And line numbers.
 namespace issue
 {
   inline void syntax_error (Issues& issues, const TSNode& node)
@@ -174,6 +182,21 @@ namespace issue
   inline void func_arg_count (Issues& issues, const AstNode& node)
   {
     issues.add_error("Function call with incorrect number of arguments", node.source, ErrorCode::FunctionCallArgsCount);
+  }
+
+  inline void func_arg_ref_required (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Function argument requires explicit 'ref'", node.source, ErrorCode::FunctionCallRefRequired);
+  }
+
+  inline void func_arg_not_ref (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Function parameter is not a reference", node.source, ErrorCode::FunctionCallParamNotRef);
+  }
+
+  inline void func_arg_ref_type (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("A ref parameter must be a variable", node.source, ErrorCode::FunctionCallParamRefTypeInvalid);
   }
 
   inline void return_type_from_func (Issues& issues, const AstNode& node)

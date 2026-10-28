@@ -1,6 +1,8 @@
+#include "cpy/ast/expressions.hpp"
 #include "cpy/common.hpp"
 #include "cpy/exec/operators.hpp"
 #include <cpy/exec/executor.hpp>
+#include <stdexcept>
 #include <utility>
 
 
@@ -37,7 +39,7 @@ Executor::Executor(const SymbolTable& sym_table)
 
 }
 
-VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarValue>&& func_args)
+VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args)
 {
   auto is_executable = [](const std::unique_ptr<AstNode>& node)
   {
@@ -53,6 +55,8 @@ VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarVa
 
   try
   {
+    // this ignores NodeType::NodeBlock because we a block can only appear in a function
+    // or condition body
     for(const auto& node : block.nodes | vw::filter(is_executable))
     {
       switch (node->node_type())
@@ -69,16 +73,8 @@ VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarVa
         case NodeType::ConditionIf:
           result = execute(block, static_cast<const ConditionIf&>(*node));
           break;
-        /*
-        case NodeType::NodeBlock:
-          process_block(ctx, static_cast<const NodeBlock&>(*node));
-          break;
-        */
-
         default:
-          //std::unreachable();
-          std::cerr << "TODO\n";
-          break;
+          throw std::runtime_error{"Unexpected node type in block"};
       }
     }
   }
@@ -160,12 +156,28 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
     const auto& call = static_cast<const FunctionCall&>(expr);
     const auto& def = m_sym_table.get_function(call.name);
 
-    std::map<VarName, VarValue> args;
+    std::map<VarName, Variable> args;
 
     for (size_t i = 0 ; i < call.args.size() ; ++i)
     {
-      auto val = execute(block, *call.args[i]);
-      args.emplace(def.params[i].name, std::move(val));
+      auto val = execute(block, *call.args[i].expr);
+
+      Variable variable;
+
+      if (def.params[i].is_ref)
+      {
+        // a: int;
+        // foo (ref a);
+        // we need to find variable a
+        const auto& var_ref = static_cast<const VariableRef&>(*call.args[i].expr);
+        variable.ref = &get_variable(var_ref.name);
+      }
+      else
+      {
+        variable.value = val;
+      }
+
+      args.emplace(def.params[i].name, std::move(variable));
     }
 
     result = execute(def.ast->body, std::move(args));
@@ -198,7 +210,7 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
 }
 
 
-void Executor::push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals)
+void Executor::push_stack (const NodeBlock& block, std::map<VarName, Variable> args)
 {
   const auto parent = m_stack.empty() ? nullptr : m_stack.top().get();
 
@@ -206,8 +218,14 @@ void Executor::push_stack (const NodeBlock& block, std::map<VarName, VarValue> v
     m_stack.emplace(std::make_unique<StackEntry>(*vars, parent));
   }
 
-  for (const auto& [name, val] : vals) {
-    m_stack.top()->get_var(name).value = std::move(val);
+  for (auto& [name, var] : args)
+  {
+    if (var.ref) {
+      m_stack.top()->get_var(name).ref = var.ref;
+    }
+    else {
+      m_stack.top()->get_var(name).value = std::move(var.value);
+    }
   }
 }
 
@@ -236,7 +254,8 @@ Variable& Executor::get_variable (const VarName name)
     throw std::runtime_error{std::format("get_variable(): failed to find resolved variable: {}", name)};
   }
 
-  return entry->get_var(name);
+  auto& var = entry->get_var(name);
+  return var.ref ? *var.ref : var;
 }
 
 

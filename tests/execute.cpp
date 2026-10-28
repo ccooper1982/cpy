@@ -1,3 +1,4 @@
+#include "cpy/exec/operators.hpp"
 #include <gtest/gtest.h>
 #include <cpy/common.hpp>
 #include <cpy/exec/executor.hpp>
@@ -5,7 +6,28 @@
 #include <cpy/semantics.hpp>
 #include <cpy/symbol_table.hpp>
 #include <string_view>
+#include <type_traits>
 
+
+template<typename T>
+VarValue make_value (T v)
+{
+  if constexpr (std::is_same_v<T, CpyBool>) {
+    return CpyBool(v);
+  }
+  else if constexpr (std::is_integral_v<T>) {
+    return CpyInt(v);
+  }
+  else if constexpr (std::floating_point<T>) {
+    return CpyDec(v);
+  }
+  else if constexpr (std::is_convertible_v<T, CpyString>) {
+    return CpyString(v);
+  }
+  else {
+    static_assert(false, "Unsupported VarValue type");
+  }
+}
 
 TEST(Exec, Basic)
 {
@@ -24,8 +46,8 @@ TEST(Exec, Basic)
   {
     ASSERT_EQ(stack.size(), 1);
     ASSERT_EQ(stack[0].size(), 2);
-    ASSERT_EQ(stack[0].at("a").value, VarValue{CpyInt{0}});
-    ASSERT_EQ(stack[0].at("b").value, VarValue{CpyInt{1}});
+    ASSERT_EQ(stack[0].at("a").value, make_value(0));
+    ASSERT_EQ(stack[0].at("b").value, make_value(1));
   };
 
   TestExecutor exec(sem.symbol_table(), on_pop);
@@ -54,7 +76,7 @@ TEST(Exec, FuncCall_NoParams_Empty)
   {
     ASSERT_EQ(stack.size(), 1);
     ASSERT_EQ(stack[0].size(), 1);
-    ASSERT_EQ(stack[0].at("a").value, VarValue{CpyInt{1}});
+    ASSERT_EQ(stack[0].at("a").value, make_value(1));
   };
 
   TestExecutor exec(sem.symbol_table(), on_push, on_pop);
@@ -84,7 +106,7 @@ TEST(Exec, FuncCall_NoParams_Local)
     if (stack_size == 1)
     {
       ASSERT_EQ(stack_size, 1);
-      ASSERT_EQ(vars.at("a").value, VarValue{CpyInt{0}});
+      ASSERT_EQ(vars.at("a").value, make_value(0));
     }
   };
 
@@ -96,8 +118,8 @@ TEST(Exec, FuncCall_NoParams_Local)
     else if (stack.size() == 2)
     {
       ASSERT_EQ(stack.size(), 2);
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyInt{1}});
-      ASSERT_EQ(stack[1].at("b").value, VarValue{CpyInt{1}});
+      ASSERT_EQ(stack[0].at("a").value, make_value(1));
+      ASSERT_EQ(stack[1].at("b").value, make_value(1));
     }
   };
 
@@ -129,8 +151,8 @@ TEST(Exec, FuncCall_ParamsAssign)
     if (stack_size == 2)
     {
       ASSERT_EQ(vars.size(), 2);
-      ASSERT_EQ(vars.at("a").value, VarValue{CpyInt{10}});
-      ASSERT_EQ(vars.at("b").value, VarValue{CpyBool{true}});
+      ASSERT_EQ(vars.at("a").value, make_value(10));
+      ASSERT_EQ(vars.at("b").value, make_value(true));
     }
   };
 
@@ -139,8 +161,8 @@ TEST(Exec, FuncCall_ParamsAssign)
     if (stack.size() == 2)
     {
       ASSERT_EQ(stack.size(), 2);
-      ASSERT_EQ(stack[1].at("a").value, VarValue{CpyInt{20}});
-      ASSERT_EQ(stack[1].at("b").value, VarValue{CpyBool{false}});
+      ASSERT_EQ(stack[1].at("a").value, make_value(20));
+      ASSERT_EQ(stack[1].at("b").value, make_value(false));
     }
   };
 
@@ -172,11 +194,11 @@ TEST(Exec, FuncCall_Params)
     if (stack.size() == 2)
     {
       ASSERT_EQ(stack.size(), 2);
-      ASSERT_EQ(stack[1].at("a").value, VarValue{CpyInt{10}});
-      ASSERT_EQ(stack[1].at("b").value, VarValue{CpyBool{true}});
-      ASSERT_EQ(stack[1].at("x").value, VarValue{CpyInt{10}});
-      ASSERT_EQ(stack[1].at("y").value, VarValue{CpyBool{true}});
-      ASSERT_EQ(stack[1].at("z").value, VarValue{CpyInt{20}});
+      ASSERT_EQ(stack[1].at("a").value, make_value(10));
+      ASSERT_EQ(stack[1].at("b").value, make_value(true));
+      ASSERT_EQ(stack[1].at("x").value, make_value(10));
+      ASSERT_EQ(stack[1].at("y").value, make_value(true));
+      ASSERT_EQ(stack[1].at("z").value, make_value(20));
     }
   };
 
@@ -212,15 +234,15 @@ TEST(Exec, FuncCall_ParamsWithParent)
       ASSERT_EQ(stack.size(), 2);
       ASSERT_EQ(stack[0].size(), 1);
       ASSERT_EQ(stack[1].size(), 4);
-      ASSERT_EQ(stack[1].at("a").value, VarValue{CpyInt{10}});
-      ASSERT_EQ(stack[1].at("b").value, VarValue{CpyBool{true}});
-      ASSERT_EQ(stack[1].at("x").value, VarValue{CpyInt{10}});
-      ASSERT_EQ(stack[1].at("y").value, VarValue{CpyBool{true}});
+      ASSERT_EQ(stack[1].at("a").value, make_value(10));
+      ASSERT_EQ(stack[1].at("b").value, make_value(true));
+      ASSERT_EQ(stack[1].at("x").value, make_value(10));
+      ASSERT_EQ(stack[1].at("y").value, make_value(true));
     }
     else if (stack.size() == 1)
     {
       ASSERT_EQ(stack.size(), 1);
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{20}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(20));
     }
   };
 
@@ -252,13 +274,13 @@ TEST(Exec, FuncCall_ParamsWithReturn)
     {
       ASSERT_EQ(stack.size(), 2);
       ASSERT_EQ(stack[1].size(), 2);
-      ASSERT_EQ(stack[1].at("a").value, VarValue{CpyInt{10}});
-      ASSERT_EQ(stack[1].at("b").value, VarValue{CpyInt{20}});
+      ASSERT_EQ(stack[1].at("a").value, make_value(10));
+      ASSERT_EQ(stack[1].at("b").value, make_value(20));
     }
     else if (stack.size() == 1)
     {
       ASSERT_EQ(stack.size(), 1);
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{30}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(30));
     }
   };
 
@@ -293,12 +315,12 @@ TEST(Exec, FuncCall_AssignParent)
       ASSERT_EQ(stack.size(), 2);
       // `a` is in parent
       ASSERT_EQ(stack[0].size(), 1);
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyString{"from"}});
+      ASSERT_EQ(stack[0].at("a").value, make_value("from"));
     }
     else if (stack.size() == 1)
     {
       ASSERT_EQ(stack[0].size(), 1);
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyString{"cpy"}});
+      ASSERT_EQ(stack[0].at("a").value, make_value("cpy"));
     }
   };
 
@@ -333,11 +355,11 @@ TEST(Exec, FuncCall_If)
   {
     // if (a)
     if (stack.size() == 2) {
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
     }
   };
 
@@ -375,11 +397,11 @@ TEST(Exec, FuncCall_Else)
   {
     // if (a)
     if (stack.size() == 2) {
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
     }
   };
 
@@ -418,11 +440,11 @@ TEST(Exec, FuncCall_ElseIf)
   {
     // if (a)
     if (stack.size() == 2) {
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
     }
   };
 
@@ -462,12 +484,12 @@ TEST(Exec, FuncCall_IfLocal)
     {
       ASSERT_EQ(stack[0].size(), 2);
       ASSERT_EQ(stack[1].size(), 1);
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
-      ASSERT_EQ(stack[1].at("zz").value, VarValue{CpyInt{4}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[1].at("zz").value, make_value(4));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+      ASSERT_EQ(stack[0].at("z").value, make_value(2));
     }
   };
 
@@ -522,7 +544,7 @@ TEST(Exec, FuncCall_ConditionVarious)
 
       // if (a)
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{2}});
+        ASSERT_EQ(stack[0].at("z").value, make_value(2));
       }
     };
 
@@ -541,7 +563,7 @@ TEST(Exec, FuncCall_ConditionVarious)
     {
       // else if (a == b)
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{4}});
+        ASSERT_EQ(stack[0].at("z").value, make_value(4));
       }
     };
 
@@ -560,7 +582,7 @@ TEST(Exec, FuncCall_ConditionVarious)
     {
       // else if (a > b)
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{6}});
+        ASSERT_EQ(stack[0].at("z").value, make_value(6));
       }
     };
 
@@ -579,7 +601,7 @@ TEST(Exec, FuncCall_ConditionVarious)
     {
       // else
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, VarValue{CpyInt{8}});
+        ASSERT_EQ(stack[0].at("z").value, make_value(8));
       }
     };
 
@@ -618,7 +640,7 @@ TEST(Exec, FuncCall_ReturnFromIf)
     }
     // end of script/return from foo() call
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyInt{5}});
+      ASSERT_EQ(stack[0].at("a").value, make_value(5));
     }
   };
 
@@ -651,17 +673,18 @@ TEST(Exec, FuncCall_ConditionDelcVarInIf)
     {
       ASSERT_EQ(stack[0].size(), 1);
       ASSERT_EQ(stack[1].size(), 1);
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{true}});
-      ASSERT_EQ(stack[1].at("b").value, VarValue{CpyInt{1}});
+      ASSERT_EQ(stack[0].at("a").value, make_value(true));
+      ASSERT_EQ(stack[1].at("b").value, make_value(1));
     }
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{false}});
+      ASSERT_EQ(stack[0].at("a").value, make_value(false));
     }
   };
 
   TestExecutor exec(sem.symbol_table(), on_pop);
   exec.execute(script.ast->block);
 }
+
 
 TEST(Exec, FuncCall_ConditionDelcVarInNestedIf)
 {
@@ -690,19 +713,174 @@ TEST(Exec, FuncCall_ConditionDelcVarInNestedIf)
   auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
   {
     if (stack.size() == 3) {
-      ASSERT_EQ(stack[2].at("b").value, VarValue{CpyBool{true}});
+      ASSERT_EQ(stack[2].at("b").value, make_value(true));
     }
     else if (stack.size() == 2)
     {
       ASSERT_EQ(stack[0].size(), 1);
       ASSERT_EQ(stack[1].size(), 0);
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{true}});
+      ASSERT_EQ(stack[0].at("a").value, make_value(true));
     }
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("a").value, VarValue{CpyBool{false}});
+      ASSERT_EQ(stack[0].at("a").value, make_value(false));
     }
   };
 
   TestExecutor exec(sem.symbol_table(), on_pop);
   exec.execute(script.ast->block);
+}
+
+
+TEST(Exec, FuncCall_ParamRef)
+{
+  {
+    const std::string_view src = R"(
+      fn foo(x: ref int)
+      {
+        x = 5;
+      }
+
+      a := 1 ;
+
+      foo(ref a);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 2)
+      {
+        ASSERT_EQ(stack[0].size(), 1);
+        ASSERT_EQ(stack[1].size(), 1);
+      }
+      else if (stack.size() == 1) {
+        ASSERT_EQ(stack[0].at("a").value, make_value(5));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo(x: ref str, y: int)
+      {
+        x = "world";
+        y = 2;
+      }
+
+      a := "hello";
+      b := 1;
+
+      foo(ref a, b);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 2)
+      {
+        ASSERT_EQ(stack[0].size(), 2);
+        ASSERT_EQ(stack[1].size(), 2);
+        ASSERT_EQ(stack[1].at("y").value, make_value(2));
+      }
+      else if (stack.size() == 1)
+      {
+        ASSERT_EQ(stack[0].at("a").value, make_value("world"));
+        ASSERT_EQ(stack[0].at("b").value, make_value(1));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo(x: ref str, y: int)
+      {
+        x = bar();
+        y = 2;
+      }
+
+      fn bar() -> str
+      {
+        return "world";
+      }
+
+      a := "hello";
+      b := 1;
+
+      foo(ref a, b);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 2)
+      {
+        ASSERT_EQ(stack[0].size(), 2);
+        ASSERT_EQ(stack[1].size(), 2);
+        ASSERT_EQ(stack[1].at("y").value, make_value(2));
+      }
+      else if (stack.size() == 1)
+      {
+        ASSERT_EQ(stack[0].at("a").value, make_value("world"));
+        ASSERT_EQ(stack[0].at("b").value, make_value(1));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo(x: ref str)
+      {
+        bar(ref x);
+      }
+
+      fn bar(xx: ref str)
+      {
+        xx = "world";
+      }
+
+      a := "hello";
+
+      foo(ref a);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 1) {
+        ASSERT_EQ(stack[0].at("a").value, make_value("world"));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
 }

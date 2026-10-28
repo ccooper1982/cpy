@@ -18,8 +18,19 @@ export default grammar({
         field("body", $.block),
       ),
 
-    parameters: ($) => seq($.parameter, repeat(seq(",", $.parameter))),
-    parameter: ($) => seq(field("name", $.identifier), ":", field("type", $.type_name)),
+    parameters: ($) =>
+      seq($.parameter,
+        repeat(seq(",", $.parameter))),
+
+    parameter: ($) =>
+      seq(
+        field("name", $.identifier),
+        ":",
+        optional(field("ref", $.ref_modifier)),
+        field("type", $.type_name),
+      ),
+
+    ref_modifier: ($) => "ref",
     return_type: ($) => seq("->", field("type_name", $.type_name)),
     type_name: ($) => $.identifier,
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
@@ -55,6 +66,18 @@ export default grammar({
       ")",
     ),
 
+    arguments: ($) =>
+      seq(
+        $.argument,
+        repeat(seq(",", $.argument)),
+      ),
+
+    argument: ($) =>
+      seq(
+        optional(field("ref", $.ref_modifier)),
+        field("expression", $.expression),
+      ),
+
     condition_if: ($) =>
       seq(
         "if", "(",
@@ -67,10 +90,8 @@ export default grammar({
 
     return: ($) =>
       seq("return",
-        optional(
-          field("expression", $.expression)
-        )
-        ),
+          optional(field("expression", $.expression))
+      ),
 
     else_if_clause: ($) =>
       seq(
@@ -115,11 +136,6 @@ export default grammar({
     qualified_name: ($) => seq(
       optional(seq($.identifier, "::")),
       $.identifier,
-    ),
-
-    arguments: ($) => seq(
-      $.expression,
-      repeat(seq(",", $.expression)),
     ),
 
     expression: ($) => choice(
