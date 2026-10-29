@@ -123,10 +123,10 @@ void Executor::execute (const NodeBlock& block, const VariableDecl& decl)
   auto& var = get_variable(decl.var_name);
 
   if (decl.is_literal_initialised()) {
-    var.value = value_from_literal_expr(*decl.initialiser);
+    var.value() = value_from_literal_expr(*decl.initialiser);
   }
   else if (decl.has_initialiser()) {
-    var.value = execute(block, *decl.initialiser);
+    var.value() = execute(block, *decl.initialiser);
   }
 }
 
@@ -136,10 +136,10 @@ void Executor::execute (const NodeBlock& block, const VariableAssign& assign)
   auto& var = get_variable(assign.name);
 
   if (assign.expr->is_literal()) {
-    var.value = value_from_literal_expr(*assign.expr);
+    var.value() = value_from_literal_expr(*assign.expr);
   }
   else {
-    var.value = execute(block, *assign.expr);
+    var.value() = execute(block, *assign.expr);
   }
 }
 
@@ -169,12 +169,11 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
         // a: int;
         // foo (ref a);
         // we need to find variable a
-        const auto& var_ref = static_cast<const VariableRef&>(*call.args[i].expr);
-        variable.ref = &get_variable(var_ref.name);
+        const auto& var_ref = static_cast<const VariableUse&>(*call.args[i].expr);
+        variable.set_ref_target(&get_variable(var_ref.name));
       }
-      else
-      {
-        variable.value = val;
+      else {
+        variable.value() = val;
       }
 
       args.emplace(def.params[i].name, std::move(variable));
@@ -199,32 +198,32 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
       }
     }
   }
-  else if (expr.is_expr_type(ExpressionType::VariableRef))
+  else if (expr.is_expr_type(ExpressionType::VariableUse))
   {
-    const auto& ref = static_cast<const VariableRef&>(expr);
+    const auto& ref = static_cast<const VariableUse&>(expr);
     const auto& variable = get_variable(ref.name);
-    result = variable.value;
+    result = variable.value();
   }
 
   return result;
 }
 
 
-void Executor::push_stack (const NodeBlock& block, std::map<VarName, Variable> args)
+void Executor::push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args)
 {
   const auto parent = m_stack.empty() ? nullptr : m_stack.top().get();
 
-  if (const auto vars = m_sym_table.get_variables(block); vars) {
-    m_stack.emplace(std::make_unique<StackEntry>(*vars, parent));
+  if (const auto block_vars = m_sym_table.get_variables(block); block_vars) {
+    m_stack.emplace(std::make_unique<StackEntry>(*block_vars, parent));
   }
 
-  for (auto& [name, var] : args)
+  for (auto& [name, var] : func_args)
   {
-    if (var.ref) {
-      m_stack.top()->get_var(name).ref = var.ref;
+    if (var.is_ref()) {
+      m_stack.top()->get_var(name).set_ref_target(var.get_ref());
     }
     else {
-      m_stack.top()->get_var(name).value = std::move(var.value);
+      m_stack.top()->get_var(name).value() = std::move(var.value());
     }
   }
 }
@@ -255,7 +254,7 @@ Variable& Executor::get_variable (const VarName name)
   }
 
   auto& var = entry->get_var(name);
-  return var.ref ? *var.ref : var;
+  return var.is_ref() ? var.get_ref_target() : var;
 }
 
 

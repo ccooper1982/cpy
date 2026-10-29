@@ -28,7 +28,7 @@ enum class ExpressionType
   Bool,
   Binary,
   FuncCall,
-  VariableRef,
+  VariableUse,
   Return
 };
 
@@ -147,7 +147,7 @@ struct StringLiteral : public Expression
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << "str = " << v;
+    os << "str = \"" << v << '\"';
   }
 
   CpyString value() const
@@ -317,22 +317,21 @@ struct FunctionCall : public Expression
 };
 
 
-// TODO rename to VariableSymbol ?
-// Note: not a "ref" like a C++ reference, but "a node which refers to a variable"
-// i.e.:
+
+// The use of a variable, i.e.:
 //  ```
 //  a: int;
 //  foo(a);
 // ```
-// the `a` is a VariableRef
-struct VariableRef : public Expression
+// the `a` is a VariableUse
+struct VariableUse : public Expression
 {
-  static constexpr ExpressionType ExprType = ExpressionType::VariableRef;
+  static constexpr ExpressionType ExprType = ExpressionType::VariableUse;
 
-  VariableRef() : Expression(ExprType, false)
+  VariableUse() : Expression(ExprType, false)
   {}
 
-  VariableRef(const std::string_view name)
+  VariableUse(const std::string_view name)
     : Expression(ExprType, false)
     , name(name)
   {}
@@ -340,7 +339,7 @@ struct VariableRef : public Expression
   VarType get_var_type() const override
   {
     // never called because the type is taken from the type of the variable
-    throw std::runtime_error{"get_var_type() called on VariableRef"};
+    throw std::runtime_error{"get_var_type() called on VariableUse"};
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -402,7 +401,7 @@ inline std::string_view to_string(const Expression& expr)
       return "BinaryExpression";
     case FuncCall:
       return "FunctionCall";
-    case VariableRef:
+    case VariableUse:
       return "VariableReference";
     case Return:
       return "Return";

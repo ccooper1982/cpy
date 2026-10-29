@@ -13,7 +13,6 @@
 #include <utility>
 
 
-
 inline static VarValue value_from_type (const VarType type)
 {
   if (!type.is_type<BuiltInType>()) {
@@ -46,25 +45,89 @@ inline static VarValue value_from_type (const VarType type)
   }
 }
 
+
+/// Represents a variable and its value.
+/// If the variable can be a reference, Variable::val is empty and `val_ref`
+/// is the actual value:
+///
+/// ```
+/// fn foo(x: ref int)
+/// {
+///    x = 42;
+/// }
+///
+/// a: int;
+///
+/// foo(ref a);
+/// ```
+///
+/// For `x`, the Variable::val is empty, whilst Variable::val_ref
+/// points to the Variable that represents `a`.
 struct Variable
 {
   Variable() = default;
-
-  Variable(const VarValue& v) : value(v)
+  Variable(const VarValue& v) : val(v)
   {}
 
-  VarValue value;
-  Variable * ref{nullptr};
+  VarValue& value() { return val; }
+  const VarValue& value() const { return val; }
+
+  Variable& get_ref_target() { return *val_ref; }
+  Variable * get_ref() { return val_ref; }
+
+  void set_ref_target(Variable * ref)
+  {
+    val = VarValue{};
+    val_ref = ref;
+  }
+
+  bool is_ref() const { return val_ref != nullptr; }
+
+
+private:
+  VarValue val;
+  Variable * val_ref{nullptr};
 };
 
+
+/// A stack entry is added to the stack on entry to each NodeBlock.
+/// Each entry stores the variables in that stack, and a pointer to
+/// the parent entry.
+/// The stack entry is added before executing statements:
+///
+/// ```
+/// fn foo()
+/// {
+///   a := "blah";
+/// }
+/// ```
+/// - The entry for foo(), will store `a` as an empty string
+/// - Execetion continues to the VariableAssign, setting `a` to "blah"
+///
+/// Also:
+///
+/// ```
+/// a :int;
+///
+/// fn foo()
+/// {
+///   a :str;
+/// }
+/// ```
+/// - The two `a` variables are entirely independent
+/// - The `a:str` is in foo's stack entry, so a lookup for
+///   `a` will resolve to `a:str`
 class StackEntry
 {
 public:
-  StackEntry(VariableMap var_map, StackEntry * parent)
-    : m_var_syms(var_map)
-    , m_parent(parent)
+  StackEntry(const ResolvedVariableMap& block_vars, StackEntry * parent)
+    : m_parent(parent)
   {
-    init();
+    // initialise this NodeBlock's variables, assigning default values, which
+    // can be replaced later when an VariableUse or VariableDecl is encountered
+    for (const auto& [var, resolved] : block_vars) {
+      m_vars.emplace(var, value_from_type(resolved.type));
+    }
   }
 
   Variable& get_var(const VarName name)
@@ -79,27 +142,9 @@ public:
 
   bool has_parent() const { return m_parent != nullptr; }
   StackEntry * get_parent() const { return m_parent; }
-
-  std::map<VarName, Variable> get_vars() const
-  {
-    return m_vars;
-  }
+  std::map<VarName, Variable> get_vars() const { return m_vars; }
 
 private:
-  void init()
-  {
-    for (const auto& [var, resolved] : m_var_syms)
-    {
-      if (!resolved.type.is_type<BuiltInType>()) {
-        throw std::runtime_error{"Only BuiltInType is supported"};
-      }
-
-      m_vars.emplace(var, value_from_type(resolved.type));
-    }
-  }
-
-private:
-  VariableMap m_var_syms;
   std::map<VarName, Variable> m_vars;
   StackEntry * m_parent{};
 };
@@ -132,13 +177,13 @@ private:
 #ifdef CPY_UNIT_TESTS
   // this for the child class TestExecutor
   protected:
-    virtual void push_stack (const NodeBlock& block, std::map<VarName, Variable> args = {});
+    virtual void push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args = {});
     virtual void pop_stack ();
 
     std::stack<std::unique_ptr<StackEntry>> m_stack;
 #else
   private:
-    void push_stack (const NodeBlock& block, std::map<VarName, Variable> args = {});
+    void push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args = {});
     void pop_stack ();
 
     std::stack<std::unique_ptr<StackEntry>> m_stack;
@@ -171,9 +216,9 @@ public:
       {
       }
 
-    void push_stack (const NodeBlock& block, std::map<VarName, Variable> args = {}) override
+    void push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args = {}) override
     {
-      Executor::push_stack(block, std::move(args));
+      Executor::push_stack(block, std::move(func_args));
       if (m_on_push) {
         m_on_push(m_stack.top()->get_vars(), m_stack.size());
       }

@@ -118,7 +118,7 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
     expr = parse_function_call(ts_node_named_child(expr_node, 0));
   }
   else if (expr_type == "identifier") {
-    expr = make_node<VariableRef>(from_source(expr_node));
+    expr = make_node<VariableUse>(from_source(expr_node));
   }
 
   if (expr) {

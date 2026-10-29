@@ -29,7 +29,7 @@ struct ResolvedFunction
   const FunctionDef * ast{};
 };
 
-using VariableMap = std::map<std::string_view, const ResolvedSymbol>;
+using ResolvedVariableMap = std::map<std::string_view, const ResolvedSymbol>;
 
 struct Scope
 {
@@ -38,7 +38,7 @@ struct Scope
   {}
 
   Scope * parent{};
-  VariableMap vars{};
+  ResolvedVariableMap vars{};
 };
 
 /// Maps function:
@@ -46,7 +46,7 @@ struct Scope
 /// Maps variables:
 ///   type, scope visibility
 ///
-/// Variable scope is essentially parent/child, similar to C++:
+/// Variable scope is essentially parent/child:
 ///  ```
 ///   a: bool;
 ///   b: int;
@@ -63,8 +63,6 @@ struct Scope
 /// A stack is used to manage the parent/child scope tracking.
 /// A new scope is created with enter_scope() (pushes onto the stack), whilst
 /// exit_scope() pops from the stack.
-///
-/// A separate map is used to map between a NodeBlock and the variables available in that scope.
 class SymbolTable
 {
   inline static const std::map<const std::string_view, const BuiltInType> BuiltInTypes = {
@@ -128,10 +126,9 @@ public:
     return resolved != nullptr && resolved->position < position;
   }
 
-  // TODO: this should return unresolved_type rather than std::optional
-  std::optional<BuiltInType> get_type(const std::string_view t) const
+  std::optional<BuiltInType> get_type(const std::string_view type_name) const
   {
-    const auto it = BuiltInTypes.find(t) ;
+    const auto it = BuiltInTypes.find(type_name) ;
     if (it == rg::end(BuiltInTypes))
      return std::nullopt;
 
@@ -155,9 +152,9 @@ public:
     throw std::runtime_error{"SymbolTable::get_variable() - var does not exist"};
   }
 
-  std::optional<VariableMap> get_variables (const NodeBlock& block) const
+  std::optional<ResolvedVariableMap> get_variables (const NodeBlock& block) const
   {
-    std::optional<VariableMap> result;
+    std::optional<ResolvedVariableMap> result;
 
     if (const auto it = m_scopes.find(&block); it != m_scopes.cend())
       result = it->second->vars;

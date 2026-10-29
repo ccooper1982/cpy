@@ -245,7 +245,7 @@ struct VariableAssign : public AstNode
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << name << '=';
+    os << name << ':';
     expr->dump(os, tab);
   }
 

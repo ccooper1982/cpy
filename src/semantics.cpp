@@ -141,8 +141,7 @@ void Semantics::process_function_signatures(Context& ctx)
       }
     }
 
-    const auto return_type = m_symbol_table.get_type(def.return_type);
-    if (!return_type) {
+    if (const auto return_type = m_symbol_table.get_type(def.return_type); !return_type) {
       issue::unknown_return_type(ctx.issues, def.name, def.return_type);
     }
     else {
@@ -270,7 +269,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       return unresolved_type;
     }
 
-    if (arg_is_ref && !arg_expr.is_expr_type(ExpressionType::VariableRef))
+    if (arg_is_ref && !arg_expr.is_expr_type(ExpressionType::VariableUse))
     {
       issue::func_arg_ref_type(ctx.issues, *call.args[i].expr);
       return unresolved_type;
@@ -300,9 +299,9 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       if (!process_expression(ctx, parent, block, expr))
         return unresolved_type;
     }
-    else if (arg_expr.is_expr_type(ExpressionType::VariableRef))
+    else if (arg_expr.is_expr_type(ExpressionType::VariableUse))
     {
-      const auto& var = static_cast<const VariableRef&>(arg_expr);
+      const auto& var = static_cast<const VariableUse&>(arg_expr);
       const auto var_type = process_expression(ctx, call, block, var);
 
       // if the variable is unknown, process_expression() will create an issue and
@@ -326,7 +325,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   return resolved_func.return_type;
 }
 
-VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableRef& expr)
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableUse& expr)
 {
   if (!m_symbol_table.has_visible_variable(expr.name, block, expr.source.start))
   {

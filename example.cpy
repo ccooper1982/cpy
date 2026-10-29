@@ -1,13 +1,14 @@
-fn foo(x: ref str)
-{
-    bar(ref x);
-}
+b :int;
 
-fn bar(xx: ref str)
+fn foo(x: str)
 {
-    xx = "world";
+    b: int;
+    c :int;
+
+    x = "";
+    b = 0;
 }
 
 a := "hello";
 
-foo(ref a);
+foo(a);

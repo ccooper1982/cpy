@@ -264,7 +264,7 @@ TEST(Ast, FuncCall_Ref)
   const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[1]);
   ASSERT_EQ(call.name, "foo");
   ASSERT_EQ(call.args.size(), 1);
-  ASSERT_TRUE(call.args[0].expr->is_expr_type(ExpressionType::VariableRef));
+  ASSERT_TRUE(call.args[0].expr->is_expr_type(ExpressionType::VariableUse));
   ASSERT_TRUE(call.args[0].is_ref);
 }
 

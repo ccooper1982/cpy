@@ -55,7 +55,7 @@ private:
   // TODO what's the parent param actually used for?
   // expressions
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const FunctionCall& expr);
-  VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableRef& expr);
+  VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableUse& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const BinaryExpression& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& expr);
 
@@ -139,8 +139,8 @@ private:
         // const auto func_def = m_symbol_table.get_function(func_call.name).ast;
         return process_expression(ctx, parent, block, static_cast<const FunctionCall&>(expr));
       }
-      case ExpressionType::VariableRef:
-        return process_expression(ctx, parent, block, static_cast<const VariableRef&>(expr));
+      case ExpressionType::VariableUse:
+        return process_expression(ctx, parent, block, static_cast<const VariableUse&>(expr));
       case ExpressionType::Return:
         return process_expression(ctx, parent, block, static_cast<const Return&>(expr));
       case ExpressionType::Binary:

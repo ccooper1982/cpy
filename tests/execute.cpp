@@ -46,8 +46,8 @@ TEST(Exec, Basic)
   {
     ASSERT_EQ(stack.size(), 1);
     ASSERT_EQ(stack[0].size(), 2);
-    ASSERT_EQ(stack[0].at("a").value, make_value(0));
-    ASSERT_EQ(stack[0].at("b").value, make_value(1));
+    ASSERT_EQ(stack[0].at("a").value(), make_value(0));
+    ASSERT_EQ(stack[0].at("b").value(), make_value(1));
   };
 
   TestExecutor exec(sem.symbol_table(), on_pop);
@@ -76,7 +76,7 @@ TEST(Exec, FuncCall_NoParams_Empty)
   {
     ASSERT_EQ(stack.size(), 1);
     ASSERT_EQ(stack[0].size(), 1);
-    ASSERT_EQ(stack[0].at("a").value, make_value(1));
+    ASSERT_EQ(stack[0].at("a").value(), make_value(1));
   };
 
   TestExecutor exec(sem.symbol_table(), on_push, on_pop);
@@ -106,7 +106,7 @@ TEST(Exec, FuncCall_NoParams_Local)
     if (stack_size == 1)
     {
       ASSERT_EQ(stack_size, 1);
-      ASSERT_EQ(vars.at("a").value, make_value(0));
+      ASSERT_EQ(vars.at("a").value(), make_value(0));
     }
   };
 
@@ -118,8 +118,8 @@ TEST(Exec, FuncCall_NoParams_Local)
     else if (stack.size() == 2)
     {
       ASSERT_EQ(stack.size(), 2);
-      ASSERT_EQ(stack[0].at("a").value, make_value(1));
-      ASSERT_EQ(stack[1].at("b").value, make_value(1));
+      ASSERT_EQ(stack[0].at("a").value(), make_value(1));
+      ASSERT_EQ(stack[1].at("b").value(), make_value(1));
     }
   };
 
@@ -151,8 +151,8 @@ TEST(Exec, FuncCall_ParamsAssign)
     if (stack_size == 2)
     {
       ASSERT_EQ(vars.size(), 2);
-      ASSERT_EQ(vars.at("a").value, make_value(10));
-      ASSERT_EQ(vars.at("b").value, make_value(true));
+      ASSERT_EQ(vars.at("a").value(), make_value(10));
+      ASSERT_EQ(vars.at("b").value(), make_value(true));
     }
   };
 
@@ -161,8 +161,8 @@ TEST(Exec, FuncCall_ParamsAssign)
     if (stack.size() == 2)
     {
       ASSERT_EQ(stack.size(), 2);
-      ASSERT_EQ(stack[1].at("a").value, make_value(20));
-      ASSERT_EQ(stack[1].at("b").value, make_value(false));
+      ASSERT_EQ(stack[1].at("a").value(), make_value(20));
+      ASSERT_EQ(stack[1].at("b").value(), make_value(false));
     }
   };
 
@@ -194,11 +194,11 @@ TEST(Exec, FuncCall_Params)
     if (stack.size() == 2)
     {
       ASSERT_EQ(stack.size(), 2);
-      ASSERT_EQ(stack[1].at("a").value, make_value(10));
-      ASSERT_EQ(stack[1].at("b").value, make_value(true));
-      ASSERT_EQ(stack[1].at("x").value, make_value(10));
-      ASSERT_EQ(stack[1].at("y").value, make_value(true));
-      ASSERT_EQ(stack[1].at("z").value, make_value(20));
+      ASSERT_EQ(stack[1].at("a").value(), make_value(10));
+      ASSERT_EQ(stack[1].at("b").value(), make_value(true));
+      ASSERT_EQ(stack[1].at("x").value(), make_value(10));
+      ASSERT_EQ(stack[1].at("y").value(), make_value(true));
+      ASSERT_EQ(stack[1].at("z").value(), make_value(20));
     }
   };
 
@@ -234,15 +234,15 @@ TEST(Exec, FuncCall_ParamsWithParent)
       ASSERT_EQ(stack.size(), 2);
       ASSERT_EQ(stack[0].size(), 1);
       ASSERT_EQ(stack[1].size(), 4);
-      ASSERT_EQ(stack[1].at("a").value, make_value(10));
-      ASSERT_EQ(stack[1].at("b").value, make_value(true));
-      ASSERT_EQ(stack[1].at("x").value, make_value(10));
-      ASSERT_EQ(stack[1].at("y").value, make_value(true));
+      ASSERT_EQ(stack[1].at("a").value(), make_value(10));
+      ASSERT_EQ(stack[1].at("b").value(), make_value(true));
+      ASSERT_EQ(stack[1].at("x").value(), make_value(10));
+      ASSERT_EQ(stack[1].at("y").value(), make_value(true));
     }
     else if (stack.size() == 1)
     {
       ASSERT_EQ(stack.size(), 1);
-      ASSERT_EQ(stack[0].at("z").value, make_value(20));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(20));
     }
   };
 
@@ -274,13 +274,13 @@ TEST(Exec, FuncCall_ParamsWithReturn)
     {
       ASSERT_EQ(stack.size(), 2);
       ASSERT_EQ(stack[1].size(), 2);
-      ASSERT_EQ(stack[1].at("a").value, make_value(10));
-      ASSERT_EQ(stack[1].at("b").value, make_value(20));
+      ASSERT_EQ(stack[1].at("a").value(), make_value(10));
+      ASSERT_EQ(stack[1].at("b").value(), make_value(20));
     }
     else if (stack.size() == 1)
     {
       ASSERT_EQ(stack.size(), 1);
-      ASSERT_EQ(stack[0].at("z").value, make_value(30));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(30));
     }
   };
 
@@ -315,12 +315,12 @@ TEST(Exec, FuncCall_AssignParent)
       ASSERT_EQ(stack.size(), 2);
       // `a` is in parent
       ASSERT_EQ(stack[0].size(), 1);
-      ASSERT_EQ(stack[0].at("a").value, make_value("from"));
+      ASSERT_EQ(stack[0].at("a").value(), make_value("from"));
     }
     else if (stack.size() == 1)
     {
       ASSERT_EQ(stack[0].size(), 1);
-      ASSERT_EQ(stack[0].at("a").value, make_value("cpy"));
+      ASSERT_EQ(stack[0].at("a").value(), make_value("cpy"));
     }
   };
 
@@ -355,11 +355,11 @@ TEST(Exec, FuncCall_If)
   {
     // if (a)
     if (stack.size() == 2) {
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
     }
   };
 
@@ -397,11 +397,11 @@ TEST(Exec, FuncCall_Else)
   {
     // if (a)
     if (stack.size() == 2) {
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
     }
   };
 
@@ -440,11 +440,11 @@ TEST(Exec, FuncCall_ElseIf)
   {
     // if (a)
     if (stack.size() == 2) {
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
     }
   };
 
@@ -484,12 +484,12 @@ TEST(Exec, FuncCall_IfLocal)
     {
       ASSERT_EQ(stack[0].size(), 2);
       ASSERT_EQ(stack[1].size(), 1);
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
-      ASSERT_EQ(stack[1].at("zz").value, make_value(4));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
+      ASSERT_EQ(stack[1].at("zz").value(), make_value(4));
     }
     // end of script/return from if(a)
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("z").value, make_value(2));
+      ASSERT_EQ(stack[0].at("z").value(), make_value(2));
     }
   };
 
@@ -544,7 +544,7 @@ TEST(Exec, FuncCall_ConditionVarious)
 
       // if (a)
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, make_value(2));
+        ASSERT_EQ(stack[0].at("z").value(), make_value(2));
       }
     };
 
@@ -563,7 +563,7 @@ TEST(Exec, FuncCall_ConditionVarious)
     {
       // else if (a == b)
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, make_value(4));
+        ASSERT_EQ(stack[0].at("z").value(), make_value(4));
       }
     };
 
@@ -582,7 +582,7 @@ TEST(Exec, FuncCall_ConditionVarious)
     {
       // else if (a > b)
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, make_value(6));
+        ASSERT_EQ(stack[0].at("z").value(), make_value(6));
       }
     };
 
@@ -601,7 +601,7 @@ TEST(Exec, FuncCall_ConditionVarious)
     {
       // else
       if (stack.size() == 2) {
-        ASSERT_EQ(stack[0].at("z").value, make_value(8));
+        ASSERT_EQ(stack[0].at("z").value(), make_value(8));
       }
     };
 
@@ -640,7 +640,7 @@ TEST(Exec, FuncCall_ReturnFromIf)
     }
     // end of script/return from foo() call
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("a").value, make_value(5));
+      ASSERT_EQ(stack[0].at("a").value(), make_value(5));
     }
   };
 
@@ -673,11 +673,11 @@ TEST(Exec, FuncCall_ConditionDelcVarInIf)
     {
       ASSERT_EQ(stack[0].size(), 1);
       ASSERT_EQ(stack[1].size(), 1);
-      ASSERT_EQ(stack[0].at("a").value, make_value(true));
-      ASSERT_EQ(stack[1].at("b").value, make_value(1));
+      ASSERT_EQ(stack[0].at("a").value(), make_value(true));
+      ASSERT_EQ(stack[1].at("b").value(), make_value(1));
     }
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("a").value, make_value(false));
+      ASSERT_EQ(stack[0].at("a").value(), make_value(false));
     }
   };
 
@@ -713,16 +713,16 @@ TEST(Exec, FuncCall_ConditionDelcVarInNestedIf)
   auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
   {
     if (stack.size() == 3) {
-      ASSERT_EQ(stack[2].at("b").value, make_value(true));
+      ASSERT_EQ(stack[2].at("b").value(), make_value(true));
     }
     else if (stack.size() == 2)
     {
       ASSERT_EQ(stack[0].size(), 1);
       ASSERT_EQ(stack[1].size(), 0);
-      ASSERT_EQ(stack[0].at("a").value, make_value(true));
+      ASSERT_EQ(stack[0].at("a").value(), make_value(true));
     }
     else if (stack.size() == 1) {
-      ASSERT_EQ(stack[0].at("a").value, make_value(false));
+      ASSERT_EQ(stack[0].at("a").value(), make_value(false));
     }
   };
 
@@ -759,7 +759,7 @@ TEST(Exec, FuncCall_ParamRef)
         ASSERT_EQ(stack[1].size(), 1);
       }
       else if (stack.size() == 1) {
-        ASSERT_EQ(stack[0].at("a").value, make_value(5));
+        ASSERT_EQ(stack[0].at("a").value(), make_value(5));
       }
     };
 
@@ -793,12 +793,12 @@ TEST(Exec, FuncCall_ParamRef)
       {
         ASSERT_EQ(stack[0].size(), 2);
         ASSERT_EQ(stack[1].size(), 2);
-        ASSERT_EQ(stack[1].at("y").value, make_value(2));
+        ASSERT_EQ(stack[1].at("y").value(), make_value(2));
       }
       else if (stack.size() == 1)
       {
-        ASSERT_EQ(stack[0].at("a").value, make_value("world"));
-        ASSERT_EQ(stack[0].at("b").value, make_value(1));
+        ASSERT_EQ(stack[0].at("a").value(), make_value("world"));
+        ASSERT_EQ(stack[0].at("b").value(), make_value(1));
       }
     };
 
@@ -837,12 +837,12 @@ TEST(Exec, FuncCall_ParamRef)
       {
         ASSERT_EQ(stack[0].size(), 2);
         ASSERT_EQ(stack[1].size(), 2);
-        ASSERT_EQ(stack[1].at("y").value, make_value(2));
+        ASSERT_EQ(stack[1].at("y").value(), make_value(2));
       }
       else if (stack.size() == 1)
       {
-        ASSERT_EQ(stack[0].at("a").value, make_value("world"));
-        ASSERT_EQ(stack[0].at("b").value, make_value(1));
+        ASSERT_EQ(stack[0].at("a").value(), make_value("world"));
+        ASSERT_EQ(stack[0].at("b").value(), make_value(1));
       }
     };
 
@@ -876,7 +876,7 @@ TEST(Exec, FuncCall_ParamRef)
     auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
     {
       if (stack.size() == 1) {
-        ASSERT_EQ(stack[0].at("a").value, make_value("world"));
+        ASSERT_EQ(stack[0].at("a").value(), make_value("world"));
       }
     };
 
