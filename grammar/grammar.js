@@ -145,15 +145,37 @@ export default grammar({
       $.boolean,
       $.function_call,
       $.identifier,
-      $.binary_expression
+      $.binary_expression,
+      $.parenthesized_expression
     ),
 
-    // TODO operator precedence with prec(1,...), prec(2,...)
-    binary_expression: ($) =>
-      prec.left(seq(
-        field("lhs", $.expression),
-        field("op", choice("+", "-", "*", "/", "!=", "==", ">=", "<=", ">", "<")),
-        field("rhs", $.expression),
-      ))
+    binary_expression: ($) => choice(
+        prec.left(3, seq(
+            field("lhs", $.expression),
+            field("op", choice("*", "/")),
+            field("rhs", $.expression),
+        )),
+
+        prec.left(2, seq(
+            field("lhs", $.expression),
+            field("op", choice("+", "-")),
+            field("rhs", $.expression),
+        )),
+
+        prec.left(1, seq(
+            field("lhs", $.expression),
+            field("op", choice(">", "<", ">=", "<=")),
+            field("rhs", $.expression),
+        )),
+
+        prec.left(0, seq(
+            field("lhs", $.expression),
+            field("op", choice("==", "!=")),
+            field("rhs", $.expression),
+        )),
+    ),
+
+    parenthesized_expression: ($) =>
+      seq("(", $.expression, ")"),
   },
 });

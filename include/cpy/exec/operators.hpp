@@ -40,6 +40,7 @@ inline VarValue operator-(const VarValue& lhs, const VarValue& rhs)
 
 inline VarValue operator/(const VarValue& lhs, const VarValue& rhs)
 {
+  // TODO divide by zero
   return do_operator(lhs, rhs, std::divides<>{});
 }
 

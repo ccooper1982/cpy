@@ -113,6 +113,16 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
     const auto op = get_binary_operator(from_source(op_node));
     expr = make_node<BinaryExpression>(parse_expression(lhs_node), parse_expression(rhs_node), op);
   }
+  else if (expr_type == "parenthesized_expression")
+  {
+    // the expression inside the parentheses are within an "expression" node, so we unwrap:
+    //  b := (1+4)
+    // Tree: (parenthesized_expression (expression (binary_expression)))
+    //        ^                         ^
+    //        expr_node                 inner
+    auto inner = ts_node_named_child(expr_node, 0);
+    expr = parse_expression(ts_node_named_child(inner, 0));
+  }
   else if (expr_type == "function_call") {
     expr = parse_function_call(ts_node_named_child(expr_node, 0));
   }

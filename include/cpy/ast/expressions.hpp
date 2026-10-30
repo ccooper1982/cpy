@@ -296,6 +296,8 @@ struct FunctionCall : public Expression
     throw std::runtime_error{"get_var_type() called on FunctionCall"};
   }
 
+  size_t arg_count() const { return args.size(); }
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
     if (!module.empty()) {

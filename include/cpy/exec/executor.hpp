@@ -196,6 +196,8 @@ private:
 
 #ifdef CPY_UNIT_TESTS
 
+#include <algorithm>
+
 using OnStackPush = std::function<void(std::map<VarName, Variable>, const size_t)>;
 using OnStackPop = std::function<void(std::vector<std::map<VarName, Variable>>)>;
 
@@ -233,9 +235,11 @@ public:
 
       while (entry)
       {
-        vars.insert(vars.begin(), entry->get_vars());
+        vars.push_back(entry->get_vars());
         entry = entry->get_parent();
       }
+
+      rg::reverse(vars);
 
       m_on_pop(std::move(vars));
       Executor::pop_stack();

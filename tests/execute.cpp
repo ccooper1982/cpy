@@ -767,78 +767,7 @@ TEST(Exec, FuncCall_ParamRef)
     exec.execute(script.ast->block);
   }
 
-  // declare  `a` prior to foo(), so the top level `a` and the
-  // function level `a` are both visible to foo(),
-  {
-    const std::string_view src = R"(
-      a := 1 ;
 
-      fn foo(a: ref int)
-      {
-        a = 5;
-      }
-
-      foo(ref a);
-    )";
-
-    Parser parser;
-    Semantics sem;
-
-    auto script = parser.parse(src);
-    sem.process(script);
-
-    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
-    {
-      if (stack.size() == 2)
-      {
-        ASSERT_EQ(stack[0].size(), 1);
-        ASSERT_EQ(stack[1].size(), 1);
-      }
-      else if (stack.size() == 1) {
-        ASSERT_EQ(stack[0].at("a").value(), make_value(5));
-      }
-    };
-
-    TestExecutor exec(sem.symbol_table(), on_pop);
-    exec.execute(script.ast->block);
-  }
-
-  {
-    const std::string_view src = R"(
-      a := 1;
-      b := 2;
-
-      fn foo(a: ref int)
-      {
-        a = 5;
-      }
-
-      foo(ref b);
-    )";
-
-    Parser parser;
-    Semantics sem;
-
-    auto script = parser.parse(src);
-    sem.process(script);
-
-    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
-    {
-      if (stack.size() == 2)
-      {
-        ASSERT_EQ(stack[0].size(), 2);
-        ASSERT_EQ(stack[1].size(), 1);
-      }
-      else if (stack.size() == 1)
-      {
-        ASSERT_EQ(stack[0].at("a").value(), make_value(1));
-        ASSERT_EQ(stack[0].at("b").value(), make_value(5));
-      }
-    };
-
-    TestExecutor exec(sem.symbol_table(), on_pop);
-    exec.execute(script.ast->block);
-  }
 
   {
     const std::string_view src = R"(
@@ -950,6 +879,162 @@ TEST(Exec, FuncCall_ParamRef)
     {
       if (stack.size() == 1) {
         ASSERT_EQ(stack[0].at("a").value(), make_value("world"));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+}
+
+
+TEST(Exec, FuncCall_ParamRefShadowing)
+{
+  {
+    const std::string_view src = R"(
+      a := 1 ;
+
+      fn foo(a: ref int)
+      {
+        a = 5;
+      }
+
+      foo(ref a);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 2)
+      {
+        ASSERT_EQ(stack[0].size(), 1);
+        ASSERT_EQ(stack[1].size(), 1);
+      }
+      else if (stack.size() == 1) {
+        ASSERT_EQ(stack[0].at("a").value(), make_value(5));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
+  {
+    const std::string_view src = R"(
+      a := 1;
+      b := 2;
+
+      fn foo(a: ref int)
+      {
+        a = 5;
+      }
+
+      foo(ref b);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 2)
+      {
+        ASSERT_EQ(stack[0].size(), 2);
+        ASSERT_EQ(stack[1].size(), 1);
+      }
+      else if (stack.size() == 1)
+      {
+        ASSERT_EQ(stack[0].at("a").value(), make_value(1));
+        ASSERT_EQ(stack[0].at("b").value(), make_value(5));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+}
+
+
+TEST(Exec, Parenthesis_DeclAssign)
+{
+  {
+    const std::string_view src = R"(
+      a := (1+2);
+      b := (1+2)+3;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      ASSERT_EQ(stack[0].at("a").value(), make_value(3));
+      ASSERT_EQ(stack[0].at("b").value(), make_value(6));
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
+  {
+    const std::string_view src = R"(
+      a := 1 + 2 * 2;
+      b := (1 + 2) * 2;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      ASSERT_EQ(stack[0].at("a").value(), make_value(5));
+      ASSERT_EQ(stack[0].at("b").value(), make_value(6));
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+}
+
+TEST(Exec, Parenthesis_FuncCall)
+{
+  {
+    const std::string_view src = R"(
+      fn add(a: int) -> int
+      {
+        return a;
+      }
+
+      a := add(1+2*2);
+      b := add((1+2)*2);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 1)
+      {
+        ASSERT_EQ(stack[0].at("a").value(), make_value(5));
+        ASSERT_EQ(stack[0].at("b").value(), make_value(6));
       }
     };
 
