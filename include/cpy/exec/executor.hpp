@@ -13,7 +13,6 @@
 #include <utility>
 
 
-
 inline static VarValue value_from_type (const VarType type)
 {
   if (!type.is_type<BuiltInType>()) {
@@ -46,22 +45,89 @@ inline static VarValue value_from_type (const VarType type)
   }
 }
 
+
+/// Represents a variable and its value.
+/// If the variable can be a reference, Variable::val is empty and `val_ref`
+/// is the actual value:
+///
+/// ```
+/// fn foo(x: ref int)
+/// {
+///    x = 42;
+/// }
+///
+/// a: int;
+///
+/// foo(ref a);
+/// ```
+///
+/// For `x`, the Variable::val is empty, whilst Variable::val_ref
+/// points to the Variable that represents `a`.
 struct Variable
 {
-  Variable(const VarValue& v) : value(v)
+  Variable() = default;
+  Variable(const VarValue& v) : val(v)
   {}
 
-  VarValue value;
+  VarValue& value() { return val; }
+  const VarValue& value() const { return val; }
+
+  Variable& get_ref_target() { return *val_ref; }
+  Variable * get_ref() { return val_ref; }
+
+  void set_ref_target(Variable * ref)
+  {
+    val = VarValue{};
+    val_ref = ref;
+  }
+
+  bool is_ref() const { return val_ref != nullptr; }
+
+
+private:
+  VarValue val;
+  Variable * val_ref{nullptr};
 };
 
+
+/// A stack entry is added to the stack on entry to each NodeBlock.
+/// Each entry stores the variables in that stack, and a pointer to
+/// the parent entry.
+/// The stack entry is added before executing statements:
+///
+/// ```
+/// fn foo()
+/// {
+///   a := "blah";
+/// }
+/// ```
+/// - The entry for foo(), will store `a` as an empty string
+/// - Execetion continues to the VariableAssign, setting `a` to "blah"
+///
+/// Also:
+///
+/// ```
+/// a :int;
+///
+/// fn foo()
+/// {
+///   a :str;
+/// }
+/// ```
+/// - The two `a` variables are entirely independent
+/// - The `a:str` is in foo's stack entry, so a lookup for
+///   `a` will resolve to `a:str`
 class StackEntry
 {
 public:
-  StackEntry(VariableMap var_map, StackEntry * parent)
-    : m_var_syms(var_map)
-    , m_parent(parent)
+  StackEntry(const ResolvedVariableMap& block_vars, StackEntry * parent)
+    : m_parent(parent)
   {
-    init();
+    // initialise this NodeBlock's variables, assigning default values, which
+    // can be replaced later when an VariableUse or VariableDecl is encountered
+    for (const auto& [var, resolved] : block_vars) {
+      m_vars.emplace(var, value_from_type(resolved.type));
+    }
   }
 
   Variable& get_var(const VarName name)
@@ -76,28 +142,9 @@ public:
 
   bool has_parent() const { return m_parent != nullptr; }
   StackEntry * get_parent() const { return m_parent; }
-
-  std::map<VarName, Variable> get_vars() const
-  {
-    return m_vars;
-  }
+  std::map<VarName, Variable> get_vars() const { return m_vars; }
 
 private:
-  void init()
-  {
-    for (const auto& [var, type] : m_var_syms)
-    {
-      if (!type.type.is_type<BuiltInType>()) {
-        throw std::runtime_error{"Only BuiltInType is supported"};
-      }
-      else {
-        m_vars.emplace(var, value_from_type(type.type));
-      }
-    }
-  }
-
-private:
-  VariableMap m_var_syms;
   std::map<VarName, Variable> m_vars;
   StackEntry * m_parent{};
 };
@@ -114,10 +161,11 @@ public:
     ~Executor() = default;
   #endif
 
-  VarValue execute(const NodeBlock& block, const std::map<VarName, VarValue>&& func_args = {});
+  VarValue execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {});
   void execute (const NodeBlock& block, const VariableAssign& assign);
   void execute (const NodeBlock& block, const VariableDecl& decl);
   VarValue execute (const NodeBlock& block, const Expression& expr);
+  VarValue execute (const NodeBlock& block, const ConditionIf& cond);
 
 private:
   Variable& get_variable (const VarName name);
@@ -127,18 +175,18 @@ private:
 
   // variable stack //
 #ifdef CPY_UNIT_TESTS
-// this for the child class TestExecutor
-protected:
-  virtual void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {});
-  virtual void pop_stack ();
+  // this for the child class TestExecutor
+  protected:
+    virtual void push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args = {});
+    virtual void pop_stack ();
 
-  std::stack<std::unique_ptr<StackEntry>> m_stack;
+    std::stack<std::unique_ptr<StackEntry>> m_stack;
 #else
-private:
-  void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {});
-  void pop_stack ();
+  private:
+    void push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args = {});
+    void pop_stack ();
 
-  std::stack<std::unique_ptr<StackEntry>> m_stack;
+    std::stack<std::unique_ptr<StackEntry>> m_stack;
 #endif
 
 private:
@@ -148,8 +196,10 @@ private:
 
 #ifdef CPY_UNIT_TESTS
 
-using OnStackPush = std::function<void(const std::map<VarName, Variable>, const size_t)>;
-using OnStackPop = std::function<void(const std::map<VarName, Variable>, const size_t)>;
+#include <algorithm>
+
+using OnStackPush = std::function<void(std::map<VarName, Variable>, const size_t)>;
+using OnStackPop = std::function<void(std::vector<std::map<VarName, Variable>>)>;
 
 class TestExecutor : public Executor
 {
@@ -168,9 +218,9 @@ public:
       {
       }
 
-    void push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals = {}) override
+    void push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args = {}) override
     {
-      Executor::push_stack(block, std::move(vals));
+      Executor::push_stack(block, std::move(func_args));
       if (m_on_push) {
         m_on_push(m_stack.top()->get_vars(), m_stack.size());
       }
@@ -178,12 +228,26 @@ public:
 
     void pop_stack () override
     {
-      m_on_pop(m_stack.top()->get_vars(), m_stack.size());
+      std::vector<std::map<VarName, Variable>> vars;
+      vars.reserve(m_stack.size());
+
+      StackEntry * entry = m_stack.top().get();
+
+      while (entry)
+      {
+        vars.push_back(entry->get_vars());
+        entry = entry->get_parent();
+      }
+
+      rg::reverse(vars);
+
+      m_on_pop(std::move(vars));
       Executor::pop_stack();
     }
 
 private:
-  OnStackPop m_on_push, m_on_pop;
+  OnStackPush m_on_push;
+  OnStackPop m_on_pop;
 };
 
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "cpy/common.hpp"
 #include <cpy/ast/ast_node.hpp>
+#include <cpy/common.hpp>
 #include <memory>
 #include <vector>
 
@@ -28,7 +28,7 @@ enum class ExpressionType
   Bool,
   Binary,
   FuncCall,
-  VariableRef,
+  VariableUse,
   Return
 };
 
@@ -147,7 +147,7 @@ struct StringLiteral : public Expression
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    os << "str = " << v;
+    os << "str = \"" << v << '\"';
   }
 
   CpyString value() const
@@ -265,18 +265,25 @@ struct BinaryExpression : public Expression
 
 };
 
+// Function Call //
+struct FunctionArgument
+{
+  NodePtr<Expression> expr;
+  bool is_ref{};
+};
+
 
 struct FunctionCall : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::FuncCall;
 
-  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args = {})
+  FunctionCall(const std::string_view name, std::vector<FunctionArgument> args = {})
     : Expression(ExprType, false)
     , name(name)
     , args(std::move(args))
   {}
 
-  FunctionCall(const std::string_view name, std::vector<std::unique_ptr<Expression>> args, const std::string_view module)
+  FunctionCall(const std::string_view name, std::vector<FunctionArgument> args, const std::string_view module)
     : Expression(ExprType, false)
     , module(module)
     , name(name)
@@ -285,10 +292,11 @@ struct FunctionCall : public Expression
 
   VarType get_var_type() const override
   {
-    // the type is taken from the return type of
-    // the function definition of the callee
+    // type is the return type of the function definition, not the call site
     throw std::runtime_error{"get_var_type() called on FunctionCall"};
   }
+
+  size_t arg_count() const { return args.size(); }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
@@ -298,7 +306,7 @@ struct FunctionCall : public Expression
     os << name << '(';
     for (std::size_t i = 0; i < args.size() ; ++i)
     {
-      args[i]->dump(os, tab);
+      args[i].expr->dump(os, tab);
       if (i+1 < args.size())
         os << ',';
     }
@@ -307,25 +315,25 @@ struct FunctionCall : public Expression
 
   std::string_view module;
   std::string_view name;
-  std::vector<NodePtr<Expression>> args;
+  std::vector<FunctionArgument> args;
 };
 
 
-// Note: not a "ref" like a C++ reference, but "a node which refers to a variable"
-// i.e.:
+
+// The use of a variable, i.e.:
 //  ```
 //  a: int;
 //  foo(a);
 // ```
-// the `a` is a VariableRef
-struct VariableRef : public Expression
+// the `a` is a VariableUse
+struct VariableUse : public Expression
 {
-  static constexpr ExpressionType ExprType = ExpressionType::VariableRef;
+  static constexpr ExpressionType ExprType = ExpressionType::VariableUse;
 
-  VariableRef() : Expression(ExprType, false)
+  VariableUse() : Expression(ExprType, false)
   {}
 
-  VariableRef(const std::string_view name)
+  VariableUse(const std::string_view name)
     : Expression(ExprType, false)
     , name(name)
   {}
@@ -333,7 +341,7 @@ struct VariableRef : public Expression
   VarType get_var_type() const override
   {
     // never called because the type is taken from the type of the variable
-    throw std::runtime_error{"get_var_type() called on VariableRef"};
+    throw std::runtime_error{"get_var_type() called on VariableUse"};
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -395,7 +403,7 @@ inline std::string_view to_string(const Expression& expr)
       return "BinaryExpression";
     case FuncCall:
       return "FunctionCall";
-    case VariableRef:
+    case VariableUse:
       return "VariableReference";
     case Return:
       return "Return";

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cpy/ast/ast_node.hpp"
 #include "cpy/ast/expressions.hpp"
 #include <concepts>
 #include <functional>
@@ -54,7 +55,7 @@ private:
   // TODO what's the parent param actually used for?
   // expressions
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const FunctionCall& expr);
-  VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableRef& expr);
+  VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableUse& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const BinaryExpression& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& expr);
 
@@ -77,7 +78,7 @@ private:
     };
 
     for (const auto& node : nodes | vw::filter(by_node_type)) {
-      handler(dynamic_cast<const NodeT&>(*node));
+      handler(static_cast<const NodeT&>(*node));
     }
   }
 
@@ -88,10 +89,10 @@ private:
   {
     const constexpr ExpressionType et = ExprT::ExprType;
 
-    walk_nodes<Expression>(block.nodes, [&](const Expression& expr_node)
+    walk_nodes<Expression>(block.nodes(), [&](const Expression& expr_node)
     {
       if (expr_node.is_expr_type(et)) {
-        handler(dynamic_cast<const ExprT&>(expr_node));
+        handler(static_cast<const ExprT&>(expr_node));
       }
     });
   }
@@ -102,7 +103,29 @@ private:
   size_t expression_count (const NodeBlock& block)
   {
     size_t count{};
-    walk_expressions<Return>(block, [&]([[maybe_unused]] const ExprT& expr){ ++count; });
+    walk_expressions<ExprT>(block, [&]([[maybe_unused]] const ExprT& expr){ ++count; });
+
+    // TODO walk_nodes() cannot accept multiple node types
+    for (const auto& node : block.nodes())
+    {
+      if (node->is_node_type(NodeType::NodeBlock))
+        count += expression_count<ExprT>(static_cast<const NodeBlock&> (*node));
+      else if (node->is_node_type(NodeType::ConditionIf))
+      {
+        const auto& cond = static_cast<const ConditionIf&> (*node);
+
+        count += expression_count<ExprT>(cond.if_body());
+
+        for (const auto& elif : cond.else_if) {
+          count += expression_count<ExprT>(elif.body);
+        }
+
+        if (cond.have_else()) {
+          count += expression_count<ExprT>(*cond.else_body);
+        }
+      }
+    }
+
     return count;
   }
 
@@ -111,13 +134,17 @@ private:
     switch (expr.expr_type())
     {
       case ExpressionType::FuncCall:
-        return process_expression(ctx, parent, block, dynamic_cast<const FunctionCall&>(expr));
-      case ExpressionType::VariableRef:
-        return process_expression(ctx, parent, block, dynamic_cast<const VariableRef&>(expr));
+      {
+        // const auto& func_call = static_cast<const FunctionCall&>(expr);
+        // const auto func_def = m_symbol_table.get_function(func_call.name).ast;
+        return process_expression(ctx, parent, block, static_cast<const FunctionCall&>(expr));
+      }
+      case ExpressionType::VariableUse:
+        return process_expression(ctx, parent, block, static_cast<const VariableUse&>(expr));
       case ExpressionType::Return:
-        return process_expression(ctx, parent, block, dynamic_cast<const Return&>(expr));
+        return process_expression(ctx, parent, block, static_cast<const Return&>(expr));
       case ExpressionType::Binary:
-        return process_expression(ctx, parent, block, dynamic_cast<const BinaryExpression&>(expr));
+        return process_expression(ctx, parent, block, static_cast<const BinaryExpression&>(expr));
       default:
         return expr.get_var_type(); // literal
     }

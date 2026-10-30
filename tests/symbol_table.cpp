@@ -403,7 +403,6 @@ TEST(SymbolTable, VariableDecl_ScopeIf)
 
     ASSERT_TRUE(script.issues->have_errors());
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
-    ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 1);
   }
 
   {
@@ -431,8 +430,8 @@ TEST(SymbolTable, VariableDecl_ScopeIf)
     ASSERT_FALSE(script.issues->have_errors());
 
     const auto& root_block = script.ast->block;
-    const auto& first_if = dynamic_cast<ConditionIf&>(*root_block.nodes[2]);
-    const auto& second_if = dynamic_cast<ConditionIf&>(*first_if.if_.body.nodes[1]);
+    const auto& first_if = dynamic_cast<ConditionIf&>(*root_block.nodes()[2]);
+    const auto& second_if = dynamic_cast<ConditionIf&>(*first_if.if_.body.nodes()[1]);
 
     ASSERT_EQ(sem.symbol_table().get_variable("a", root_block).type, BuiltInType::Bool);
     ASSERT_EQ(sem.symbol_table().get_variable("b", root_block).type, BuiltInType::Int);
@@ -469,7 +468,7 @@ TEST(SymbolTable, VariableDecl_IfElseIf)
 
     const auto& root = script.ast->block;
 
-    const auto& if_ = dynamic_cast<ConditionIf&>(*root.nodes[2]);
+    const auto& if_ = dynamic_cast<ConditionIf&>(*root.nodes()[2]);
 
     ASSERT_EQ(if_.else_if_count(), 2);
     ASSERT_TRUE(if_.have_else());
@@ -506,12 +505,12 @@ TEST(SymbolTable, VariableDecl_ScopeIfElseIf)
 
     const auto& root = script.ast->block;
 
-    const auto& first_if = dynamic_cast<ConditionIf&>(*root.nodes[1]);
+    const auto& first_if = dynamic_cast<ConditionIf&>(*root.nodes()[1]);
     ASSERT_EQ(first_if.if_body_node_count(), 3); // b, c and if
 
-    const auto& second_if = dynamic_cast<ConditionIf&>(*first_if.if_body().nodes[2]);
+    const auto& second_if = dynamic_cast<ConditionIf&>(*first_if.if_body().nodes()[2]);
     ASSERT_EQ(second_if.else_if_count(), 1);
-    ASSERT_EQ(second_if.else_if[0].body.nodes.size(), 1); // c: str
+    ASSERT_EQ(second_if.else_if[0].body.node_count(), 1); // c: str
 
     ASSERT_EQ(sem.symbol_table().get_variable("a", root).type, BuiltInType::Bool);
     ASSERT_EQ(sem.symbol_table().get_variable("b", first_if.if_.body).type, BuiltInType::Int);
@@ -679,7 +678,7 @@ TEST(SymbolTable, FuncCall_VarAssign)
 
     const auto& sym_table = sem.symbol_table();
     const auto& root = script.ast->block;
-    const auto& if_ = dynamic_cast<const ConditionIf&>(*root.nodes[3]).if_body();
+    const auto& if_ = dynamic_cast<const ConditionIf&>(*root.nodes()[3]).if_body();
 
     ASSERT_TRUE(sym_table.scope_has_variable("a", root));
     ASSERT_TRUE(sym_table.scope_has_variable("a", if_));
@@ -687,10 +686,10 @@ TEST(SymbolTable, FuncCall_VarAssign)
     ASSERT_EQ(sym_table.get_variable("a", root).type, BuiltInType::Int);
     ASSERT_EQ(sym_table.get_variable("a", if_).type, BuiltInType::Bool);
 
-    const auto& assign_root = dynamic_cast<const VariableAssign&>(*root.nodes[2]);
+    const auto& assign_root = dynamic_cast<const VariableAssign&>(*root.nodes()[2]);
     ASSERT_TRUE(assign_root.expr->is_expr_type(ExpressionType::Int));
 
-    const auto& assign_if = dynamic_cast<const VariableAssign&>(*if_.nodes[1]);
+    const auto& assign_if = dynamic_cast<const VariableAssign&>(*if_.nodes()[1]);
     ASSERT_TRUE(assign_if.expr->is_expr_type(ExpressionType::Bool));
   }
 }

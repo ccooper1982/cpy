@@ -13,20 +13,19 @@ concept IsCpyArithmetic = std::is_same_v<T, CpyInt> || std::is_same_v<T, CpyDec>
 template<class OpF>
 inline VarValue do_operator (const VarValue& lhs, const VarValue& rhs, OpF&& op)
 {
-  return std::visit(
-      [&](const auto& val_l, const auto& val_r) -> VarValue
-      {
-        using L = std::decay_t<decltype(val_l)>;
-        using R = std::decay_t<decltype(val_r)>;
+  return std::visit([&](const auto& val_l, const auto& val_r) -> VarValue
+          {
+            using L = std::decay_t<decltype(val_l)>;
+            using R = std::decay_t<decltype(val_r)>;
 
-        if constexpr (IsCpyArithmetic<L> && IsCpyArithmetic<R>) {
-          return op(val_l, val_r);
-        }
-        else {
-          throw std::logic_error{"Called do_operator() on unsupported type"};
-        }
-      }
-    , lhs, rhs);
+            if constexpr (IsCpyArithmetic<L> && IsCpyArithmetic<R>) {
+              return op(val_l, val_r);
+            }
+            else {
+              throw std::logic_error{"Called do_operator() on unsupported type"};
+            }
+          }
+        , lhs, rhs);
 }
 
 inline VarValue operator+(const VarValue& lhs, const VarValue& rhs)
@@ -41,6 +40,7 @@ inline VarValue operator-(const VarValue& lhs, const VarValue& rhs)
 
 inline VarValue operator/(const VarValue& lhs, const VarValue& rhs)
 {
+  // TODO divide by zero
   return do_operator(lhs, rhs, std::divides<>{});
 }
 

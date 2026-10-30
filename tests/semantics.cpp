@@ -48,6 +48,44 @@ TEST(Semantics, Ok)
   }
 }
 
+TEST(Semantics, VarUndeclared)
+{
+  {
+    const std::string_view src = R"(
+      a = 5;
+      a: int;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn hello()
+      {
+        a = 5;
+      }
+
+      a: int;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
+  }
+}
+
+
 TEST(Semantics, FuncDef)
 {
   {
@@ -190,12 +228,14 @@ TEST(Semantics, FuncCall)
 }
 
 
-TEST(Semantics, Func_Return)
+TEST(Semantics, FuncCall_RefInvalid)
 {
   {
     const std::string_view src = R"(
-      fn foo1() -> int {}
-      fn foo2() {}
+      fn hello(x: ref int) {}
+
+      a: int;
+      hello(a);
     )";
 
     Parser parser;
@@ -205,12 +245,15 @@ TEST(Semantics, Func_Return)
     sem.process(script);
 
     ASSERT_TRUE(script.issues->have_errors());
-    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionReturnExprExpected), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallRefRequired), 1);
   }
 
   {
     const std::string_view src = R"(
-      fn foo1() -> int { return "one"; }
+      fn hello(x: int) {}
+
+      a: int;
+      hello(ref a);
     )";
 
     Parser parser;
@@ -220,9 +263,62 @@ TEST(Semantics, Func_Return)
     sem.process(script);
 
     ASSERT_TRUE(script.issues->have_errors());
-    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionReturnExpression), 1);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallParamNotRef), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn hello(x: ref int) {}
+
+      hello(ref 42);
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    Semantics sem;
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallParamRefTypeInvalid), 1);
   }
 }
+
+
+TEST(Semantics, FuncDef_ReturnValid)
+{
+  const std::string_view src = R"(
+    fn foo1() -> int {}
+    fn foo2() {}
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  Semantics sem;
+  sem.process(script);
+
+  ASSERT_TRUE(script.issues->have_errors());
+  ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionReturnExprExpected), 1);
+}
+
+TEST(Semantics, FuncDef_ReturnInvalid)
+{
+  const std::string_view src = R"(
+    fn foo1() -> int { return "one"; }
+    fn foo2() { return "one"; }
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  Semantics sem;
+  sem.process(script);
+
+  ASSERT_TRUE(script.issues->have_errors());
+  ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionReturnExpression), 2);
+}
+
 
 TEST(Semantics, VariableDecl)
 {
@@ -413,4 +509,54 @@ TEST(Semantics, VarAssign)
     ASSERT_TRUE(script.issues->have_errors());
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableAssignType), 1);
   }
+}
+
+
+TEST(Semantics, ParenthesisErrors)
+{
+
+  const std::string_view src = R"(
+    a := (1+true);
+    b := (1+foo());
+
+    fn foo2() -> int {}
+
+    c :int;
+    c = (1+2) + (foo2()+true);
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  ASSERT_TRUE(script.issues->have_errors());
+  ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 2);
+  ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionNotExist), 1);
+}
+
+
+TEST(Semantics, Parenthesis)
+{
+  const std::string_view src = R"(
+    fn foo1() -> int { return 0; }
+    fn foo2() -> str { return ""; }
+    fn foo3(x: str) -> int { return 0; }
+
+    a := (1 + 2);
+    b := (1 + foo1()) + foo3("");
+
+    c :int;
+    c = (foo1()+1) + foo3(foo2());
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  ASSERT_FALSE(script.issues->have_errors());
+
 }

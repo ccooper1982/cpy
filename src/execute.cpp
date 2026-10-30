@@ -1,4 +1,8 @@
+#include "cpy/ast/expressions.hpp"
+#include "cpy/common.hpp"
+#include "cpy/exec/operators.hpp"
 #include <cpy/exec/executor.hpp>
+#include <stdexcept>
 #include <utility>
 
 
@@ -19,8 +23,13 @@ static VarValue value_from_literal_expr(const Expression& expr)
     default:
       throw std::runtime_error{"Expression type is not literal"};
   }
+}
 
-  std::unreachable();
+
+[[nodiscard]] static bool is_true(const VarValue& value)
+{
+    const auto * b = std::get_if<CpyBool>(&value);
+    return b != nullptr && *b;
 }
 
 
@@ -30,7 +39,7 @@ Executor::Executor(const SymbolTable& sym_table)
 
 }
 
-VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarValue>&& func_args)
+VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args)
 {
   auto is_executable = [](const std::unique_ptr<AstNode>& node)
   {
@@ -46,7 +55,9 @@ VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarVa
 
   try
   {
-    for(const auto& node : block.nodes | vw::filter(is_executable))
+    // this ignores NodeType::NodeBlock because we a block can only appear in a function
+    // or condition body
+    for(const auto& node : block.nodes() | vw::filter(is_executable))
     {
       switch (node->node_type())
       {
@@ -59,20 +70,11 @@ VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarVa
         case NodeType::Expression:
           result = execute(block, static_cast<const Expression&>(*node));
           break;
-
-        /*
         case NodeType::ConditionIf:
-          process_condition(ctx, *node, block, static_cast<const ConditionIf&>(*node));
+          result = execute(block, static_cast<const ConditionIf&>(*node));
           break;
-        case NodeType::NodeBlock:
-          process_block(ctx, static_cast<const NodeBlock&>(*node));
-          break;
-        */
-
         default:
-          //std::unreachable();
-          std::cerr << "TODO\n";
-          break;
+          throw std::runtime_error{"Unexpected node type in block"};
       }
     }
   }
@@ -87,27 +89,57 @@ VarValue Executor::execute(const NodeBlock& block, const std::map<VarName, VarVa
 }
 
 
+VarValue Executor::execute (const NodeBlock& block, const ConditionIf& cond)
+{
+  VarValue result;
+
+  auto cond_result = execute(block, *cond.if_.condition);
+
+  if (is_true(cond_result)) {
+    result = execute(cond.if_body());
+  }
+  else
+  {
+    for(const auto& [cond, body] : cond.else_if)
+    {
+      if (cond_result = execute(block, *cond); is_true(cond_result))
+      {
+        result = execute(body);
+        break;
+      }
+    }
+
+    if (!is_true(cond_result) && cond.have_else()) {
+      result = execute(*cond.else_body);
+    }
+  }
+
+  return result;
+}
+
+
 void Executor::execute (const NodeBlock& block, const VariableDecl& decl)
 {
   auto& var = get_variable(decl.var_name);
 
   if (decl.is_literal_initialised()) {
-    var.value = value_from_literal_expr(*decl.initialiser);
+    var.value() = value_from_literal_expr(*decl.initialiser);
   }
   else if (decl.has_initialiser()) {
-    var.value = execute(block, *decl.initialiser);
+    var.value() = execute(block, *decl.initialiser);
   }
 }
+
 
 void Executor::execute (const NodeBlock& block, const VariableAssign& assign)
 {
   auto& var = get_variable(assign.name);
 
   if (assign.expr->is_literal()) {
-    var.value = value_from_literal_expr(*assign.expr);
+    var.value() = value_from_literal_expr(*assign.expr);
   }
   else {
-    var.value = execute(block, *assign.expr);
+    var.value() = execute(block, *assign.expr);
   }
 }
 
@@ -124,12 +156,27 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
     const auto& call = static_cast<const FunctionCall&>(expr);
     const auto& def = m_sym_table.get_function(call.name);
 
-    std::map<VarName, VarValue> args;
+    std::map<VarName, Variable> args;
 
     for (size_t i = 0 ; i < call.args.size() ; ++i)
     {
-      auto val = execute(block, *call.args[i]);
-      args.emplace(def.params[i].name, std::move(val));
+      auto val = execute(block, *call.args[i].expr);
+
+      Variable variable;
+
+      if (def.params[i].is_ref)
+      {
+        // a: int;
+        // foo (ref a);
+        // we need to find variable a
+        const auto& var_ref = static_cast<const VariableUse&>(*call.args[i].expr);
+        variable.set_ref_target(&get_variable(var_ref.name));
+      }
+      else {
+        variable.value() = val;
+      }
+
+      args.emplace(def.params[i].name, std::move(variable));
     }
 
     result = execute(def.ast->body, std::move(args));
@@ -151,27 +198,33 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
       }
     }
   }
-  else if (expr.is_expr_type(ExpressionType::VariableRef))
+  else if (expr.is_expr_type(ExpressionType::VariableUse))
   {
-    const auto& ref = static_cast<const VariableRef&>(expr);
+    const auto& ref = static_cast<const VariableUse&>(expr);
     const auto& variable = get_variable(ref.name);
-    result = variable.value;
+    result = variable.value();
   }
 
   return result;
 }
 
 
-void Executor::push_stack (const NodeBlock& block, std::map<VarName, VarValue> vals)
+void Executor::push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args)
 {
   const auto parent = m_stack.empty() ? nullptr : m_stack.top().get();
 
-  if (const auto vars = m_sym_table.get_variables(block); vars) {
-    m_stack.emplace(std::make_unique<StackEntry>(*vars, parent));
+  if (const auto block_vars = m_sym_table.get_variables(block); block_vars) {
+    m_stack.emplace(std::make_unique<StackEntry>(*block_vars, parent));
   }
 
-  for (const auto& [name, val] : vals) {
-    m_stack.top()->get_var(name).value = std::move(val);
+  for (auto& [name, var] : func_args)
+  {
+    if (var.is_ref()) {
+      m_stack.top()->get_var(name).set_ref_target(var.get_ref());
+    }
+    else {
+      m_stack.top()->get_var(name).value() = std::move(var.value());
+    }
   }
 }
 
@@ -200,7 +253,8 @@ Variable& Executor::get_variable (const VarName name)
     throw std::runtime_error{std::format("get_variable(): failed to find resolved variable: {}", name)};
   }
 
-  return entry->get_var(name);
+  auto& var = entry->get_var(name);
+  return var.is_ref() ? var.get_ref_target() : var;
 }
 
 

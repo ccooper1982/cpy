@@ -1,7 +1,6 @@
 #include "cpy/ast/ast_node.hpp"
-#include "cpy/ast/expressions.hpp"
-#include <algorithm>
 #include <cpy/ast/ast.hpp>
+#include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
 #include <cpy/modules.hpp>
 #include <cpy/semantics.hpp>
@@ -35,7 +34,7 @@ void Semantics::process(Script& script)
   m_symbol_table.enter_scope(&ctx.ast.block);
 
   process_block(ctx, ctx.ast, ctx.ast.block, false);
-  process_function_bodies(ctx, ctx.ast.block);;
+  process_function_bodies(ctx, ctx.ast.block);
 
   m_symbol_table.exit_scope();
 }
@@ -74,13 +73,13 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
         }
 
         // if param type is invalid, the function will not be in the symbol table
-        for(const auto& param : def.params) {
-          m_symbol_table.add_variable(param.param_name, *m_symbol_table.get_type(param.type_name));
+        for(const auto& param : def.get_params()) {
+          m_symbol_table.add_variable(param, def.source.start);
         }
       }
     }
 
-    for(const auto& node : block.nodes | vw::filter(executable))
+    for(const auto& node : block.nodes() | vw::filter(executable))
     {
       switch (node->node_type())
       {
@@ -120,7 +119,7 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
 
 void Semantics::process_function_signatures(Context& ctx)
 {
-  walk_nodes<FunctionDef>(ctx.ast.block.nodes, [&, this](const FunctionDef& def)
+  walk_nodes<FunctionDef>(ctx.ast.block.nodes(), [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
     if (m_symbol_table.has_function(def.name))
@@ -130,10 +129,10 @@ void Semantics::process_function_signatures(Context& ctx)
     }
 
     std::vector<ResolvedSymbol> resolved_params;
-    for (const auto& param : def.params)
+    for (const auto& param : def.get_params())
     {
       if (const auto type = m_symbol_table.get_type(param.type_name); type) {
-        resolved_params.emplace_back(param.param_name, *type);
+        resolved_params.emplace_back(param.param_name, *type, param.is_ref);
       }
       else
       {
@@ -142,8 +141,7 @@ void Semantics::process_function_signatures(Context& ctx)
       }
     }
 
-    const auto return_type = m_symbol_table.get_type(def.return_type);
-    if (!return_type) {
+    if (const auto return_type = m_symbol_table.get_type(def.return_type); !return_type) {
       issue::unknown_return_type(ctx.issues, def.name, def.return_type);
     }
     else {
@@ -152,9 +150,10 @@ void Semantics::process_function_signatures(Context& ctx)
   });
 }
 
+
 void Semantics::process_function_bodies(Context& ctx, const NodeBlock& block)
 {
-  walk_nodes<FunctionDef>(block.nodes, [this, &ctx](const FunctionDef& def)
+  walk_nodes<FunctionDef>(block.nodes(), [this, &ctx](const FunctionDef& def)
   {
     process_block(ctx, def, def.body);
   });
@@ -201,13 +200,13 @@ void Semantics::process_variable_declaration(Context& ctx, const NodeBlock& bloc
     issue::var_init_type_differ(ctx.issues, decl);
   }
   else {
-    m_symbol_table.add_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type);
+    m_symbol_table.add_variable(decl.var_name, decl.has_initialiser() ? init_type : var_type, decl.source.start);
   }
 }
 
 void Semantics::process_variable_assign(Context& ctx, const NodeBlock& block, const VariableAssign& assign)
 {
-  if (!m_symbol_table.has_visible_variable(assign.name, block))
+  if (!m_symbol_table.has_visible_variable(assign.name, block, assign.source.start))
   {
     issue::var_unknown(ctx.issues, assign, assign.name);
     return;
@@ -238,9 +237,9 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_type;
   }
 
-  const auto& resolved = m_symbol_table.get_function(call.name);
+  const auto& resolved_func = m_symbol_table.get_function(call.name);
 
-  if (call.args.size() != resolved.params.size())
+  if (call.args.size() != resolved_func.params.size())
   {
     issue::func_arg_count(ctx.issues, call);
     return unresolved_type;
@@ -248,65 +247,85 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 
   for (uint8_t i = 0 ; i < call.args.size() ; ++i)
   {
-    const auto param_type = resolved.params[i].type.value_as<BuiltInType>();
-    if (param_type)
+    const auto resolved_type = resolved_func.params[i].type.value_as<BuiltInType>();
+
+    if (!resolved_type) {
+      return unresolved_type;
+    }
+
+    const auto arg_is_ref = call.args[i].is_ref;
+    const auto& arg_expr = *call.args[i].expr;
+
+    if (!arg_is_ref && resolved_func.params[i].is_ref)
     {
-      const auto& arg = *call.args[i];
+      issue::func_arg_ref_required(ctx.issues, *call.args[i].expr);
+      return unresolved_type;
+    }
 
-      if (arg.is_expr_type(ExpressionType::FuncCall))
-      {
-        const auto& func_call = static_cast<const FunctionCall&>(arg);
+    if (arg_is_ref && !resolved_func.params[i].is_ref)
+    {
+      issue::func_arg_not_ref(ctx.issues, *call.args[i].expr);
+      return unresolved_type;
+    }
 
-        if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
-          return unresolved_type;
-        }
-        else if (ret_type == BuiltInType::Void)
-        {
-          issue::func_arg_void(ctx.issues, arg, resolved.params[i].name);
-          return unresolved_type;
-        }
-        else if (ret_type != *param_type)
-        {
-          issue::func_arg(ctx.issues, arg, resolved.params[i].name);
-          return unresolved_type;
-        }
-      }
-      else if (arg.is_expr_type(ExpressionType::Binary))
-      {
-        const auto& expr = static_cast<const BinaryExpression&>(arg);
-        if (!process_expression(ctx, parent, block, expr))
-          return unresolved_type;
-      }
-      else if (arg.is_expr_type(ExpressionType::VariableRef))
-      {
-        const auto& var = static_cast<const VariableRef&>(arg);
-        const auto var_type = process_expression(ctx, call, block, var);
+    if (arg_is_ref && !arg_expr.is_expr_type(ExpressionType::VariableUse))
+    {
+      issue::func_arg_ref_type(ctx.issues, *call.args[i].expr);
+      return unresolved_type;
+    }
 
-        // if the variable is unknown, process_expression() will create an isue and
-        // return unresolved_type
-        if (var_type == unresolved_type) {
-          return unresolved_type;
-        }
-        else if (var_type != *param_type)
-        {
-          issue::func_arg(ctx.issues, call, resolved.params[i].name);
-          return unresolved_type;
-        }
+    if (arg_expr.is_expr_type(ExpressionType::FuncCall))
+    {
+      const auto& func_call = static_cast<const FunctionCall&>(arg_expr);
+
+      if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
+        return unresolved_type;
       }
-      else if (!arg.is_convertible_to(*param_type))
+      else if (ret_type == BuiltInType::Void)
       {
-        issue::func_arg(ctx.issues, call, resolved.params[i].name);
+        issue::func_arg_void(ctx.issues, arg_expr, resolved_func.params[i].name);
+        return unresolved_type;
+      }
+      else if (ret_type != *resolved_type)
+      {
+        issue::func_arg(ctx.issues, arg_expr, resolved_func.params[i].name);
         return unresolved_type;
       }
     }
+    else if (arg_expr.is_expr_type(ExpressionType::Binary))
+    {
+      const auto& expr = static_cast<const BinaryExpression&>(arg_expr);
+      if (!process_expression(ctx, parent, block, expr))
+        return unresolved_type;
+    }
+    else if (arg_expr.is_expr_type(ExpressionType::VariableUse))
+    {
+      const auto& var = static_cast<const VariableUse&>(arg_expr);
+      const auto var_type = process_expression(ctx, call, block, var);
+
+      // if the variable is unknown, process_expression() creates
+      if (var_type == unresolved_type) {
+        return unresolved_type;
+      }
+      else if (var_type != *resolved_type)
+      {
+        issue::func_arg(ctx.issues, call, resolved_func.params[i].name);
+        return unresolved_type;
+      }
+    }
+    else if (!arg_expr.is_convertible_to(*resolved_type))
+    {
+      issue::func_arg(ctx.issues, call, resolved_func.params[i].name);
+      return unresolved_type;
+    }
   }
 
-  return resolved.return_type;
+  return resolved_func.return_type;
 }
 
-VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableRef& expr)
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableUse& expr)
 {
-  if (!m_symbol_table.has_visible_variable(expr.name, block))
+  if (!m_symbol_table.has_visible_variable(expr.name, block, expr.source.start))
   {
     issue::var_unknown(ctx.issues, parent, expr.name);
     return unresolved_type;
@@ -345,19 +364,19 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 }
 
 
-VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& expr)
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& ret_expr)
 {
   if (std::addressof(block) == std::addressof(ctx.ast.block))
   {
-    issue::return_from_root(ctx.issues, expr);
+    issue::return_from_root(ctx.issues, ret_expr);
     return unresolved_type;
   }
-  else if (!expr.has_expression()) {
+  else if (!ret_expr.has_expression()) {
     return BuiltInType::Void;
   }
   else if (!parent.is_node_type(NodeType::FunctionDef))
   {
-    issue::compiler_error(ctx.issues, expr, "Return statement not in a function");
+    issue::compiler_error(ctx.issues, ret_expr, "Return statement not in a function");
     return unresolved_type;
   }
   else
@@ -365,16 +384,17 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     const auto& func_def = static_cast<const FunctionDef&>(parent);
     const auto& resolved_func = m_symbol_table.get_function(func_def.name);
 
-    const auto expr_ret_type = handle_expression(ctx, parent, block, *expr.return_expr);
+    const auto expr_ret_type = handle_expression(ctx, parent, block, *ret_expr.return_expr);
 
     if (expr_ret_type != resolved_func.return_type) {
-      issue::return_type_from_func(ctx.issues, expr);
+      issue::return_type_from_func(ctx.issues, ret_expr);
       return unresolved_type;
     }
 
     return expr_ret_type;
   }
 }
+
 
 /// Determines the validity of the BinaryExpression::op on the operands, and returns
 /// the return type (or unresolved_type if invalid).
@@ -439,15 +459,20 @@ void Semantics::process_condition(Context& ctx, const AstNode& parent, const Nod
 {
   auto handle_condition_body = [&](const ConditionIf::ConditionBody& cb)
   {
-    const auto cond_if_result = handle_expression(ctx, parent, block, static_cast<const Expression&>(*cb.condition));
+    const auto cond_if_result = handle_expression(ctx, cond, block, static_cast<const Expression&>(*cb.condition));
 
-    if (cond_if_result != BuiltInType::Bool)
+    // if the handle_expression() fails (i.e. the condition contains an undeclared variable),
+    // we bail to suppress further errors
+    if (!cond_if_result) {
+      return false;
+    }
+    else if (cond_if_result != BuiltInType::Bool)
     {
       issue::condition_not_bool(ctx.issues, *cb.condition);
       return false;
     }
     else {
-      process_block(ctx, cond, cb.body);
+      process_block(ctx, parent, cb.body);
     }
     return true;
   };

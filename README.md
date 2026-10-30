@@ -3,6 +3,14 @@ C++ Pythony, an alternative to shell script.
 
 Mostly experimenting with Tree-sitter and creating an AST.
 
+# Aim
+- A programmer friendly scripting language
+- No config files or virtual environment required
+- Integrated knowledge of pipes and processes
+- No memory management
+- Type safety
+
+
 # Build
 ```
 cd grammar && tree-sitter generate

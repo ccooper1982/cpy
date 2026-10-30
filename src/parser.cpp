@@ -26,7 +26,6 @@ static NodePtr<NodeT> make_node (Args&&... args)
   return std::make_unique<NodeT>(std::forward<Args>(args)...);
 }
 
-
 static BinaryOperator get_binary_operator(const std::string_view op)
 {
   if (op == "+")  return BinaryOperator::Add;
@@ -114,11 +113,21 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
     const auto op = get_binary_operator(from_source(op_node));
     expr = make_node<BinaryExpression>(parse_expression(lhs_node), parse_expression(rhs_node), op);
   }
+  else if (expr_type == "parenthesized_expression")
+  {
+    // the expression inside the parentheses are within an "expression" node, so we unwrap:
+    //  b := (1+4)
+    // Tree: (parenthesized_expression (expression (binary_expression)))
+    //        ^                         ^
+    //        expr_node                 inner
+    auto inner = ts_node_named_child(expr_node, 0);
+    expr = parse_expression(ts_node_named_child(inner, 0));
+  }
   else if (expr_type == "function_call") {
     expr = parse_function_call(ts_node_named_child(expr_node, 0));
   }
   else if (expr_type == "identifier") {
-    expr = make_node<VariableRef>(from_source(expr_node));
+    expr = make_node<VariableUse>(from_source(expr_node));
   }
 
   if (expr) {
@@ -200,9 +209,9 @@ NodePtr<Return> Parser::parse_return(const TSNode& ts_node)
 }
 
 
-std::vector<NodePtr<AstNode>> Parser::parse_statements (const TSNode& ts_statements)
+NodeBlock::Nodes Parser::parse_statements (const TSNode& ts_statements)
 {
-  std::vector<NodePtr<AstNode>> statements;
+  NodeBlock::Nodes statements;
 
   const auto statement_count = ts_node_named_child_count(ts_statements);
   statements.reserve(std::min<uint32_t>(statement_count, 30));
@@ -253,17 +262,24 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
 }
 
 
-std::vector<NodePtr<Expression>> Parser::parse_function_call_args(const TSNode& args_node)
+std::vector<FunctionArgument> Parser::parse_function_call_args(const TSNode& args_node)
 {
-  std::vector<NodePtr<Expression>> args;
+  std::vector<FunctionArgument> args;
   if (!ts_node_is_null(args_node))
   {
     const auto n_args = ts_node_named_child_count(args_node);
 
-    for (uint32_t arg = 0 ; arg < n_args ; ++arg)
+    for (uint32_t i = 0 ; i < n_args ; ++i)
     {
-      const auto expr_node = ts_node_named_child(args_node, arg);
-      args.push_back(parse_expression(expr_node));
+      const auto arg_node = ts_node_named_child(args_node, i);
+      const auto ref_node = child_by_field_name(arg_node, "ref");
+      const auto expr_node = child_by_field_name(arg_node, "expression");
+
+      FunctionArgument arg;
+      arg.expr = parse_expression(expr_node);
+      arg.is_ref = !ts_node_is_null(ref_node);
+
+      args.push_back(std::move(arg));
     }
   }
   return args;
@@ -315,17 +331,22 @@ NodePtr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
 
   if (!ts_node_is_null(parameters))
   {
+    FunctionDef::FunctionParams params;
+
     const uint32_t param_count = ts_node_named_child_count(parameters);
 
-    ast_node->params.reserve(param_count);
+    // ast_node->params.reserve(param_count);
 
     for (uint32_t p = 0; p < param_count; ++p)
     {
       TSNode parameter = ts_node_named_child(parameters, p);
       TSNode param_name_node = child_by_field_name(parameter, "name");
       TSNode param_type_node = child_by_field_name(parameter, "type");
+      TSNode ref_node = child_by_field_name(parameter, "ref");
 
       FunctionParam param;
+      set_source_region(parameter, param);
+
       if (!ts_node_is_null(param_name_node)) {
         param.param_name = from_source(param_name_node);
       }
@@ -333,10 +354,11 @@ NodePtr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
         param.type_name = from_source(param_type_node);
       }
 
-      set_source_region(parameter, param);
-
-      ast_node->params.push_back(std::move(param));
+      param.is_ref = !ts_node_is_null(ref_node);
+      params.push_back(std::move(param));
     }
+
+    ast_node->set_params(std::move(params));
   }
 
   // body
@@ -345,7 +367,7 @@ NodePtr<FunctionDef> Parser::parse_function_def(const TSNode& ts_node)
   {
     set_source_region(body, ast_node->body);
     if (auto statements = parse_statements(body); !statements.empty()) {
-      ast_node->body.nodes = std::move(statements);
+      ast_node->body.set_nodes(std::move(statements));
     }
   }
 
@@ -372,14 +394,14 @@ NodePtr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
       result.condition = parse_expression(cond);
     }
 
-    result.body.nodes = parse_statements(body);
+    result.body.set_nodes(parse_statements(body));
     return result;
   };
 
   auto node = make_node<ConditionIf>();
+  set_source_region(ts_node, *node);
 
   node->if_ = parse_condition_body(ts_node);
-  set_source_region(ts_node, node->if_.body);
 
   for (uint32_t i = 0; i < ts_node_named_child_count(ts_node); ++i)
   {
@@ -407,7 +429,7 @@ void Parser::parse_script(const TSNode& ts_root)
   const auto n_children = ts_node_named_child_count(ts_root);
 
   m_ast = make_node<SourceFile>();
-  m_ast->block.nodes.reserve(std::min(n_children, 20U));
+
   set_source_region(ts_root, m_ast->block);
 
   for (uint32_t i = 0 ; i < n_children ; ++i)

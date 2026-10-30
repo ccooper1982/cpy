@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cpy/ast/ast_node.hpp"
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <ostream>
@@ -17,6 +18,8 @@ struct ResolvedSymbol
 {
   std::string_view name;
   VarType type;
+  bool is_ref{};
+  uint32_t position{};
 };
 
 struct ResolvedFunction
@@ -26,7 +29,7 @@ struct ResolvedFunction
   const FunctionDef * ast{};
 };
 
-using VariableMap = std::map<std::string_view, const ResolvedSymbol>;
+using ResolvedVariableMap = std::map<std::string_view, const ResolvedSymbol>;
 
 struct Scope
 {
@@ -35,7 +38,7 @@ struct Scope
   {}
 
   Scope * parent{};
-  VariableMap vars{};
+  ResolvedVariableMap vars{};
 };
 
 /// Maps function:
@@ -43,7 +46,7 @@ struct Scope
 /// Maps variables:
 ///   type, scope visibility
 ///
-/// Variable scope is essentially parent/child, similar to C++:
+/// Variable scope is essentially parent/child:
 ///  ```
 ///   a: bool;
 ///   b: int;
@@ -51,17 +54,15 @@ struct Scope
 ///   if (a)
 ///   {
 ///     c: int;
-///     if (a > b) // a and b are visible from the parent scope
+///     if (a > b) # a and b are visible from the parent scope
 ///     {
-///       c: int;  // this 'c' is a new variable
+///       c: str;  # a new 'c' variable
 ///     }
 ///   }
 ///  ```
 /// A stack is used to manage the parent/child scope tracking.
 /// A new scope is created with enter_scope() (pushes onto the stack), whilst
 /// exit_scope() pops from the stack.
-///
-/// A separate map is used to map between a NodeBlock and the variables available in that scope.
 class SymbolTable
 {
   inline static const std::map<const std::string_view, const BuiltInType> BuiltInTypes = {
@@ -97,12 +98,17 @@ public:
     return m_resolved_functions.contains(name);
   }
 
-  void add_variable(const std::string_view name, VarType type)
+  void add_variable(const std::string_view name, const VarType type, const uint32_t position)
   {
     if (m_scope_tracker.empty())
       throw std::runtime_error{"SymbolTable::add_variable(): scope tracker is empty"};
 
-    m_scope_tracker.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type});
+    m_scope_tracker.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type, .position = position});
+  }
+
+  void add_variable(const FunctionParam& param, const uint32_t position)
+  {
+    add_variable(param.param_name, *get_type(param.type_name), position);
   }
 
   // Check the current scope for variable. Does not check parents.
@@ -114,15 +120,15 @@ public:
   // Checks if a variable is visible from the given block.
   // If not present in `block`, checks parents, until the variable is found.
   // Returns false if not found.
-  bool has_visible_variable(const std::string_view name, const NodeBlock& block) const
+  bool has_visible_variable(const std::string_view name, const NodeBlock& block, const uint32_t position) const
   {
-    return get_resolved_variable(name, &block, true) != nullptr;
+    const auto resolved = get_resolved_variable(name, &block, true);
+    return resolved != nullptr && resolved->position < position;
   }
 
-  // TODO: this should return unresolved_type rather than std::optional
-  std::optional<BuiltInType> get_type(const std::string_view t) const
+  std::optional<BuiltInType> get_type(const std::string_view type_name) const
   {
-    const auto it = BuiltInTypes.find(t) ;
+    const auto it = BuiltInTypes.find(type_name) ;
     if (it == rg::end(BuiltInTypes))
      return std::nullopt;
 
@@ -136,7 +142,7 @@ public:
 
   /// Gets a resolved variable, checking the NodeBlock's scope, then checking each
   /// parent until it is found.
-  /// Throws if the variable does not exis: has_visible_variable() should return
+  /// Throws if the variable does not exist: has_visible_variable() should return
   /// true prior to calling get_variable().
   const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const
   {
@@ -146,9 +152,9 @@ public:
     throw std::runtime_error{"SymbolTable::get_variable() - var does not exist"};
   }
 
-  std::optional<VariableMap> get_variables (const NodeBlock& block) const
+  std::optional<ResolvedVariableMap> get_variables (const NodeBlock& block) const
   {
-    std::optional<VariableMap> result;
+    std::optional<ResolvedVariableMap> result;
 
     if (const auto it = m_scopes.find(&block); it != m_scopes.cend())
       result = it->second->vars;
@@ -179,7 +185,7 @@ public:
       os << "  - return: "<< to_string(resolved.return_type) << '\n' ;
       os << "  - params:\n";
       for(const auto& symbol : resolved.params) {
-        os << std::setw(8) << symbol.name << " : " << to_string(symbol.type) << '\n';
+        os << std::setw(8) << symbol.name << " : " << (symbol.is_ref ? "ref " : "") << to_string(symbol.type) << '\n';
       }
     }
 
@@ -191,7 +197,7 @@ public:
     {
       std::cout << "Block: [" << block->source.start << ", " << block->source.end <<  "]\n";
       for (const auto& [var, resolved] : scope->vars) {
-        std::cout << resolved.name << ":" << to_string(resolved.type) << "\n";
+        std::cout << resolved.name << ":" << (resolved.is_ref ? "ref" : "") << to_string(resolved.type) << "\n";
       }
     }
   }
@@ -220,7 +226,8 @@ private:
     }
 
     // travel up parents
-    for (scope = scope->parent; scope ; scope = scope->parent) {
+    for (scope = scope->parent; scope ; scope = scope->parent)
+    {
       if (const auto resolved = in_scope(scope); resolved)
         return resolved;
     }
