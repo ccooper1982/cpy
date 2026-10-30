@@ -73,13 +73,13 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
         }
 
         // if param type is invalid, the function will not be in the symbol table
-        for(const auto& param : def.params) {
+        for(const auto& param : def.get_params()) {
           m_symbol_table.add_variable(param, def.source.start);
         }
       }
     }
 
-    for(const auto& node : block.nodes | vw::filter(executable))
+    for(const auto& node : block.nodes() | vw::filter(executable))
     {
       switch (node->node_type())
       {
@@ -119,7 +119,7 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
 
 void Semantics::process_function_signatures(Context& ctx)
 {
-  walk_nodes<FunctionDef>(ctx.ast.block.nodes, [&, this](const FunctionDef& def)
+  walk_nodes<FunctionDef>(ctx.ast.block.nodes(), [&, this](const FunctionDef& def)
   {
     // overloading not permitted yet
     if (m_symbol_table.has_function(def.name))
@@ -129,7 +129,7 @@ void Semantics::process_function_signatures(Context& ctx)
     }
 
     std::vector<ResolvedSymbol> resolved_params;
-    for (const auto& param : def.params)
+    for (const auto& param : def.get_params())
     {
       if (const auto type = m_symbol_table.get_type(param.type_name); type) {
         resolved_params.emplace_back(param.param_name, *type, param.is_ref);
@@ -153,7 +153,7 @@ void Semantics::process_function_signatures(Context& ctx)
 
 void Semantics::process_function_bodies(Context& ctx, const NodeBlock& block)
 {
-  walk_nodes<FunctionDef>(block.nodes, [this, &ctx](const FunctionDef& def)
+  walk_nodes<FunctionDef>(block.nodes(), [this, &ctx](const FunctionDef& def)
   {
     process_block(ctx, def, def.body);
   });
@@ -245,17 +245,16 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_type;
   }
 
-  // TODO extract loop body to:
-  // bool handle_function_call_argument(Context& ctx, const ResolvedFunction& resolved_function, const FunctionArgument& arg)
   for (uint8_t i = 0 ; i < call.args.size() ; ++i)
   {
     const auto resolved_type = resolved_func.params[i].type.value_as<BuiltInType>();
-    const auto arg_is_ref = call.args[i].is_ref;
-    const auto& arg_expr = *call.args[i].expr;
 
     if (!resolved_type) {
       return unresolved_type;
     }
+
+    const auto arg_is_ref = call.args[i].is_ref;
+    const auto& arg_expr = *call.args[i].expr;
 
     if (!arg_is_ref && resolved_func.params[i].is_ref)
     {
@@ -304,8 +303,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       const auto& var = static_cast<const VariableUse&>(arg_expr);
       const auto var_type = process_expression(ctx, call, block, var);
 
-      // if the variable is unknown, process_expression() will create an issue and
-      // return unresolved_type
+      // if the variable is unknown, process_expression() creates
       if (var_type == unresolved_type) {
         return unresolved_type;
       }

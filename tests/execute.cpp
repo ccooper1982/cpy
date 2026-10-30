@@ -767,6 +767,79 @@ TEST(Exec, FuncCall_ParamRef)
     exec.execute(script.ast->block);
   }
 
+  // declare  `a` prior to foo(), so the top level `a` and the
+  // function level `a` are both visible to foo(),
+  {
+    const std::string_view src = R"(
+      a := 1 ;
+
+      fn foo(a: ref int)
+      {
+        a = 5;
+      }
+
+      foo(ref a);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 2)
+      {
+        ASSERT_EQ(stack[0].size(), 1);
+        ASSERT_EQ(stack[1].size(), 1);
+      }
+      else if (stack.size() == 1) {
+        ASSERT_EQ(stack[0].at("a").value(), make_value(5));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
+  {
+    const std::string_view src = R"(
+      a := 1;
+      b := 2;
+
+      fn foo(a: ref int)
+      {
+        a = 5;
+      }
+
+      foo(ref b);
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 2)
+      {
+        ASSERT_EQ(stack[0].size(), 2);
+        ASSERT_EQ(stack[1].size(), 1);
+      }
+      else if (stack.size() == 1)
+      {
+        ASSERT_EQ(stack[0].at("a").value(), make_value(1));
+        ASSERT_EQ(stack[0].at("b").value(), make_value(5));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
   {
     const std::string_view src = R"(
       fn foo(x: ref str, y: int)

@@ -89,7 +89,7 @@ private:
   {
     const constexpr ExpressionType et = ExprT::ExprType;
 
-    walk_nodes<Expression>(block.nodes, [&](const Expression& expr_node)
+    walk_nodes<Expression>(block.nodes(), [&](const Expression& expr_node)
     {
       if (expr_node.is_expr_type(et)) {
         handler(static_cast<const ExprT&>(expr_node));
@@ -106,7 +106,7 @@ private:
     walk_expressions<ExprT>(block, [&]([[maybe_unused]] const ExprT& expr){ ++count; });
 
     // TODO walk_nodes() cannot accept multiple node types
-    for (const auto& node : block.nodes)
+    for (const auto& node : block.nodes())
     {
       if (node->is_node_type(NodeType::NodeBlock))
         count += expression_count<ExprT>(static_cast<const NodeBlock&> (*node));

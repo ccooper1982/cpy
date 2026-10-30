@@ -18,19 +18,33 @@ struct NodeBlock : public AstNode
 {
   static constexpr NodeType Type = NodeType::NodeBlock;
 
+  using Nodes = std::vector<NodePtr<AstNode>>;
+
+
   NodeBlock() : AstNode(Type)
-  {}
+  {
+    m_nodes.reserve(6);
+  }
 
   void add_node(NodePtr<AstNode>&& node)
   {
     if (node) {
-      nodes.push_back(std::move(node));
+      m_nodes.push_back(std::move(node));
     }
   }
 
+  void set_nodes(Nodes&& nodes)
+  {
+    m_nodes = std::move(nodes);
+  }
+
+  const Nodes& nodes() const { return m_nodes; }
+  size_t node_count() const  { return m_nodes.size(); }
+
+
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
   {
-    for (const auto& n : nodes)
+    for (const auto& n : m_nodes)
     {
       os << std::string(tab*2, ' ');
       n->dump(os, tab);
@@ -38,7 +52,8 @@ struct NodeBlock : public AstNode
     }
   }
 
-  std::vector<NodePtr<AstNode>> nodes;
+protected:
+  Nodes m_nodes;
 };
 
 
@@ -56,7 +71,7 @@ struct ConditionIf : public AstNode
   {}
 
   const NodeBlock& if_body () const { return if_.body; }
-  size_t if_body_node_count() const { return if_body().nodes.size() ; }
+  size_t if_body_node_count() const { return if_body().nodes().size() ; }
   size_t else_if_count () const { return else_if.size(); }
   bool have_else() const { return else_body.has_value(); }
 
@@ -129,6 +144,8 @@ struct FunctionDef : public AstNode
 {
   static constexpr NodeType Type = NodeType::FunctionDef;
 
+  using FunctionParams = std::vector<FunctionParam>;
+
   FunctionDef() : AstNode(Type)
   {}
 
@@ -145,11 +162,25 @@ struct FunctionDef : public AstNode
     body.dump(os, tab);
   }
 
+  void set_params(FunctionParams parameters)
+  {
+    params = std::move(parameters);
+  }
 
-  std::string name;
-  std::vector<FunctionParam> params;
+  const auto& get_params () const
+  {
+    return params;
+  }
+
+  size_t param_count() const { return params.size(); }
+  bool has_params() const { return !params.empty(); }
+
+  std::string_view name;
   std::string_view return_type;
   NodeBlock body;
+
+private:
+  FunctionParams params;
 };
 
 

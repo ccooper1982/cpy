@@ -18,7 +18,7 @@ TEST(Ast, ZeroNodes)
 {
   Parser parser;
   auto script = parser.parse(std::string_view{});
-  ASSERT_EQ(script.ast->block.nodes.size(), 0);
+  ASSERT_EQ(script.ast->block.nodes().size(), 0);
 }
 
 // Function Definition //
@@ -31,11 +31,11 @@ TEST(Ast, FuncDef_NoArgs)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 1);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes().size(), 1);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
 
-  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
-  ASSERT_TRUE(def.params.empty());
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
+  ASSERT_TRUE(def.get_params().empty());
   ASSERT_EQ(def.name, "hello");
 }
 
@@ -49,15 +49,15 @@ TEST(Ast, FuncDef_1Arg)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 1);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes().size(), 1);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
 
-  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
 
   ASSERT_EQ(def.name, "hello");
-  ASSERT_EQ(def.params.size(), 1);
-  ASSERT_EQ(def.params[0].param_name, "a");
-  ASSERT_EQ(def.params[0].type_name, "int");
+  ASSERT_EQ(def.get_params().size(), 1);
+  ASSERT_EQ(def.get_params()[0].param_name, "a");
+  ASSERT_EQ(def.get_params()[0].type_name, "int");
 }
 
 TEST(Ast, FuncDef_2Arg)
@@ -69,20 +69,20 @@ TEST(Ast, FuncDef_2Arg)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 1);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes().size(), 1);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
 
-  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
 
   ASSERT_EQ(def.name, "hello");
-  ASSERT_EQ(def.params.size(), 2);
-  ASSERT_EQ(def.params[0].param_name, "a");
+  ASSERT_EQ(def.get_params().size(), 2);
+  ASSERT_EQ(def.get_params()[0].param_name, "a");
 
-  const FunctionParam& p1 = def.params[0];
+  const FunctionParam& p1 = def.get_params()[0];
   ASSERT_EQ(p1.param_name, "a");
   ASSERT_EQ(p1.type_name, "int");
 
-  const FunctionParam& p2 = def.params[1];
+  const FunctionParam& p2 = def.get_params()[1];
   ASSERT_EQ(p2.param_name, "b");
   ASSERT_EQ(p2.type_name, "str");
 }
@@ -96,13 +96,13 @@ TEST(Ast, FuncDef_1Arg_InvalidType)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 1);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes().size(), 1);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
 
-  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
   ASSERT_EQ(def.name, "hello");
-  ASSERT_EQ(def.params.size(), 1);
-  ASSERT_EQ(def.params[0].param_name, "a");
+  ASSERT_EQ(def.get_params().size(), 1);
+  ASSERT_EQ(def.get_params()[0].param_name, "a");
 }
 
 TEST(Ast, FuncDef_RefParam)
@@ -116,31 +116,31 @@ TEST(Ast, FuncDef_RefParam)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 3);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes().size(), 3);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::FunctionDef);
 
-  const auto& def_foo1 = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+  const auto& def_foo1 = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
   ASSERT_EQ(def_foo1.name, "foo1");
-  ASSERT_EQ(def_foo1.params.size(), 1);
-  ASSERT_EQ(def_foo1.params[0].param_name, "a");
-  ASSERT_TRUE(def_foo1.params[0].is_ref);
+  ASSERT_EQ(def_foo1.param_count(), 1);
+  ASSERT_EQ(def_foo1.get_params()[0].param_name, "a");
+  ASSERT_TRUE(def_foo1.get_params()[0].is_ref);
 
-  const auto& def_foo2 = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[1]);
+  const auto& def_foo2 = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[1]);
   ASSERT_EQ(def_foo2.name, "foo2");
-  ASSERT_EQ(def_foo2.params.size(), 2);
-  ASSERT_EQ(def_foo2.params[0].param_name, "a");
-  ASSERT_TRUE(def_foo2.params[0].is_ref);
+  ASSERT_EQ(def_foo2.param_count(), 2);
+  ASSERT_EQ(def_foo2.get_params()[0].param_name, "a");
+  ASSERT_TRUE(def_foo2.get_params()[0].is_ref);
 
-  const auto& def_foo3 = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[2]);
+  const auto& def_foo3 = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[2]);
   ASSERT_EQ(def_foo3.name, "foo3");
-  ASSERT_EQ(def_foo3.params.size(), 3);
-  ASSERT_EQ(def_foo3.params[0].param_name, "a");
-  ASSERT_TRUE(def_foo3.params[0].is_ref);
-  ASSERT_EQ(def_foo3.params[1].param_name, "b");
-  ASSERT_FALSE(def_foo3.params[1].is_ref);
-  ASSERT_EQ(def_foo3.params[2].param_name, "c");
-  ASSERT_TRUE(def_foo3.params[2].is_ref);
+  ASSERT_EQ(def_foo3.param_count(), 3);
+  ASSERT_EQ(def_foo3.get_params()[0].param_name, "a");
+  ASSERT_TRUE(def_foo3.get_params()[0].is_ref);
+  ASSERT_EQ(def_foo3.get_params()[1].param_name, "b");
+  ASSERT_FALSE(def_foo3.get_params()[1].is_ref);
+  ASSERT_EQ(def_foo3.get_params()[2].param_name, "c");
+  ASSERT_TRUE(def_foo3.get_params()[2].is_ref);
 }
 
 // Function Call //
@@ -153,9 +153,9 @@ TEST(Ast, FuncCall_NotExist)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 1);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::Expression);
-  ASSERT_EQ(dynamic_cast<FunctionCall&>(*script.ast->block.nodes[0]).name, "hello");
+  ASSERT_EQ(script.ast->block.nodes().size(), 1);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::Expression);
+  ASSERT_EQ(dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[0]).name, "hello");
 }
 
 TEST(Ast, FuncCall_NoArgs)
@@ -168,11 +168,11 @@ TEST(Ast, FuncCall_NoArgs)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 2);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes().size(), 2);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::Expression);
 
-  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[1]);
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[1]);
   ASSERT_EQ(call.name, "hello");
   ASSERT_TRUE(call.args.empty());
 }
@@ -187,11 +187,11 @@ TEST(Ast, FuncCall_Args)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 2);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes().size(), 2);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::Expression);
 
-  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[1]);
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[1]);
   ASSERT_EQ(call.name, "hello");
   ASSERT_EQ(call.args.size(), 2);
   ASSERT_TRUE(call.args[0].expr->is_expr_type(ExpressionType::Int));
@@ -210,9 +210,9 @@ TEST(Ast, FuncCall_InvalidCall)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 4);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes().size(), 4);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::Expression);
 }
 
 TEST(Ast, FuncCall_AllPrimitives)
@@ -226,20 +226,20 @@ TEST(Ast, FuncCall_AllPrimitives)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 2);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes().size(), 2);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::Expression);
 
-  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
-  ASSERT_EQ(def.params.size(), 4);
+  const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
+  ASSERT_EQ(def.get_params().size(), 4);
 
-  const auto& params = def.params;
+  const auto& params = def.get_params();
   ASSERT_EQ(params[0].type_name, "int");
   ASSERT_EQ(params[1].type_name, "str");
   ASSERT_EQ(params[2].type_name, "dec");
   ASSERT_EQ(params[3].type_name, "bool");
 
-  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[1]);
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[1]);
   ASSERT_EQ(call.args.size(), 4);
   ASSERT_TRUE(call.args[0].expr->is_expr_type(ExpressionType::Int));
   ASSERT_TRUE(call.args[1].expr->is_expr_type(ExpressionType::String));
@@ -257,11 +257,11 @@ TEST(Ast, FuncCall_Ref)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 2);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes().size(), 2);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::Expression);
 
-  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[1]);
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[1]);
   ASSERT_EQ(call.name, "foo");
   ASSERT_EQ(call.args.size(), 1);
   ASSERT_TRUE(call.args[0].expr->is_expr_type(ExpressionType::VariableUse));
@@ -278,12 +278,12 @@ TEST(Ast, FuncCall_Module)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 2);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::Expression);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes().size(), 2);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::Expression);
 
-  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[0]);
-  const auto& call_module = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[1]);
+  const auto& call = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[0]);
+  const auto& call_module = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[1]);
 
   ASSERT_EQ(call.module, "");
   ASSERT_EQ(call_module.module, "foo");
@@ -302,12 +302,12 @@ TEST(Ast, FuncCall_BinaryExprLiterals)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 3);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::Expression);
-  ASSERT_EQ(script.ast->block.nodes[2]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes().size(), 3);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.nodes()[2]->node_type(), NodeType::Expression);
 
-  const auto& call_ok = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[1]);
+  const auto& call_ok = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[1]);
   ASSERT_EQ(call_ok.args.size(), 1);
   ASSERT_EQ(call_ok.args[0].expr->node_type(), NodeType::Expression);
   ASSERT_TRUE(call_ok.args[0].expr->is_expr_type(ExpressionType::Binary));
@@ -326,7 +326,7 @@ TEST(Ast, FuncCall_BinaryExprLiterals)
   ASSERT_EQ(rhs_expr.v, 2);
 
   // foo(1+"2") ; binary expression with Int + String
-  const auto& call_fail = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[2]);
+  const auto& call_fail = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[2]);
   const auto& bin_expr_fail = dynamic_cast<BinaryExpression&>(*call_fail.args[0].expr);
 
   ASSERT_NE(bin_expr_fail.lhs, nullptr);
@@ -349,19 +349,19 @@ TEST(Ast, FuncCall_BinaryExprFuncs)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 3);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(script.ast->block.nodes[2]->node_type(), NodeType::Expression);
+  ASSERT_EQ(script.ast->block.node_count(), 3);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(script.ast->block.nodes()[2]->node_type(), NodeType::Expression);
 
-  const auto& def_foo = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
-  ASSERT_EQ(def_foo.params.size(), 1);
+  const auto& def_foo = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
+  ASSERT_EQ(def_foo.param_count(), 1);
 
-  const auto& def_get = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[1]);
-  ASSERT_TRUE(def_get.params.empty());
+  const auto& def_get = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[1]);
+  ASSERT_FALSE(def_get.has_params());
   ASSERT_EQ(def_get.return_type, "int");
 
-  const auto& call_foo = dynamic_cast<FunctionCall&>(*script.ast->block.nodes[2]);
+  const auto& call_foo = dynamic_cast<FunctionCall&>(*script.ast->block.nodes()[2]);
   ASSERT_EQ(call_foo.args.size(), 1);
   ASSERT_TRUE(call_foo.args[0].expr->is_expr_type(ExpressionType::Binary));
 
@@ -383,18 +383,18 @@ TEST(Ast, FuncCall_ReturnLiteral)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 2);
-  ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
-  ASSERT_TRUE(script.ast->block.nodes[1]->is_node_type(NodeType::FunctionDef));
+  ASSERT_EQ(script.ast->block.nodes().size(), 2);
+  ASSERT_TRUE(script.ast->block.nodes()[0]->is_node_type(NodeType::FunctionDef));
+  ASSERT_TRUE(script.ast->block.nodes()[1]->is_node_type(NodeType::FunctionDef));
 
-  const auto& ret_none = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
-  const auto& ret_int = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[1]);
+  const auto& ret_none = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
+  const auto& ret_int = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[1]);
 
-  ASSERT_EQ(ret_none.body.nodes.size(), 0);
-  ASSERT_EQ(ret_int.body.nodes.size(), 1);
+  ASSERT_EQ(ret_none.body.node_count(), 0);
+  ASSERT_EQ(ret_int.body.node_count(), 1);
 
-  ASSERT_TRUE(ret_int.body.nodes[0]->is_expression());
-  const auto& ret_node = dynamic_cast<const Return&>(*ret_int.body.nodes[0]);
+  ASSERT_TRUE(ret_int.body.nodes()[0]->is_expression());
+  const auto& ret_node = dynamic_cast<const Return&>(*ret_int.body.nodes()[0]);
   ASSERT_TRUE(ret_node.has_expression());
   ASSERT_TRUE(ret_node.return_expr->is_literal());
   ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Int));
@@ -413,14 +413,14 @@ TEST(Ast, FuncCall_ReturnBinaryExpr)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 1);
-  ASSERT_TRUE(script.ast->block.nodes[0]->is_node_type(NodeType::FunctionDef));
+  ASSERT_EQ(script.ast->block.nodes().size(), 1);
+  ASSERT_TRUE(script.ast->block.nodes()[0]->is_node_type(NodeType::FunctionDef));
 
-  const auto& foo_def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
-  ASSERT_EQ(foo_def.body.nodes.size(), 1);
-  ASSERT_TRUE(foo_def.body.nodes[0]->is_expression());
+  const auto& foo_def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
+  ASSERT_EQ(foo_def.body.nodes().size(), 1);
+  ASSERT_TRUE(foo_def.body.nodes()[0]->is_expression());
 
-  const auto& ret_node = dynamic_cast<const Return&>(*foo_def.body.nodes[0]);
+  const auto& ret_node = dynamic_cast<const Return&>(*foo_def.body.nodes()[0]);
   ASSERT_TRUE(ret_node.has_expression());
   ASSERT_TRUE(ret_node.return_expr->is_expr_type(ExpressionType::Binary));
 }
@@ -439,22 +439,22 @@ TEST(Ast, VariableDeclNoInit)
   Parser parser;
   auto script = parser.parse(src);
 
-  ASSERT_EQ(script.ast->block.nodes.size(), 3);
-  ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(script.ast->block.nodes[1]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(script.ast->block.nodes[2]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(script.ast->block.nodes().size(), 3);
+  ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(script.ast->block.nodes()[1]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(script.ast->block.nodes()[2]->node_type(), NodeType::VariableDecl);
 
-  const auto& var_a = dynamic_cast<VariableDecl&>(*script.ast->block.nodes[0]);
+  const auto& var_a = dynamic_cast<VariableDecl&>(*script.ast->block.nodes()[0]);
   ASSERT_EQ(var_a.var_name, "a");
   ASSERT_EQ(var_a.var_type, "int");
   ASSERT_EQ(var_a.get_decl_type(), VariableDecl::DeclType::ExplicitNoInit);
 
-  const auto& var_b = dynamic_cast<VariableDecl&>(*script.ast->block.nodes[1]);
+  const auto& var_b = dynamic_cast<VariableDecl&>(*script.ast->block.nodes()[1]);
   ASSERT_EQ(var_b.var_name, "b");
   ASSERT_EQ(var_b.var_type, "str");
   ASSERT_EQ(var_a.get_decl_type(), VariableDecl::DeclType::ExplicitNoInit);
 
-  const auto& var_c = dynamic_cast<VariableDecl&>(*script.ast->block.nodes[2]);
+  const auto& var_c = dynamic_cast<VariableDecl&>(*script.ast->block.nodes()[2]);
   ASSERT_EQ(var_c.var_name, "c");
   ASSERT_EQ(var_c.var_type, "bacon");
   ASSERT_EQ(var_a.get_decl_type(), VariableDecl::DeclType::ExplicitNoInit);
@@ -476,17 +476,17 @@ TEST(Ast, VariableDeclInit)
 
   const auto& ast = *script.ast;
 
-  ASSERT_EQ(ast.block.nodes.size(), 5);
-  ASSERT_EQ(ast.block.nodes[0]->node_type(), NodeType::FunctionDef);
-  ASSERT_EQ(ast.block.nodes[1]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(ast.block.nodes[2]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(ast.block.nodes[3]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(ast.block.nodes[4]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.block.nodes().size(), 5);
+  ASSERT_EQ(ast.block.nodes()[0]->node_type(), NodeType::FunctionDef);
+  ASSERT_EQ(ast.block.nodes()[1]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.block.nodes()[2]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.block.nodes()[3]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.block.nodes()[4]->node_type(), NodeType::VariableDecl);
 
-  const auto& var_decl_a = dynamic_cast<const VariableDecl&>(*ast.block.nodes[1]);
-  const auto& var_decl_b = dynamic_cast<const VariableDecl&>(*ast.block.nodes[2]);
-  const auto& var_decl_c = dynamic_cast<const VariableDecl&>(*ast.block.nodes[3]);
-  const auto& var_decl_d = dynamic_cast<const VariableDecl&>(*ast.block.nodes[4]);
+  const auto& var_decl_a = dynamic_cast<const VariableDecl&>(*ast.block.nodes()[1]);
+  const auto& var_decl_b = dynamic_cast<const VariableDecl&>(*ast.block.nodes()[2]);
+  const auto& var_decl_c = dynamic_cast<const VariableDecl&>(*ast.block.nodes()[3]);
+  const auto& var_decl_d = dynamic_cast<const VariableDecl&>(*ast.block.nodes()[4]);
 
   ASSERT_EQ(var_decl_a.get_decl_type(), VariableDecl::DeclType::InferredType);
   ASSERT_EQ(var_decl_b.get_decl_type(), VariableDecl::DeclType::InferredType);
@@ -511,15 +511,15 @@ TEST(Ast, Condition)
 
   const auto& ast = *script.ast;
 
-  ASSERT_EQ(ast.block.nodes.size(), 3);
-  ASSERT_EQ(ast.block.nodes[0]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(ast.block.nodes[1]->node_type(), NodeType::VariableDecl);
-  ASSERT_EQ(ast.block.nodes[2]->node_type(), NodeType::ConditionIf);
+  ASSERT_EQ(ast.block.nodes().size(), 3);
+  ASSERT_EQ(ast.block.nodes()[0]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.block.nodes()[1]->node_type(), NodeType::VariableDecl);
+  ASSERT_EQ(ast.block.nodes()[2]->node_type(), NodeType::ConditionIf);
 
-  const auto& cond = dynamic_cast<ConditionIf&>(*ast.block.nodes[2]);
+  const auto& cond = dynamic_cast<ConditionIf&>(*ast.block.nodes()[2]);
   ASSERT_TRUE(cond.if_.condition->is_expr_type(ExpressionType::Binary));
-  ASSERT_EQ(cond.if_.body.nodes.size(), 1);
-  ASSERT_TRUE(cond.if_.body.nodes[0]->is_node_type(NodeType::Expression));
+  ASSERT_EQ(cond.if_.body.node_count(), 1);
+  ASSERT_TRUE(cond.if_.body.nodes()[0]->is_node_type(NodeType::Expression));
 }
 
 TEST(Ast, VarAssign)
@@ -538,12 +538,12 @@ TEST(Ast, VarAssign)
 
   const auto& ast = *script.ast;
 
-  ASSERT_EQ(ast.block.nodes.size(), 6);
+  ASSERT_EQ(ast.block.nodes().size(), 6);
 
   const auto is_variable_assign = [](const NodePtr<AstNode>& node) {
       return node->is_node_type(NodeType::VariableAssign);
     };
-  ASSERT_TRUE(rg::all_of(ast.block.nodes, is_variable_assign));
+  ASSERT_TRUE(rg::all_of(ast.block.nodes(), is_variable_assign));
 
   static const std::array expected =
   {
@@ -555,11 +555,11 @@ TEST(Ast, VarAssign)
     std::pair{"f", ExpressionType::Binary},
   };
 
-  ASSERT_EQ(ast.block.nodes.size(), expected.size());
+  ASSERT_EQ(ast.block.nodes().size(), expected.size());
 
   for (std::size_t i = 0; i < expected.size(); ++i)
   {
-    const auto& assign = static_cast<const VariableAssign&>(*ast.block.nodes[i]);
+    const auto& assign = static_cast<const VariableAssign&>(*ast.block.nodes()[i]);
 
     EXPECT_EQ(assign.name, expected[i].first);
     ASSERT_TRUE(assign.expr->is_expr_type(expected[i].second));
@@ -567,7 +567,7 @@ TEST(Ast, VarAssign)
 
   // `e` is assigned from a binary expression of two literals
   {
-    const auto& var_e = static_cast<VariableAssign&>(*ast.block.nodes[4]);
+    const auto& var_e = static_cast<VariableAssign&>(*ast.block.nodes()[4]);
     ASSERT_EQ(var_e.name, "e");
     ASSERT_TRUE(var_e.expr->is_expr_type(ExpressionType::Binary));
 
@@ -578,7 +578,7 @@ TEST(Ast, VarAssign)
 
   // `f` is assigned from a binary expression of two function calls
   {
-    const auto& var_f = static_cast<VariableAssign&>(*ast.block.nodes[5]);
+    const auto& var_f = static_cast<VariableAssign&>(*ast.block.nodes()[5]);
     ASSERT_EQ(var_f.name, "f");
     ASSERT_TRUE(var_f.expr->is_expr_type(ExpressionType::Binary));
 
@@ -599,8 +599,8 @@ TEST(Ast, SyntaxError)
 
     auto script = parser.parse(src);
 
-    ASSERT_EQ(script.ast->block.nodes.size(), 1);
-    ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
+    ASSERT_EQ(script.ast->block.nodes().size(), 1);
+    ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
   }
 
   {
@@ -611,17 +611,17 @@ TEST(Ast, SyntaxError)
 
     auto script = parser.parse(src);
 
-    ASSERT_EQ(script.ast->block.nodes.size(), 1);
-    ASSERT_EQ(script.ast->block.nodes[0]->node_type(), NodeType::FunctionDef);
+    ASSERT_EQ(script.ast->block.nodes().size(), 1);
+    ASSERT_EQ(script.ast->block.nodes()[0]->node_type(), NodeType::FunctionDef);
 
-    const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes[0]);
+    const auto& def = dynamic_cast<FunctionDef&>(*script.ast->block.nodes()[0]);
     ASSERT_EQ(def.name, "hello");
 
-    ASSERT_EQ(def.params.size(), 2);
-    ASSERT_EQ(def.params[0].param_name, "a");
-    ASSERT_EQ(def.params[0].type_name, "int");
+    ASSERT_EQ(def.get_params().size(), 2);
+    ASSERT_EQ(def.get_params()[0].param_name, "a");
+    ASSERT_EQ(def.get_params()[0].type_name, "int");
 
-    ASSERT_EQ(def.params[1].param_name, "b");
-    ASSERT_EQ(def.params[1].type_name, "");
+    ASSERT_EQ(def.get_params()[1].param_name, "b");
+    ASSERT_EQ(def.get_params()[1].type_name, "");
   }
 }

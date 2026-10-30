@@ -57,7 +57,7 @@ VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&&
   {
     // this ignores NodeType::NodeBlock because we a block can only appear in a function
     // or condition body
-    for(const auto& node : block.nodes | vw::filter(is_executable))
+    for(const auto& node : block.nodes() | vw::filter(is_executable))
     {
       switch (node->node_type())
       {
