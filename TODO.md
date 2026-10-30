@@ -1,27 +1,5 @@
 # TODO
 
-## Parameter Semantics
-```
-fn foo (x: int)
-{
-  x = 3;
-}
-```
-
-`x` is pased by value, do we want to support pass by reference? Probably useful.
-
-What is syntax:
-
-```
-fn foo (x: ref int)
-{
-  x = 3;
-}
-
-a: int;
-foo(ref a);
-```
-
 ## String Concatenation
 ```
 a := "hello";
