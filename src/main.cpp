@@ -1,8 +1,10 @@
+#include "cpy/exceptions.hpp"
 #include <cpy/exec/executor.hpp>
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
 #include <cpy/semantics.hpp>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 
@@ -49,11 +51,10 @@ int main (int argc, char ** argv)
   std::cout << "AST:";
   script.ast->dump(std::cout);
 
-  Semantics sems;
-
   // errors here if tree-sitter found syntax errors
   if (!script.issues->have_errors())
   {
+    Semantics sems;
     sems.process(script);
 
     std::cout << "Sym Table:\n";
@@ -62,7 +63,26 @@ int main (int argc, char ** argv)
     if (!script.issues->have_errors())
     {
       Executor exec {sems.symbol_table()};
-      exec.execute(script.ast->block);
+
+      try
+      {
+        exec.execute(script.ast->block);
+      }
+      catch (const RuntimeError& ex_run)
+      {
+        std::cerr << "Runtime Error: " << ex_run.what() << '\n';
+        return 1;
+      }
+      catch (const std::exception& ex)
+      {
+        std::cerr << "Internal execution error: " << ex.what() << '\n';
+        return -1;
+      }
+      catch (...)
+      {
+        std::cerr << "Unknown execution error\n";
+        return -1;
+      }
     }
   }
 

@@ -53,34 +53,27 @@ VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&&
 
   push_stack(block, std::move(func_args));
 
-  try
+  // this ignores NodeType::NodeBlock because we a block can only appear in a function
+  // or condition body
+  for(const auto& node : block.nodes() | vw::filter(is_executable))
   {
-    // this ignores NodeType::NodeBlock because we a block can only appear in a function
-    // or condition body
-    for(const auto& node : block.nodes() | vw::filter(is_executable))
+    switch (node->node_type())
     {
-      switch (node->node_type())
-      {
-        case NodeType::VariableDecl:
-          execute(block, static_cast<const VariableDecl&>(*node));
-          break;
-        case NodeType::VariableAssign:
-          execute(block, static_cast<const VariableAssign&>(*node));
-          break;
-        case NodeType::Expression:
-          result = execute(block, static_cast<const Expression&>(*node));
-          break;
-        case NodeType::ConditionIf:
-          result = execute(block, static_cast<const ConditionIf&>(*node));
-          break;
-        default:
-          throw std::runtime_error{"Unexpected node type in block"};
-      }
+      case NodeType::VariableDecl:
+        execute(block, static_cast<const VariableDecl&>(*node));
+        break;
+      case NodeType::VariableAssign:
+        execute(block, static_cast<const VariableAssign&>(*node));
+        break;
+      case NodeType::Expression:
+        result = execute(block, static_cast<const Expression&>(*node));
+        break;
+      case NodeType::ConditionIf:
+        result = execute(block, static_cast<const ConditionIf&>(*node));
+        break;
+      default:
+        throw std::runtime_error{"Unexpected node type in block"};
     }
-  }
-  catch (const std::exception& ex)
-  {
-    std::cerr << ex.what();
   }
 
   pop_stack();
@@ -181,6 +174,11 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
 
     result = execute(def.ast->body, std::move(args));
   }
+  else if (expr.is_expr_type(ExpressionType::Unary))
+  {
+    const auto& unary_expr = static_cast<const UnaryExpression&>(expr);
+    result = apply_operator(block, *unary_expr.operand, unary_expr.op);
+  }
   else if (expr.is_expr_type(ExpressionType::Binary))
   {
     const auto& bin_expr = static_cast<const BinaryExpression&>(expr);
@@ -258,23 +256,28 @@ Variable& Executor::get_variable (const VarName name)
 }
 
 
+VarValue Executor::apply_operator(const NodeBlock& block, const Expression& operand, const UnaryOperator op)
+{
+  VarValue val = execute(block, operand);
+
+  switch (op)
+  {
+    using enum UnaryOperator;
+
+    case Not:
+      return !val;
+    case Negate:
+      return -val;
+    case BitwiseNot:
+      return ~val;
+  }
+}
+
+
 VarValue Executor::apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op)
 {
-  VarValue lhs_val, rhs_val;
-
-  if (lhs.is_literal()) {
-    lhs_val = value_from_literal_expr(lhs);
-  }
-  else {
-    lhs_val = execute(block, lhs);
-  }
-
-  if (rhs.is_literal()) {
-    rhs_val = value_from_literal_expr(rhs);
-  }
-  else {
-    rhs_val = execute(block, rhs);
-  }
+  VarValue lhs_val = execute(block, lhs);
+  VarValue rhs_val = execute(block, rhs);
 
   switch (op)
   {

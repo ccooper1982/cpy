@@ -1,3 +1,4 @@
+#include "cpy/exceptions.hpp"
 #include "cpy/exec/operators.hpp"
 #include <gtest/gtest.h>
 #include <cpy/common.hpp>
@@ -1041,4 +1042,95 @@ TEST(Exec, Parenthesis_FuncCall)
     TestExecutor exec(sem.symbol_table(), on_pop);
     exec.execute(script.ast->block);
   }
+}
+
+TEST(Exec, Operators_DivideByZero)
+{
+  const std::string_view src = R"(
+    z := 0;
+    a := 1/z;
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>>){
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  ASSERT_THROW(exec.execute(script.ast->block), RuntimeError);
+}
+
+
+TEST(Exec, Operators_IntegerDivisionOverflow)
+{
+  const std::string_view src = R"(
+    a := -9223372036854775807 - 1;
+    b := -1;
+    c := a / b;
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>>) {
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  ASSERT_THROW(exec.execute(script.ast->block), RuntimeError);
+}
+
+TEST(Exec, Operators_OutOfRange)
+{
+  {
+    const std::string_view src = R"(
+      max := 9223372036854775807;
+      v := max + 1;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>>) {
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    ASSERT_THROW(exec.execute(script.ast->block), RuntimeError);
+  }
+
+  {
+    const std::string_view src = R"(
+      v := -2 - 9223372036854775807;
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>>) {
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    ASSERT_THROW(exec.execute(script.ast->block), RuntimeError);
+  }
+
+  // TODO test multiplication:
+  // ```
+  // a := 1.0e200;
+  // b := 1.0e200;
+  // c := a * b;
+  // ```
+  // But need to support this notation
+
 }

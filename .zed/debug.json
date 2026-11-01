@@ -31,7 +31,7 @@
   //   "adapter": "CodeLLDB",
   //   "request": "launch",
   //   "program": "$ZED_WORKTREE_ROOT/build/cpy_tests",
-  //   "args": ["--gtest_filter=Exec.FuncCall_ParamRef"],
+  //   "args": ["--gtest_filter=Semantics.OutOfRange"],
   //   "cwd": "$ZED_WORKTREE_ROOT",
   //   "build": {
   //     "command": "meson",

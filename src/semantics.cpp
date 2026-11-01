@@ -1,4 +1,5 @@
 #include "cpy/ast/ast_node.hpp"
+#include "cpy/common.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
@@ -364,6 +365,13 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 }
 
 
+VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const UnaryExpression& expr)
+{
+  VarType operand_type = handle_expression(ctx, parent, block, *expr.operand);
+  return process_operator(ctx, operand_type, expr);
+}
+
+
 VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& ret_expr)
 {
   if (std::addressof(block) == std::addressof(ctx.ast.block))
@@ -396,6 +404,40 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 }
 
 
+VarType Semantics::process_operator(Context& ctx, const VarType& operand_type, const UnaryExpression& expr)
+{
+  using enum UnaryOperator;
+  using enum BuiltInType;
+
+  bool valid{};
+
+  if (operand_type == Void) {
+    issue::unary_operand_void(ctx.issues, expr);
+  }
+  else
+  {
+    switch (expr.op)
+    {
+      case UnaryOperator::Negate:
+        valid = operand_type == Decimal || operand_type == Int;
+        break;
+      case UnaryOperator::Not:
+        valid = operand_type == Bool;
+        break;
+      case UnaryOperator::BitwiseNot:
+        valid = operand_type == Int;
+        break;
+    }
+
+    if (!valid) {
+      issue::unary_operand_invalid(ctx.issues, expr);
+    }
+  }
+
+  return valid ? operand_type : unresolved_type;
+}
+
+
 /// Determines the validity of the BinaryExpression::op on the operands, and returns
 /// the return type (or unresolved_type if invalid).
 VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarType& b, const BinaryExpression& expr)
@@ -425,7 +467,8 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
       case Subtract:
       case Multiply:
       case Divide:
-        valid = a == Int || a == Decimal || a == String;
+        // TODO string concatenation
+        valid = a == Int || a == Decimal ;//|| a == String;
         result_type = a;
         break;
 
@@ -446,6 +489,24 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
 
     if (!valid) {
       issue::binary_operands_invalid(ctx.issues, expr);
+    }
+  }
+
+  if (valid && expr.op == BinaryOperator::Divide && is_numeric_literal_expression(*expr.rhs))
+  {
+    bool by_zero{};
+
+    // TODO 'v', really?
+    if (expr.rhs->is_expr_type(ExpressionType::Int)) {
+      by_zero = static_cast<const IntegerLiteral&>(*expr.rhs).v == 0;
+    }
+    else {
+      by_zero = static_cast<const DecimalLiteral&>(*expr.rhs).v == 0.0;
+    }
+
+    if (by_zero) {
+      issue::expr_divide_by_zero(ctx.issues, expr);
+      valid = false;
     }
   }
 

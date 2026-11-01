@@ -17,7 +17,7 @@ using CpyString = std::string;
 
 using VarName = std::string_view;
 
-// helper type for the visitor
+// helper type for the visiting
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
 

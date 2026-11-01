@@ -145,9 +145,15 @@ export default grammar({
       $.boolean,
       $.function_call,
       $.identifier,
+      $.unary_expression,
       $.binary_expression,
-      $.parenthesized_expression
+      $.parenthesized_expression,
     ),
+
+    unary_expression: $ => prec(4, seq(
+        field("op", choice("-", "!", "~")),
+        field("expr", $.expression)
+    )),
 
     binary_expression: ($) => choice(
         prec.left(3, seq(
