@@ -172,6 +172,7 @@ private:
 
   // operators //
   VarValue apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op);
+  VarValue apply_operator(const NodeBlock& block, const Expression& operand, const UnaryOperator op);
 
   // variable stack //
 #ifdef CPY_UNIT_TESTS

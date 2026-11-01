@@ -56,10 +56,12 @@ private:
   // expressions
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const FunctionCall& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const VariableUse& expr);
+  VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const UnaryExpression& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const BinaryExpression& expr);
   VarType process_expression(Context& ctx, const AstNode& parent, const NodeBlock& block, const Return& expr);
 
   // operators
+  VarType process_operator(Context& ctx, const VarType& operand_type, const UnaryExpression& expr);
   VarType process_operator(Context& ctx, const VarType& a, const VarType& b, const BinaryExpression& expr);
 
   // conditions
@@ -143,6 +145,8 @@ private:
         return process_expression(ctx, parent, block, static_cast<const VariableUse&>(expr));
       case ExpressionType::Return:
         return process_expression(ctx, parent, block, static_cast<const Return&>(expr));
+      case ExpressionType::Unary:
+        return process_expression(ctx, parent, block, static_cast<const UnaryExpression&>(expr));
       case ExpressionType::Binary:
         return process_expression(ctx, parent, block, static_cast<const BinaryExpression&>(expr));
       default:

@@ -20,6 +20,13 @@ enum class BinaryOperator
   GreaterEqual,
 };
 
+enum class UnaryOperator
+{
+  Not,
+  Negate,
+  BitwiseNot,
+};
+
 enum class ExpressionType
 {
   Int,
@@ -27,6 +34,7 @@ enum class ExpressionType
   Dec,
   Bool,
   Binary,
+  Unary,
   FuncCall,
   VariableUse,
   Return
@@ -63,6 +71,7 @@ private:
 
 
 inline std::string_view to_string(const Expression& expr);
+inline std::string_view to_string(const UnaryOperator op);
 inline std::string_view to_string(const BinaryOperator op);
 
 
@@ -265,6 +274,42 @@ struct BinaryExpression : public Expression
 
 };
 
+struct UnaryExpression : public Expression
+{
+  static constexpr ExpressionType ExprType = ExpressionType::Unary;
+
+  explicit UnaryExpression() : Expression(ExprType, false)
+  {}
+
+  explicit UnaryExpression(NodePtr<Expression>&& op_expr, const UnaryOperator op)
+    : Expression(ExprType, false)
+    , op(op)
+    , operand(std::move(op_expr))
+  {}
+
+  bool is_convertible_to(const BuiltInType t) const override
+  {
+    return operand->is_convertible_to(t);
+  }
+
+  VarType get_var_type() const override
+  {
+    if (operand->is_expr_type(ExpressionType::FuncCall)) {
+      throw std::runtime_error{"get_var_type() called on UnaryExpression with FunctionCall operand"};
+    }
+    return operand->get_var_type();
+  }
+
+  void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
+  {
+    os << to_string(op);
+    operand->dump(os, tab);
+  }
+
+  UnaryOperator op;
+  NodePtr<Expression> operand;
+};
+
 // Function Call //
 struct FunctionArgument
 {
@@ -366,6 +411,14 @@ const ExprT& get_expression(const std::unique_ptr<Expression>& expr)
 }
 
 
+inline bool is_numeric_literal_expression (const Expression& expr)
+{
+  if (!expr.is_literal()) {
+    return false;
+  }
+  return expr.is_expr_type(ExpressionType::Int) || expr.is_expr_type(ExpressionType::Dec);
+}
+
 inline std::string_view to_string(const BinaryOperator op)
 {
   switch (op)
@@ -381,7 +434,17 @@ inline std::string_view to_string(const BinaryOperator op)
     case BinaryOperator::LessEqual:   return "<=";
     case BinaryOperator::GreaterEqual: return ">=";
   }
+  std::unreachable();
+}
 
+inline std::string_view to_string(const UnaryOperator op)
+{
+  switch (op)
+  {
+    case UnaryOperator::Not:        return "!";
+    case UnaryOperator::Negate:     return "-";
+    case UnaryOperator::BitwiseNot: return "~";
+  }
   std::unreachable();
 }
 
@@ -401,6 +464,8 @@ inline std::string_view to_string(const Expression& expr)
       return "StringLiteral";
     case Binary:
       return "BinaryExpression";
+    case Unary:
+      return "UnaryExpression";
     case FuncCall:
       return "FunctionCall";
     case VariableUse:

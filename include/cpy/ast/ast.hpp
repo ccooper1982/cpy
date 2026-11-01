@@ -253,7 +253,7 @@ struct VariableDecl : public AstNode
     if (has_explicit_type()) {
       os << var_type;
     }
-    else if (initialiser) {
+    else if (has_initialiser()) {
       os << "[inferred " << to_string(*initialiser) << "]";
     }
   }

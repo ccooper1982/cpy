@@ -558,5 +558,64 @@ TEST(Semantics, Parenthesis)
   sem.process(script);
 
   ASSERT_FALSE(script.issues->have_errors());
+}
 
+
+TEST(Semantics, UnaryExpressions)
+{
+  const std::string_view src = R"(
+    a := !3;
+    b := ~true;
+    c := ~1.5;
+    d := -false;
+    e := !(4);
+    f := !foo();
+
+    fn foo() {}
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  ASSERT_TRUE(script.issues->have_errors());
+  ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandInvalid), 5);
+  ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandVoid), 1);
+}
+
+
+TEST(Semantics, DivideByZeroLiteral)
+{
+  const std::string_view src = R"(
+    a := 1/0;
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  ASSERT_TRUE(script.issues->have_errors());
+  ASSERT_EQ(script.issues->get_count(ErrorCode::ExprDivideByZero), 1);
+}
+
+
+TEST(Semantics, OutOfRange)
+{
+  const std::string_view src = R"(
+    a := -9223372036854775808;
+    b := 9223372036854775808;
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  ASSERT_TRUE(script.issues->have_errors());
+  ASSERT_EQ(script.issues->get_count(ErrorCode::OutOfRange), 2);
 }

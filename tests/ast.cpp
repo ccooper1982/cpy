@@ -626,17 +626,17 @@ TEST(Ast, Parenthesis_FuncCall)
   Parser parser;
   auto script = parser.parse(src);
 
-  const auto& ast = *script.ast;
+  const auto& nodes = script.ast->block.nodes();
 
-  ASSERT_EQ(ast.block.nodes().size(), 2);
-  ASSERT_TRUE(ast.block.nodes()[0]->is_node_type(NodeType::Expression));
-  ASSERT_TRUE(ast.block.nodes()[1]->is_node_type(NodeType::Expression));
+  ASSERT_EQ(nodes.size(), 2);
+  ASSERT_TRUE(nodes[0]->is_node_type(NodeType::Expression));
+  ASSERT_TRUE(nodes[1]->is_node_type(NodeType::Expression));
 
-  ASSERT_TRUE(static_cast<const Expression&>(*ast.block.nodes()[0]).is_expr_type(ExpressionType::FuncCall));
-  ASSERT_TRUE(static_cast<const Expression&>(*ast.block.nodes()[1]).is_expr_type(ExpressionType::FuncCall));
+  ASSERT_TRUE(static_cast<const Expression&>(*nodes[0]).is_expr_type(ExpressionType::FuncCall));
+  ASSERT_TRUE(static_cast<const Expression&>(*nodes[1]).is_expr_type(ExpressionType::FuncCall));
 
-  const auto& foo1 = static_cast<const FunctionCall&>(*ast.block.nodes()[0]);
-  const auto& foo2 = static_cast<const FunctionCall&>(*ast.block.nodes()[1]);
+  const auto& foo1 = static_cast<const FunctionCall&>(*nodes[0]);
+  const auto& foo2 = static_cast<const FunctionCall&>(*nodes[1]);
 
   ASSERT_EQ(foo1.arg_count(), 1);
   ASSERT_EQ(foo2.arg_count(), 2);
@@ -645,6 +645,50 @@ TEST(Ast, Parenthesis_FuncCall)
   ASSERT_TRUE(foo2.args[0].expr->is_expr_type(ExpressionType::Int));
   ASSERT_TRUE(foo2.args[1].expr->is_expr_type(ExpressionType::Binary));
 }
+
+TEST(Ast, Parenthesis_UnaryExpression)
+{
+  const std::string_view src = R"(
+    a := -1;
+
+    b :bool;
+    b = !false;
+
+    c := -(1 + 2);
+
+    d := foo(-1);
+  )";
+
+  Parser parser;
+  auto script = parser.parse(src);
+
+  const auto& nodes = script.ast->block.nodes();
+
+  ASSERT_EQ(nodes.size(), 5);
+  ASSERT_TRUE(nodes[0]->is_node_type(NodeType::VariableDecl));
+  ASSERT_TRUE(nodes[1]->is_node_type(NodeType::VariableDecl));
+  ASSERT_TRUE(nodes[2]->is_node_type(NodeType::VariableAssign));
+  ASSERT_TRUE(nodes[3]->is_node_type(NodeType::VariableDecl));
+  ASSERT_TRUE(nodes[4]->is_node_type(NodeType::VariableDecl));
+
+  ASSERT_TRUE(static_cast<const VariableDecl&>(*nodes[0]).initialiser->is_expr_type(ExpressionType::Unary));
+  ASSERT_TRUE(static_cast<const VariableAssign&>(*nodes[2]).expr->is_expr_type(ExpressionType::Unary));
+  ASSERT_TRUE(static_cast<const VariableDecl&>(*nodes[3]).initialiser->is_expr_type(ExpressionType::Unary));
+  ASSERT_TRUE(static_cast<const VariableDecl&>(*nodes[4]).initialiser->is_expr_type(ExpressionType::FuncCall));
+
+  const auto& unary_a = static_cast<const UnaryExpression&>(*static_cast<const VariableDecl&>(*nodes[0]).initialiser);
+  ASSERT_TRUE(unary_a.operand->is_expr_type(ExpressionType::Int));
+
+  const auto& unary_b = static_cast<const UnaryExpression&>(*static_cast<const VariableAssign&>(*nodes[2]).expr);
+  ASSERT_TRUE(unary_b.operand->is_expr_type(ExpressionType::Bool));
+
+  const auto& unary_c = static_cast<const UnaryExpression&>(*static_cast<const VariableDecl&>(*nodes[3]).initialiser);
+  ASSERT_TRUE(unary_c.operand->is_expr_type(ExpressionType::Binary));
+
+  const auto& func_call_d = static_cast<const FunctionCall&>(*static_cast<const VariableDecl&>(*nodes[4]).initialiser);
+  ASSERT_TRUE(func_call_d.args[0].expr->is_expr_type(ExpressionType::Unary));
+}
+
 
 // Syntax Errors //
 TEST(Ast, SyntaxError)

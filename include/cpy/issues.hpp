@@ -35,10 +35,14 @@ enum class ErrorCode
   VariableAssignType,
   BinaryOperandsInvalid,
   BinaryOperandsVoid,
+  UnaryOperandInvalid,
+  UnaryOperandVoid,
+  ExprDivideByZero,
   ConditionNotBool,
   ReturnFromRoot,
   Unsupported,
   SyntaxError,
+  OutOfRange,
   Compiler
 };
 
@@ -131,6 +135,24 @@ namespace issue
     const auto end_byte = ts_node_end_byte(node);
 
     issues.add_error(std::format("Syntax error at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::SyntaxError);
+  }
+
+  inline void out_of_range(Issues& issues, const TSNode& node)
+  {
+    const auto start = ts_node_start_point(node);
+    const auto start_byte = ts_node_start_byte(node);
+    const auto end_byte = ts_node_end_byte(node);
+
+    issues.add_error(std::format("Out of range at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::OutOfRange);
+  }
+
+  inline void invalid_number(Issues& issues, const TSNode& node)
+  {
+    const auto start = ts_node_start_point(node);
+    const auto start_byte = ts_node_start_byte(node);
+    const auto end_byte = ts_node_end_byte(node);
+
+    issues.add_error(std::format("Invalid number at {}:{}", start.row+1, start.column+1), start_byte, end_byte, ErrorCode::OutOfRange);
   }
 
   inline void compiler_error (Issues& issues, const AstNode& node, const std::string_view msg = "")
@@ -250,6 +272,16 @@ namespace issue
     issues.add_error("Void operand(s) in binary expression", node.source, ErrorCode::BinaryOperandsVoid);
   }
 
+  inline void unary_operand_invalid (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Unary expression operand has incompatible type", node.source, ErrorCode::UnaryOperandInvalid);
+  }
+
+  inline void unary_operand_void (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Void operand in unary expression", node.source, ErrorCode::UnaryOperandVoid);
+  }
+
   inline void condition_not_bool (Issues& issues, const AstNode& node)
   {
     issues.add_error("Condition expression is not boolean", node.source, ErrorCode::ConditionNotBool);
@@ -258,5 +290,10 @@ namespace issue
   inline void return_from_root (Issues& issues, const AstNode& node)
   {
     issues.add_error("Cannot return from script root", node.source, ErrorCode::ReturnFromRoot);
+  }
+
+  inline void expr_divide_by_zero (Issues& issues, const AstNode& node)
+  {
+    issues.add_error("Divide by 0", node.source, ErrorCode::ExprDivideByZero);
   }
 }

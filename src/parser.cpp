@@ -42,6 +42,15 @@ static BinaryOperator get_binary_operator(const std::string_view op)
   std::unreachable();
 }
 
+static UnaryOperator get_unary_operator(const std::string_view op)
+{
+  if (op == "!")  return UnaryOperator::Not;
+  if (op == "-")  return UnaryOperator::Negate;
+  if (op == "~")  return UnaryOperator::BitwiseNot;
+
+  std::unreachable();
+}
+
 static void set_source_region (const TSNode& ts_node, AstNode& ast_node)
 {
   ast_node.source = SourceRegion{ts_node_start_byte(ts_node), ts_node_end_byte(ts_node)};
@@ -71,20 +80,36 @@ std::string_view Parser::from_source (const TSNode& node)
 
 NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
 {
+  auto number_from_source = [&expr_node, this](const std::string_view src, auto& v)
+  {
+    // tree-sitter will catch invalid numbers, i.e.: `a := 123a;`
+    // this is more defensive
+    v = {};
+    const auto [ptr, ec] = std::from_chars(src.data(), src.data()+src.size(), v);
+    if (ec == std::errc::result_out_of_range) {
+      issue::out_of_range(*m_issues, expr_node);
+    }
+    else if (ec == std::errc::invalid_argument || ptr != src.data() + src.size()){
+      issue::invalid_number(*m_issues, expr_node);
+    }
+  };
+
   NodePtr<Expression> expr;
 
   const std::string_view expr_type = ts_node_type(ts_node_named_child(expr_node, 0));
-
-  if (expr_type.empty())
-    return nullptr;
-
   const std::string_view value = from_source(ts_node_named_child(expr_node, 0));
 
   if (expr_type == "integer")
   {
-    CpyInt i{};
-    std::from_chars(value.data(), value.data()+value.size(), i);
+    CpyInt i;
+    number_from_source(value, i);
     expr = make_node<IntegerLiteral>(i);
+  }
+  else if (expr_type == "decimal")
+  {
+    CpyDec d;
+    number_from_source(value, d);
+    expr = make_node<DecimalLiteral>(d);
   }
   else if (expr_type == "string")
   {
@@ -94,14 +119,18 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
     //  "" -> empty string
     expr = make_node<StringLiteral>(value.substr(1, value.size()-2));
   }
-  else if (expr_type == "decimal")
-  {
-    CpyDec d{};
-    std::from_chars(value.data(), value.data()+value.size(), d);
-    expr = make_node<DecimalLiteral>(d);
-  }
   else if (expr_type == "boolean") {
     expr = make_node<BooleanLiteral>(value == "true");
+  }
+  else if (expr_type == "unary_expression")
+  {
+    const auto unary_expr_node = ts_node_named_child(expr_node, 0);
+    const auto op_node = child_by_field_name(unary_expr_node, "op");
+    const auto operand_expr = child_by_field_name(unary_expr_node, "expr");
+
+    const auto op = get_unary_operator(from_source(op_node));
+
+    expr = make_node<UnaryExpression>(parse_expression(operand_expr), op);
   }
   else if (expr_type == "binary_expression")
   {
@@ -480,7 +509,7 @@ void Parser::parse()
 Script Parser::parse(const fs::path& src_file)
 {
   if (std::ifstream stream(src_file); !stream) {
-      throw std::runtime_error{"Failed to open source file: " + src_file.string()};
+    throw std::runtime_error{"Failed to open source file: " + src_file.string()};
   }
   else {
     m_src = std::make_unique<std::string> (std::istreambuf_iterator<char>{stream},
