@@ -341,6 +341,11 @@ struct FunctionCall : public Expression
     throw std::runtime_error{"get_var_type() called on FunctionCall"};
   }
 
+  bool is_convertible_to(const BuiltInType) const override
+  {
+    throw std::runtime_error{"is_convertible_to() called on FunctionCall. Use symbol table"};
+  }
+
   size_t arg_count() const { return args.size(); }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override

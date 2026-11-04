@@ -20,7 +20,8 @@ enum class NodeType
   Expression,
   VariableDecl,
   VariableAssign,
-  ConditionIf
+  ConditionIf,
+  LoopWhile
 };
 
 enum class BuiltInType

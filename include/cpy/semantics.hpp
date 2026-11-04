@@ -67,6 +67,9 @@ private:
   // conditions
   void process_condition(Context& ctx, const AstNode& parent, const NodeBlock& block, const ConditionIf& cond);
 
+  // loops
+  void process_while(Context& ctx, const AstNode& parent, const NodeBlock& block, const LoopWhile& loop);
+
   // utils
   template<typename NodeT, typename Handler>
     requires std::derived_from<NodeT, AstNode> &&

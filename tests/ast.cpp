@@ -615,7 +615,6 @@ TEST(Ast, Parenthesis_DeclAssign)
   ASSERT_TRUE(decl_b.initialiser->is_expr_type(ExpressionType::Binary));
 }
 
-
 TEST(Ast, Parenthesis_FuncCall)
 {
   const std::string_view src = R"(
@@ -689,6 +688,63 @@ TEST(Ast, Parenthesis_UnaryExpression)
   ASSERT_TRUE(func_call_d.args[0].expr->is_expr_type(ExpressionType::Unary));
 }
 
+
+TEST(Ast, Parenthesis_LoopWhile)
+{
+  {
+    const std::string_view src = R"(
+       while (true) {}
+       while (a < 5) {}
+       while (!a) {}
+       while (foo()) {}
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    const auto& nodes = script.ast->block.nodes();
+
+    ASSERT_EQ(nodes.size(), 4);
+    ASSERT_TRUE(nodes[0]->is_node_type(NodeType::LoopWhile));
+    ASSERT_TRUE(nodes[1]->is_node_type(NodeType::LoopWhile));
+    ASSERT_TRUE(nodes[2]->is_node_type(NodeType::LoopWhile));
+    ASSERT_TRUE(nodes[3]->is_node_type(NodeType::LoopWhile));
+
+    const auto& loop1 = static_cast<const LoopWhile&>(*nodes[0]);
+    const auto& loop2 = static_cast<const LoopWhile&>(*nodes[1]);
+    const auto& loop3 = static_cast<const LoopWhile&>(*nodes[2]);
+    const auto& loop4 = static_cast<const LoopWhile&>(*nodes[3]);
+
+    ASSERT_TRUE(loop1.expr->is_expr_type(ExpressionType::Bool));
+    ASSERT_TRUE(loop2.expr->is_expr_type(ExpressionType::Binary));
+    ASSERT_TRUE(loop3.expr->is_expr_type(ExpressionType::Unary));
+    ASSERT_TRUE(loop4.expr->is_expr_type(ExpressionType::FuncCall));
+  }
+
+  {
+    const std::string_view src = R"(
+      while (true)
+      {
+        foo();
+      }
+    )";
+
+    Parser parser;
+    auto script = parser.parse(src);
+
+    const auto& nodes = script.ast->block.nodes();
+
+    ASSERT_EQ(nodes.size(), 1);
+    ASSERT_TRUE(nodes[0]->is_node_type(NodeType::LoopWhile));
+
+    const auto& loop = static_cast<const LoopWhile&>(*nodes[0]);
+
+    ASSERT_TRUE(loop.expr->is_expr_type(ExpressionType::Bool));
+    ASSERT_EQ(loop.body.node_count(), 1);
+    ASSERT_TRUE(loop.body.nodes()[0]->is_expression());
+    ASSERT_TRUE(static_cast<const Expression&>(*loop.body.nodes()[0]).is_expr_type(ExpressionType::FuncCall));
+  }
+}
 
 // Syntax Errors //
 TEST(Ast, SyntaxError)

@@ -114,6 +114,24 @@ struct ConditionIf : public AstNode
 };
 
 
+// Loops //
+struct LoopWhile : public AstNode
+{
+  LoopWhile() : AstNode(NodeType::LoopWhile)
+  {}
+
+  void dump (std::ostream& os, const uint8_t tab = 0) const override
+  {
+    os << "while (";
+    expr->dump(os, tab);
+    os << ")\n";
+    body.dump(os, tab+1);
+  }
+
+  NodePtr<Expression> expr;
+  NodeBlock body;
+};
+
 // Functions Definition //
 
 struct FunctionParam : public AstNode
@@ -315,3 +333,13 @@ struct SourceFile : public AstNode
     block.dump(os, tab);
   }
 };
+
+
+inline bool is_node_executable (const std::unique_ptr<AstNode>& node)
+{
+  return  node->node_type() == NodeType::Expression ||
+          node->node_type() == NodeType::VariableDecl ||
+          node->node_type() == NodeType::VariableAssign ||
+          node->node_type() == NodeType::ConditionIf ||
+          node->node_type() == NodeType::LoopWhile ;
+}

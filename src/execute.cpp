@@ -39,44 +39,59 @@ Executor::Executor(const SymbolTable& sym_table)
 
 }
 
-VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args)
-{
-  auto is_executable = [](const std::unique_ptr<AstNode>& node)
-  {
-    return  node->node_type() == NodeType::VariableDecl ||
-            node->node_type() == NodeType::VariableAssign ||
-            node->node_type() == NodeType::ConditionIf ||
-            node->node_type() == NodeType::Expression;
-  };
 
+VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args, const bool add_stack)
+{
   VarValue result;
 
-  push_stack(block, std::move(func_args));
+  if (add_stack) {
+    push_stack(block, std::move(func_args));
+  }
 
-  // this ignores NodeType::NodeBlock because we a block can only appear in a function
-  // or condition body
-  for(const auto& node : block.nodes() | vw::filter(is_executable))
+
+  for(const auto& node : block.nodes() | vw::filter(is_node_executable))
   {
     switch (node->node_type())
     {
-      case NodeType::VariableDecl:
-        execute(block, static_cast<const VariableDecl&>(*node));
-        break;
-      case NodeType::VariableAssign:
-        execute(block, static_cast<const VariableAssign&>(*node));
-        break;
       case NodeType::Expression:
         result = execute(block, static_cast<const Expression&>(*node));
         break;
       case NodeType::ConditionIf:
         result = execute(block, static_cast<const ConditionIf&>(*node));
         break;
+      case NodeType::LoopWhile:
+        result = execute(block, static_cast<const LoopWhile&>(*node));
+        break;
+      case NodeType::VariableDecl:
+        execute(block, static_cast<const VariableDecl&>(*node));
+        break;
+      case NodeType::VariableAssign:
+        execute(block, static_cast<const VariableAssign&>(*node));
+        break;
       default:
         throw std::runtime_error{"Unexpected node type in block"};
     }
   }
 
-  pop_stack();
+  if (add_stack) {
+    pop_stack();
+  }
+
+  return result;
+}
+
+
+VarValue Executor::execute (const NodeBlock& block, const LoopWhile& loop)
+{
+  // - execute the loop's condition expression on each iteration
+  // - the block's variables are pushed onto the stack once, and only popped
+  //   when the loop is exited
+  VarValue result;
+
+  while (is_true(execute(block, *loop.expr)))
+  {
+    result = execute(loop.body, {}, true);
+  }
 
   return result;
 }
@@ -271,6 +286,7 @@ VarValue Executor::apply_operator(const NodeBlock& block, const Expression& oper
     case BitwiseNot:
       return ~val;
   }
+  std::unreachable();
 }
 
 
@@ -304,4 +320,5 @@ VarValue Executor::apply_operator(const NodeBlock& block, const Expression& lhs,
     case NotEqual:
       return lhs_val != rhs_val;
   }
+  std::unreachable();
 }

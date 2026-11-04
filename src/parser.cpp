@@ -265,6 +265,7 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
   const auto cond_if = child_by_field_name(ts_statement, "condition_if");
   const auto var_assign = child_by_field_name(ts_statement, "var_assign");
   const auto return_ = child_by_field_name(ts_statement, "return");
+  const auto loop_while = child_by_field_name(ts_statement, "loop_while");
 
   NodePtr<AstNode> node;
 
@@ -281,10 +282,13 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
     node = parse_condition_if (cond_if);
   }
   else if(!ts_node_is_null(var_assign)) {
-    node = parse_variable_assign (var_assign);
+    node = parse_variable_assign(var_assign);
   }
   else if(!ts_node_is_null(return_)) {
-    node = parse_return (return_);
+    node = parse_return(return_);
+  }
+  else if(!ts_node_is_null(loop_while)) {
+    node = parse_loop_while(loop_while);
   }
 
   return node;
@@ -452,6 +456,22 @@ NodePtr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
   return node;
 }
 
+
+NodePtr<LoopWhile> Parser::parse_loop_while(const TSNode& ts_node)
+{
+  auto loop = make_node<LoopWhile>();
+
+  const auto cond = child_by_field_name(ts_node, "condition");
+  const auto body = child_by_field_name(ts_node, "body");
+
+  loop->expr = parse_expression(cond);
+  loop->body.set_nodes(parse_statements(body));
+
+  set_source_region(cond, *loop->expr);
+  set_source_region(body, loop->body);
+
+  return loop;
+}
 
 void Parser::parse_script(const TSNode& ts_root)
 {

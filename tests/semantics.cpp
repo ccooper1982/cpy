@@ -514,7 +514,6 @@ TEST(Semantics, VarAssign)
 
 TEST(Semantics, ParenthesisErrors)
 {
-
   const std::string_view src = R"(
     a := (1+true);
     b := (1+foo());
@@ -618,4 +617,49 @@ TEST(Semantics, OutOfRange)
 
   ASSERT_TRUE(script.issues->have_errors());
   ASSERT_EQ(script.issues->get_count(ErrorCode::OutOfRange), 2);
+}
+
+TEST(Semantics, LoopWhile_Valid)
+{
+  const std::string_view src = R"(
+    i :int;
+
+    while (i < 5) {}
+    while (i < foo()) {}
+    while (foo() < i) {}
+
+    fn foo() -> int { return 0; }
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  ASSERT_FALSE(script.issues->have_errors());
+}
+
+TEST(Semantics, LoopWhile_Invalid)
+{
+  const std::string_view src = R"(
+    i :int;
+
+    while (i) {}
+    while (foo_int()) {}
+    while (foo_void()) {}
+    while (5.5) {}
+
+    fn foo_int() -> int {}
+    fn foo_void() {}
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  ASSERT_TRUE(script.issues->have_errors());
+  ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 4);
 }

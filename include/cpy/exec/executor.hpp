@@ -161,20 +161,24 @@ public:
     ~Executor() = default;
   #endif
 
-  VarValue execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {});
+  VarValue execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {}, const bool add_stack = true);
+
+private:
   void execute (const NodeBlock& block, const VariableAssign& assign);
   void execute (const NodeBlock& block, const VariableDecl& decl);
   VarValue execute (const NodeBlock& block, const Expression& expr);
   VarValue execute (const NodeBlock& block, const ConditionIf& cond);
-
-private:
-  Variable& get_variable (const VarName name);
+  VarValue execute (const NodeBlock& block, const LoopWhile& loop);
 
   // operators //
   VarValue apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op);
   VarValue apply_operator(const NodeBlock& block, const Expression& operand, const UnaryOperator op);
 
-  // variable stack //
+
+  // variables //
+
+  Variable& get_variable (const VarName name);
+
 #ifdef CPY_UNIT_TESTS
   // this for the child class TestExecutor
   protected:

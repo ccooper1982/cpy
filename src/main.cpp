@@ -48,8 +48,8 @@ int main (int argc, char ** argv)
     return 1;
   }
 
-  std::cout << "AST:";
-  script.ast->dump(std::cout);
+  // std::cout << "AST:";
+  // script.ast->dump(std::cout);
 
   // errors here if tree-sitter found syntax errors
   if (!script.issues->have_errors())
@@ -57,8 +57,8 @@ int main (int argc, char ** argv)
     Semantics sems;
     sems.process(script);
 
-    std::cout << "Sym Table:\n";
-    sems.symbol_table().dump(std::cout);
+    // std::cout << "Sym Table:\n";
+    // sems.symbol_table().dump(std::cout);
 
     if (!script.issues->have_errors())
     {
