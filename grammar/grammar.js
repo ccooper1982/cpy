@@ -57,6 +57,7 @@ export default grammar({
           ";"
         ),
         field("condition_if", $.condition_if),
+        field("loop_while", $.loop_while),
       ),
 
     function_call: ($) => seq(
@@ -104,6 +105,14 @@ export default grammar({
     else_clause: ($) =>
       seq(
         "else",
+        field("body", $.block),
+      ),
+
+    loop_while: ($) =>
+      seq(
+        "while", "(",
+        field("condition", $.expression),
+        ")",
         field("body", $.block),
       ),
 

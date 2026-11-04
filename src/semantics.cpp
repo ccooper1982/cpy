@@ -42,14 +42,6 @@ void Semantics::process(Script& script)
 
 void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlock& block, const bool add_scope)
 {
-  auto executable = [](const std::unique_ptr<AstNode>& node)
-  {
-    return  node->node_type() == NodeType::VariableDecl ||
-            node->node_type() == NodeType::VariableAssign ||
-            node->node_type() == NodeType::ConditionIf ||
-            node->node_type() == NodeType::Expression;
-  };
-
   try
   {
     if (add_scope) {
@@ -80,10 +72,13 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
       }
     }
 
-    for(const auto& node : block.nodes() | vw::filter(executable))
+    for(const auto& node : block.nodes() | vw::filter(is_node_executable))
     {
       switch (node->node_type())
       {
+        case NodeType::NodeBlock:
+          process_block(ctx, parent, static_cast<const NodeBlock&>(*node));
+          break;
         case NodeType::VariableDecl:
           process_variable_declaration(ctx, block, static_cast<const VariableDecl&>(*node));
           break;
@@ -93,8 +88,8 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
         case NodeType::ConditionIf:
           process_condition(ctx, parent, block, static_cast<const ConditionIf&>(*node));
           break;
-        case NodeType::NodeBlock:
-          process_block(ctx, parent, static_cast<const NodeBlock&>(*node));
+        case NodeType::LoopWhile:
+          process_while(ctx, parent, block, static_cast<const LoopWhile&>(*node));
           break;
         case NodeType::Expression:
           handle_expression(ctx, parent, block, static_cast<const Expression&>(*node));
@@ -440,9 +435,9 @@ VarType Semantics::process_operator(Context& ctx, const VarType& operand_type, c
 
 /// Determines the validity of the BinaryExpression::op on the operands, and returns
 /// the return type (or unresolved_type if invalid).
-VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarType& b, const BinaryExpression& expr)
+VarType Semantics::process_operator(Context& ctx, const VarType& left_type, const VarType& right_type, const BinaryExpression& expr)
 {
-  if (a == unresolved_type) {
+  if (left_type == unresolved_type || right_type == unresolved_type) {
     throw std::runtime_error{"process_operator() encountered unresolved VarType"};
   }
 
@@ -453,10 +448,10 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
   bool valid{};
 
   // check for Void first, to highlight that, rather than differing types
-  if (a == Void || b == Void) {
+  if (left_type == Void || right_type == Void) {
     issue::binary_operands_void(ctx.issues, expr);
   }
-  else if (a != b) {
+  else if (left_type != right_type) {
     issue::binary_operands_invalid(ctx.issues, expr);
   }
   else
@@ -468,8 +463,8 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
       case Multiply:
       case Divide:
         // TODO string concatenation
-        valid = a == Int || a == Decimal ;//|| a == String;
-        result_type = a;
+        valid = left_type == Int || left_type == Decimal ;//|| a == String;
+        result_type = left_type;
         break;
 
       case Equal:
@@ -482,7 +477,7 @@ VarType Semantics::process_operator(Context& ctx, const VarType& a, const VarTyp
       case Greater:
       case LessEqual:
       case GreaterEqual:
-        valid = !(a == Bool || a == String);
+        valid = !(left_type == Bool || left_type == String);
         result_type = Bool;
         break;
     }
@@ -550,5 +545,19 @@ void Semantics::process_condition(Context& ctx, const AstNode& parent, const Nod
     if (cond.else_body) {
       process_block(ctx, cond, *cond.else_body);
     }
+  }
+}
+
+
+// Loops //
+void Semantics::process_while(Context& ctx, const AstNode& parent, const NodeBlock& block, const LoopWhile& loop)
+{
+  const auto condition_expr_type = handle_expression(ctx, parent, block, *loop.expr);
+
+  if (condition_expr_type != BuiltInType::Bool) {
+    issue::condition_not_bool(ctx.issues, *loop.expr);
+  }
+  else {
+    process_block(ctx, loop, loop.body);
   }
 }

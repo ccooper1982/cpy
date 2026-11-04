@@ -1132,5 +1132,213 @@ TEST(Exec, Operators_OutOfRange)
   // c := a * b;
   // ```
   // But need to support this notation
+}
 
+TEST(Exec, UnaryExpressions)
+{
+  const std::string_view src = R"(
+    a := -4;
+    b := -(a);
+    c := !false;
+    d := !c;
+    e := ~2;
+    f := -(~e);
+    g := !((2 + b) / 3 == 2);
+    h := !foo();
+
+    fn foo() -> bool { return false; }
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  // note: CpyInt is signed, hence `~2 == ~(00000010) == (11111101)`
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+  {
+    if (stack.size() == 1) // end of script
+    {
+      ASSERT_EQ(stack[0].at("a").value(), make_value(-4));
+      ASSERT_EQ(stack[0].at("b").value(), make_value(4));
+      ASSERT_EQ(stack[0].at("c").value(), make_value(true));
+      ASSERT_EQ(stack[0].at("d").value(), make_value(false));
+      ASSERT_EQ(stack[0].at("e").value(), make_value(-3));
+      ASSERT_EQ(stack[0].at("f").value(), make_value(-2));
+      ASSERT_EQ(stack[0].at("g").value(), make_value(false));
+      ASSERT_EQ(stack[0].at("h").value(), make_value(true));
+    }
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  exec.execute(script.ast->block);
+}
+
+TEST(Exec, LoopWhile_Basic)
+{
+  {
+    const std::string_view src = R"(
+      i := 0;
+      j := 5;
+      k := 0;
+
+      while (i < 5)
+      {
+        i = i+1;
+        j = j-1;
+        k = k+i;
+      }
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+    {
+      if (stack.size() == 1)
+      {
+        ASSERT_EQ(stack[0].at("i").value(), make_value(5));
+        ASSERT_EQ(stack[0].at("j").value(), make_value(0));
+        ASSERT_EQ(stack[0].at("k").value(), make_value(15));
+      }
+    };
+
+    TestExecutor exec(sem.symbol_table(), on_pop);
+    exec.execute(script.ast->block);
+  }
+
+  const std::string_view src = R"(
+    i := 0;
+
+    while (i < 5)
+    {
+      i = i+1;
+      a := i;
+    }
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+  {
+    if (stack.size() == 2) // end of each loop iteration
+    {
+      static auto a = 1;
+
+      ASSERT_EQ(stack[1].at("a").value(), make_value(a));
+
+      ++a;
+    }
+    else if (stack.size() == 1) {
+      ASSERT_EQ(stack[0].at("i").value(), make_value(5));
+    }
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  exec.execute(script.ast->block);
+}
+
+TEST(Exec, LoopWhile_FuncCond)
+{
+  const std::string_view src = R"(
+    i := 0;
+
+    while (i < get_stop()) {
+      i = i+1;
+    }
+
+    fn get_stop() -> int { return 5; }
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+  {
+    if (stack.size() == 1) {
+      ASSERT_EQ(stack[0].at("i").value(), make_value(5));
+    }
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  exec.execute(script.ast->block);
+}
+
+
+TEST(Exec, LoopWhile_FuncCondRefLhs)
+{
+  const std::string_view src = R"(
+    i := 0;
+
+    while (get_i(ref i) < 5) {
+    }
+
+    fn get_i(x: ref int) -> int
+    {
+        x = x+1;
+        return x;
+    }
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+  {
+    if (stack.size() == 1) {
+      ASSERT_EQ(stack[0].at("i").value(), make_value(5));
+    }
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  exec.execute(script.ast->block);
+}
+
+
+TEST(Exec, LoopWhile_FuncCondRefRhs)
+{
+  const std::string_view src = R"(
+    i := 0;
+    max := 10;
+
+    while (i < get_stop(ref max)) {
+      i = i+1;
+    }
+
+    fn get_stop(x: ref int) -> int
+    {
+      x = x-1;
+      return x;
+    }
+  )";
+
+  Parser parser;
+  Semantics sem;
+
+  auto script = parser.parse(src);
+  sem.process(script);
+
+  auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
+  {
+    if (stack.size() == 1) {
+      ASSERT_EQ(stack[0].at("i").value(), make_value(5));
+    }
+  };
+
+  TestExecutor exec(sem.symbol_table(), on_pop);
+  exec.execute(script.ast->block);
 }

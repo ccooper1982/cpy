@@ -60,6 +60,8 @@ private:
 
   NodePtr<Return> parse_return(const TSNode& ts_node);
 
+  NodePtr<LoopWhile> parse_loop_while(const TSNode& ts_node);
+
   std::string_view from_source (const TSNode& node);
 
 private:
