@@ -1,5 +1,6 @@
 #include "cpy/ast/ast_node.hpp"
 #include "cpy/common.hpp"
+#include "cpy/symbol_table.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
@@ -11,6 +12,7 @@
 #include <optional>
 #include <ranges>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -124,6 +126,12 @@ void Semantics::process_function_signatures(Context& ctx)
       return;
     }
 
+    if (m_symbol_table.has_core_function(def.name))
+    {
+      issue::func_core_exists(ctx.issues, def, def.name);
+      return;
+    }
+
     std::vector<ResolvedSymbol> resolved_params;
     for (const auto& param : def.get_params())
     {
@@ -227,64 +235,82 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_type;
   }
 
-  if (!m_symbol_table.has_function(call.name))
+  const bool is_core_function = m_symbol_table.has_core_function(call.name);
+
+  if (!m_symbol_table.has_function(call.name) && !is_core_function)
   {
     issue::func_not_exist(ctx.issues, call, call.name);
     return unresolved_type;
   }
 
   const auto& resolved_func = m_symbol_table.get_function(call.name);
+  const bool is_variadic = resolved_func.param_mode == ParamMode::VariadicAny;
+  const auto supplied_arg_count = call.args.size();
 
-  if (call.args.size() != resolved_func.params.size())
+  if (is_core_function)
+  {
+    if (!is_variadic && supplied_arg_count < m_symbol_table.get_core_function_min_args(call.name))
+    {
+      issue::func_arg_count(ctx.issues, call);
+      return unresolved_type;
+    }
+  }
+  else if (!is_variadic && supplied_arg_count != resolved_func.params.size())
   {
     issue::func_arg_count(ctx.issues, call);
     return unresolved_type;
   }
 
+  // TODO this code is quite grim, attempt a tidy:
+  //  - different rules dependant on `is_variadic`
   for (uint8_t i = 0 ; i < call.args.size() ; ++i)
   {
-    const auto resolved_type = resolved_func.params[i].type.value_as<BuiltInType>();
+    const auto arg_type = is_variadic ? unresolved_type : resolved_func.params[i].type.value_as<BuiltInType>();
 
-    if (!resolved_type) {
+    if (!is_variadic && !arg_type) {
       return unresolved_type;
     }
 
     const auto arg_is_ref = call.args[i].is_ref;
     const auto& arg_expr = *call.args[i].expr;
 
-    if (!arg_is_ref && resolved_func.params[i].is_ref)
+    if (!is_variadic)
     {
-      issue::func_arg_ref_required(ctx.issues, *call.args[i].expr);
-      return unresolved_type;
-    }
+      if (!arg_is_ref && resolved_func.params[i].is_ref)
+      {
+        issue::func_arg_ref_required(ctx.issues, *call.args[i].expr);
+        return unresolved_type;
+      }
 
-    if (arg_is_ref && !resolved_func.params[i].is_ref)
-    {
-      issue::func_arg_not_ref(ctx.issues, *call.args[i].expr);
-      return unresolved_type;
-    }
+      if (arg_is_ref && !resolved_func.params[i].is_ref)
+      {
+        issue::func_arg_not_ref(ctx.issues, *call.args[i].expr);
+        return unresolved_type;
+      }
 
-    if (arg_is_ref && !arg_expr.is_expr_type(ExpressionType::VariableUse))
-    {
-      issue::func_arg_ref_type(ctx.issues, *call.args[i].expr);
-      return unresolved_type;
+      if (arg_is_ref && !arg_expr.is_expr_type(ExpressionType::VariableUse))
+      {
+        issue::func_arg_ref_type(ctx.issues, *call.args[i].expr);
+        return unresolved_type;
+      }
     }
 
     if (arg_expr.is_expr_type(ExpressionType::FuncCall))
     {
       const auto& func_call = static_cast<const FunctionCall&>(arg_expr);
+      const auto msg = is_variadic ? std::to_string(i) : std::string(resolved_func.params[i].name);
 
       if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
         return unresolved_type;
       }
       else if (ret_type == BuiltInType::Void)
       {
-        issue::func_arg_void(ctx.issues, arg_expr, resolved_func.params[i].name);
+        issue::func_arg_void(ctx.issues, arg_expr, msg);
         return unresolved_type;
       }
-      else if (ret_type != *resolved_type)
+      else if (!is_variadic && ret_type != *arg_type)
       {
-        issue::func_arg(ctx.issues, arg_expr, resolved_func.params[i].name);
+        issue::func_arg(ctx.issues, arg_expr, msg);
         return unresolved_type;
       }
     }
@@ -299,17 +325,17 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
       const auto& var = static_cast<const VariableUse&>(arg_expr);
       const auto var_type = process_expression(ctx, call, block, var);
 
-      // if the variable is unknown, process_expression() creates
+      // if the variable is unknown, process_expression() creates an issue
       if (var_type == unresolved_type) {
         return unresolved_type;
       }
-      else if (var_type != *resolved_type)
+      else if (!is_variadic && var_type != *arg_type)
       {
         issue::func_arg(ctx.issues, call, resolved_func.params[i].name);
         return unresolved_type;
       }
     }
-    else if (!arg_expr.is_convertible_to(*resolved_type))
+    else if (!is_variadic && !arg_expr.is_convertible_to(*arg_type))
     {
       issue::func_arg(ctx.issues, call, resolved_func.params[i].name);
       return unresolved_type;

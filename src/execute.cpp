@@ -1,9 +1,11 @@
 #include "cpy/ast/expressions.hpp"
 #include "cpy/common.hpp"
+#include "cpy/exec/core.hpp"
 #include "cpy/exec/operators.hpp"
 #include <cpy/exec/executor.hpp>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 
 static VarValue value_from_literal_expr(const Expression& expr)
@@ -40,14 +42,11 @@ Executor::Executor(const SymbolTable& sym_table)
 }
 
 
-VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args, const bool add_stack)
+VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args)
 {
   VarValue result;
 
-  if (add_stack) {
-    push_stack(block, std::move(func_args));
-  }
-
+  push_stack(block, std::move(func_args));
 
   for(const auto& node : block.nodes() | vw::filter(is_node_executable))
   {
@@ -73,9 +72,7 @@ VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&&
     }
   }
 
-  if (add_stack) {
-    pop_stack();
-  }
+  pop_stack();
 
   return result;
 }
@@ -88,9 +85,8 @@ VarValue Executor::execute (const NodeBlock& block, const LoopWhile& loop)
   //   when the loop is exited
   VarValue result;
 
-  while (is_true(execute(block, *loop.expr)))
-  {
-    result = execute(loop.body, {}, true);
+  while (is_true(execute(block, *loop.expr))) {
+    result = execute(loop.body);
   }
 
   return result;
@@ -159,35 +155,8 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
   if (expr.is_literal()) {
     result = value_from_literal_expr(expr);
   }
-  else if (expr.is_expr_type(ExpressionType::FuncCall))
-  {
-    const auto& call = static_cast<const FunctionCall&>(expr);
-    const auto& def = m_sym_table.get_function(call.name);
-
-    std::map<VarName, Variable> args;
-
-    for (size_t i = 0 ; i < call.args.size() ; ++i)
-    {
-      auto val = execute(block, *call.args[i].expr);
-
-      Variable variable;
-
-      if (def.params[i].is_ref)
-      {
-        // a: int;
-        // foo (ref a);
-        // we need to find variable a
-        const auto& var_ref = static_cast<const VariableUse&>(*call.args[i].expr);
-        variable.set_ref_target(&get_variable(var_ref.name));
-      }
-      else {
-        variable.value() = val;
-      }
-
-      args.emplace(def.params[i].name, std::move(variable));
-    }
-
-    result = execute(def.ast->body, std::move(args));
+  else if (expr.is_expr_type(ExpressionType::FuncCall)) {
+    result = execute(block, static_cast<const FunctionCall&>(expr));
   }
   else if (expr.is_expr_type(ExpressionType::Unary))
   {
@@ -221,6 +190,49 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
   return result;
 }
 
+
+VarValue Executor::execute (const NodeBlock& block, const FunctionCall& call)
+{
+  const auto& def = m_sym_table.get_function(call.name);
+
+  if (m_sym_table.has_core_function(call.name))
+  {
+    std::vector<VarValue> values;
+
+    for (size_t i = 0 ; i < call.args.size() ; ++i)
+    {
+      auto val = execute(block, *call.args[i].expr);
+      values.push_back(std::move(val));
+    }
+
+    return CoreFunctions.at(call.name).implementation(values);
+  }
+  else
+  {
+    std::map<VarName, Variable> args;
+
+    for (size_t i = 0 ; i < call.args.size() ; ++i)
+    {
+      Variable variable;
+
+      if (def.params[i].is_ref)
+      {
+        //  a: int;
+        //  foo (ref a);
+        // we need to find `a`
+        const auto& var_ref = static_cast<const VariableUse&>(*call.args[i].expr);
+        variable.set_ref_target(&get_variable(var_ref.name));
+      }
+      else {
+        variable.value() = execute(block, *call.args[i].expr);
+      }
+
+      args.emplace(def.params[i].name, std::move(variable));
+    }
+
+    return execute(def.ast->body, std::move(args));
+  }
+}
 
 void Executor::push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args)
 {

@@ -6,7 +6,6 @@
 #include <cpy/common.hpp>
 #include <cpy/exceptions.hpp>
 
-using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool>;
 
 template<typename T>
 concept IsCpyDecimal = std::is_same_v<T, CpyDec>;

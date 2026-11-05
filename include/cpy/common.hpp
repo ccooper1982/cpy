@@ -16,6 +16,7 @@ using CpyBool = bool;
 using CpyString = std::string;
 
 using VarName = std::string_view;
+using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool>;
 
 // helper type for the visiting
 template<class... Ts>

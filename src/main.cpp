@@ -45,49 +45,57 @@ int main (int argc, char ** argv)
   catch (const std::exception& ex)
   {
     std::cerr << ex.what() << '\n';
+    return -1;
+  }
+
+  if (script.issues->have_errors()) {
     return 1;
   }
 
   // std::cout << "AST:";
   // script.ast->dump(std::cout);
 
-  // errors here if tree-sitter found syntax errors
-  if (!script.issues->have_errors())
+  Semantics sems;
+  sems.process(script);
+
+  // std::cout << "Sym Table:\n";
+  // sems.symbol_table().dump(std::cout);
+
+
+  if (script.issues->have_errors())
   {
-    Semantics sems;
-    sems.process(script);
-
-    // std::cout << "Sym Table:\n";
-    // sems.symbol_table().dump(std::cout);
-
-    if (!script.issues->have_errors())
-    {
-      Executor exec {sems.symbol_table()};
-
-      try
-      {
-        exec.execute(script.ast->block);
-      }
-      catch (const RuntimeError& ex_run)
-      {
-        std::cerr << "Runtime Error: " << ex_run.what() << '\n';
-        return 1;
-      }
-      catch (const std::exception& ex)
-      {
-        std::cerr << "Internal execution error: " << ex.what() << '\n';
-        return -1;
-      }
-      catch (...)
-      {
-        std::cerr << "Unknown execution error\n";
-        return -1;
-      }
-    }
+    std::cout << "Issues:\n";
+    script.issues->dump(std::cout, *script.src);
+    return 1;
   }
 
-  std::cout << "Issues:\n";
-  script.issues->dump(std::cout, *script.src);
+  int exit_status{};
 
-  return script.issues->have_errors() ? 1 : 0;
+  Executor exec {sems.symbol_table()};
+
+  try
+  {
+    exec.execute(script.ast->block);
+  }
+  catch (const ScriptExit& exit)
+  {
+    exit_status = exit.exit_status();
+  }
+  catch (const RuntimeError& ex_run)
+  {
+    std::cerr << "Runtime Error: " << ex_run.what() << '\n';
+    return 1;
+  }
+  catch (const std::exception& ex)
+  {
+    std::cerr << "Internal execution error: " << ex.what() << '\n';
+    return -1;
+  }
+  catch (...)
+  {
+    std::cerr << "Unknown execution error\n";
+    return -1;
+  }
+
+  return exit_status;
 }

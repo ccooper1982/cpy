@@ -1,7 +1,3 @@
-i := 0;
+fn foo() -> str { return "world"; }
 
-while (i < 5)
-{
-    i = i+1;
-    a := i;
-}
+println("hello ", foo());
