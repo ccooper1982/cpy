@@ -1,7 +1,3 @@
-#include "cpy/ast/ast_node.hpp"
-#include "cpy/common.hpp"
-#include "cpy/exec/core.hpp"
-#include "cpy/symbol_table.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
@@ -546,7 +542,7 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
 
 void Semantics::process_condition(Context& ctx, const AstNode& parent, const NodeBlock& block, const ConditionIf& cond)
 {
-  auto handle_condition_body = [&](const ConditionIf::ConditionBody& cb)
+  auto handle_condition_body = [&](const ConditionIf::Condition& cb)
   {
     const auto cond_if_result = handle_expression(ctx, parent, block, static_cast<const Expression&>(*cb.condition));
 

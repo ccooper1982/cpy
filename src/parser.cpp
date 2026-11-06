@@ -416,12 +416,12 @@ NodePtr<ConditionIf> Parser::parse_condition_if(const TSNode& ts_node)
     return nullptr;
   }
 
-  auto parse_condition_body = [this](const TSNode& ts_node) -> ConditionIf::ConditionBody
+  auto parse_condition_body = [this](const TSNode& ts_node) -> ConditionIf::Condition
   {
     const TSNode cond = child_by_field_name(ts_node, "condition");
     const TSNode body = child_by_field_name(ts_node, "body");
 
-    ConditionIf::ConditionBody result;
+    ConditionIf::Condition result;
 
     if (!ts_node_is_null(cond)) {
       result.condition = parse_expression(cond);

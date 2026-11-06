@@ -8,37 +8,49 @@
 #include <filesystem>
 #include <iostream>
 
-int a{};
-void f()
+
+static Parser parser;
+static Script script;
+static Semantics semantics;
+
+static int execute ();
+
+
+static bool startup_valid(const int argc, char **& argv)
 {
-  a = 5;
+  if (argc != 2)
+  {
+    std::cerr << "No input source file:\n";
+    return false;
+  }
+
+  if (const fs::path file = argv[1]; !fs::exists(file))
+  {
+    std::cerr << "File does not exist: " << file.string() << '\n';
+    return false;
+  }
+
+  return true;
 }
 
 // TODO
 //  - separate into libcpy and cpy executable
+
+// return status:
+//    0: good
+//  < 0: compiler erorr
+//  > 0: user error
 int main (int argc, char ** argv)
 {
-  if (argc != 2)
-  {
-    std::cerr << "Need input source file:\n";
-    return 1;
-  }
-
-  const fs::path file = argv[1];
-
-  if (!fs::exists(file))
-  {
-    std::cerr << "File does not exist: " << file.string() << '\n';
+  if (!startup_valid(argc, argv)) {
     return 1;
   }
 
   Modules::initialise();
 
-  Parser parser;
-  Script script;
-
   try
   {
+    const fs::path file = argv[1];
     script = parser.parse(file);
   }
   catch (const std::exception& ex)
@@ -47,20 +59,14 @@ int main (int argc, char ** argv)
     return -1;
   }
 
-  if (script.issues->have_errors()) {
+  if (script.issues->have_errors())
+  {
     std::cout << "Issues:\n";
     script.issues->dump(std::cout, *script.src);
+    return 1;
   }
 
-  // std::cout << "AST:";
-  // script.ast->dump(std::cout);
-
-  Semantics sems;
-  sems.process(script);
-
-  // std::cout << "Sym Table:\n";
-  // sems.symbol_table().dump(std::cout);
-
+  semantics.process(script);
 
   if (script.issues->have_errors())
   {
@@ -69,9 +75,15 @@ int main (int argc, char ** argv)
     return 1;
   }
 
+  return execute();
+}
+
+
+static int execute ()
+{
   int exit_status{};
 
-  Executor exec {sems.symbol_table()};
+  Executor exec {semantics.symbol_table()};
 
   try
   {

@@ -1,7 +1,10 @@
+#include "cpy/ast/ast.hpp"
 #include "cpy/ast/expressions.hpp"
 #include "cpy/common.hpp"
 #include "cpy/exec/operators.hpp"
+#include <algorithm>
 #include <cpy/exec/executor.hpp>
+#include <ranges>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -31,6 +34,11 @@ static VarValue value_from_literal_expr(const Expression& expr)
 {
     const auto * b = std::get_if<CpyBool>(&value);
     return b != nullptr && *b;
+}
+
+[[nodiscard]] static bool is_true(const ExecutionResult& result)
+{
+  return is_true(result.value);
 }
 
 
@@ -86,7 +94,7 @@ ExecutionResult Executor::execute (const NodeBlock& block, const LoopWhile& loop
   // execute the loop's condition expression on each iteration
   ExecutionResult result;
 
-  while (is_true(execute(block, *loop.expr).value))
+  while (is_true(execute(block, *loop.expr)))
   {
     if (result = execute(loop.body); result.returned) {
       break;
@@ -101,24 +109,24 @@ ExecutionResult Executor::execute (const NodeBlock& block, const ConditionIf& co
 {
   ExecutionResult result;
 
-  auto cond_result = execute(block, *cond.if_.condition);
+  auto if_result = execute(block, *cond.if_.condition);
 
-  if (is_true(cond_result.value)) {
+  if (is_true(if_result)) {
     result = execute(cond.if_body());
   }
   else
   {
-    // TODO tidy
-    for(const auto& [cond, body] : cond.else_if)
+    auto condition_true = [this, &block](const ConditionIf::Condition& cb)
     {
-      if (cond_result = execute(block, *cond); is_true(cond_result.value))
-      {
-        result = execute(body);
-        break;
-      }
-    }
+      return is_true(execute(block, *cb.condition));
+    };
 
-    if (!is_true(cond_result.value) && cond.have_else()) {
+    const auto it = rg::find_if(cond.else_if, condition_true);
+
+    if (it != rg::end(cond.else_if)) {
+      result = execute(it->body);
+    }
+    else if (cond.have_else()) {
       result = execute(*cond.else_body);
     }
   }

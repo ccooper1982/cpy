@@ -61,7 +61,7 @@ protected:
 
 struct ConditionIf : public AstNode
 {
-  struct ConditionBody
+  struct Condition
   {
     std::unique_ptr<Expression> condition;
     NodeBlock body;
@@ -108,8 +108,8 @@ struct ConditionIf : public AstNode
     }
   }
 
-  ConditionBody if_;
-  std::vector<ConditionBody> else_if;
+  Condition if_;
+  std::vector<Condition> else_if;
   std::optional<NodeBlock> else_body;
 };
 
