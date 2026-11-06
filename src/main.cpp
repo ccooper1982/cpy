@@ -14,7 +14,6 @@ void f()
   a = 5;
 }
 
-
 // TODO
 //  - separate into libcpy and cpy executable
 int main (int argc, char ** argv)
@@ -49,7 +48,8 @@ int main (int argc, char ** argv)
   }
 
   if (script.issues->have_errors()) {
-    return 1;
+    std::cout << "Issues:\n";
+    script.issues->dump(std::cout, *script.src);
   }
 
   // std::cout << "AST:";

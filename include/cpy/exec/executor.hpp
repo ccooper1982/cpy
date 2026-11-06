@@ -11,6 +11,7 @@
 #include <optional>
 #include <stdexcept>
 #include <utility>
+#include <variant>
 
 
 inline static VarValue value_from_type (const VarType type)
@@ -149,6 +150,17 @@ private:
   StackEntry * m_parent{};
 };
 
+struct ExecutionResult
+{
+  ExecutionResult() = default;
+
+  ExecutionResult(VarValue val)
+    : value(std::move(val))
+  {}
+
+  VarValue value{std::monostate{}};
+  bool returned{};
+};
 
 class Executor
 {
@@ -161,20 +173,19 @@ public:
     ~Executor() = default;
   #endif
 
-  VarValue execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {});
+  ExecutionResult execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {});
 
 private:
   void execute (const NodeBlock& block, const VariableAssign& assign);
   void execute (const NodeBlock& block, const VariableDecl& decl);
-  VarValue execute (const NodeBlock& block, const Expression& expr);
-  VarValue execute (const NodeBlock& block, const ConditionIf& cond);
-  VarValue execute (const NodeBlock& block, const LoopWhile& loop);
-  VarValue execute (const NodeBlock& block, const FunctionCall& call);
+  ExecutionResult execute (const NodeBlock& block, const Expression& expr);
+  ExecutionResult execute (const NodeBlock& block, const ConditionIf& cond);
+  ExecutionResult execute (const NodeBlock& block, const LoopWhile& loop);
+  ExecutionResult execute (const NodeBlock& block, const FunctionCall& call);
 
   // operators //
   VarValue apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op);
   VarValue apply_operator(const NodeBlock& block, const Expression& operand, const UnaryOperator op);
-
 
   // variables //
   Variable& get_variable (const VarName name);
