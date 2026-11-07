@@ -1,6 +1,7 @@
-#include <filesystem>
+
 #include <gtest/gtest.h>
 
+#include "test_common.hpp"
 #include <cpy/parser.hpp>
 #include <stdexcept>
 
@@ -8,8 +9,6 @@
  * This just tests the parser can read from string_view or from filesystem::path.
  * It doesn't test the AST in depth, only that nothing breaks.
  */
-
-static const auto TestScriptsDir = fs::path{"tests/scripts"};
 
 TEST(Parser, String)
 {

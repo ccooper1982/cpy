@@ -42,8 +42,9 @@ static VarValue value_from_literal_expr(const Expression& expr)
 }
 
 
-Executor::Executor(const SymbolTable& sym_table)
+Executor::Executor(const SymbolTable& sym_table, const RuntimeContext& rt_context)
   : m_sym_table(sym_table)
+  , m_rt_context(rt_context)
 {
 
 }
@@ -219,7 +220,7 @@ ExecutionResult Executor::execute (const NodeBlock& block, const FunctionCall& c
       values.push_back(std::move(frame.value));
     }
 
-    return CoreFunctions.at(call.name).implementation(values);
+    return CoreFunctions.at(call.name).implementation(m_rt_context, values);
   }
   else
   {

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "cpy/ast/ast_node.hpp"
+
+#include "cpy/common.hpp"
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -32,8 +33,8 @@ struct ResolvedFunction
 {
   std::vector<ResolvedSymbol> params;
   VarType return_type;
-  const FunctionDef * ast{};
   ParamMode param_mode{ParamMode::Fixed};
+  const FunctionDef * ast{};
 };
 
 using ResolvedVariableMap = std::map<std::string_view, const ResolvedSymbol>;
@@ -49,7 +50,7 @@ struct Scope
 };
 
 
-using CoreFunction = VarValue (*)(const std::span<const VarValue>);
+using CoreFunction = VarValue (*)(const RuntimeContext&, const std::span<const VarValue>);
 
 struct CoreFunctionDef
 {
@@ -65,7 +66,6 @@ inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
       {
         {},
         BuiltInType::Void,
-        nullptr,
         ParamMode::VariadicAny
       },
       core::print
@@ -77,7 +77,6 @@ inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
       {
         {},
         BuiltInType::Void,
-        nullptr,
         ParamMode::VariadicAny
       },
       core::println
@@ -91,10 +90,61 @@ inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
           {"status", BuiltInType::Int}
         },
         BuiltInType::Void,
-        nullptr,
         ParamMode::Fixed
       },
       core::exit
+    }
+  },
+  {
+    "argv_str",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::String,
+        ParamMode::Fixed
+      },
+      core::get_argv_str
+    }
+  },
+  {
+    "argv_int",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::Int,
+        ParamMode::Fixed
+      },
+      core::get_argv_int
+    }
+  },
+  {
+    "argv_dec",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::Decimal,
+        ParamMode::Fixed
+      },
+      core::get_argv_dec
+    }
+  },
+  {
+    "argv_bool",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::Bool,
+        ParamMode::Fixed
+      },
+      core::get_argv_bool
     }
   }
 };

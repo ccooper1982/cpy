@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <string_view>
 #include <ranges>
+#include <vector>
 
 namespace fs = std::filesystem;
 namespace rg = std::ranges;
@@ -72,3 +73,9 @@ std::expected<Expected, CpyError> make_error(const std::string_view msg)
 {
   return std::unexpected(CpyError{msg});
 }
+
+
+struct RuntimeContext
+{
+  std::vector<std::string> argv;
+};

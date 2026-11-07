@@ -1,7 +1,7 @@
-#include "cpy/exceptions.hpp"
-#include "cpy/exec/operators.hpp"
 #include <gtest/gtest.h>
+
 #include <cpy/common.hpp>
+#include <cpy/exceptions.hpp>
 #include <cpy/exec/executor.hpp>
 #include <cpy/parser.hpp>
 #include <cpy/semantics.hpp>
@@ -30,7 +30,7 @@ VarValue make_value (T v)
   }
 }
 
-TEST(Exec, Basic)
+TEST(ExecStack, Basic)
 {
   const std::string_view src = R"(
     a :int;
@@ -55,7 +55,7 @@ TEST(Exec, Basic)
   exec.execute(script.ast->block);
 }
 
-TEST(Exec, FuncCall_NoParams_Empty)
+TEST(ExecStack, FuncCall_NoParams_Empty)
 {
   const std::string_view src = R"(
     a :int = 1;
@@ -85,7 +85,7 @@ TEST(Exec, FuncCall_NoParams_Empty)
 }
 
 
-TEST(Exec, FuncCall_NoParams_Local)
+TEST(ExecStack, FuncCall_NoParams_Local)
 {
   const std::string_view src = R"(
     a :int = 1;
@@ -129,7 +129,7 @@ TEST(Exec, FuncCall_NoParams_Local)
 }
 
 
-TEST(Exec, FuncCall_ParamsAssign)
+TEST(ExecStack, FuncCall_ParamsAssign)
 {
   const std::string_view src = R"(
     foo(10, true);
@@ -171,7 +171,7 @@ TEST(Exec, FuncCall_ParamsAssign)
   exec.execute(script.ast->block);
 }
 
-TEST(Exec, FuncCall_Params)
+TEST(ExecStack, FuncCall_Params)
 {
   const std::string_view src = R"(
     foo(10, true);
@@ -208,7 +208,7 @@ TEST(Exec, FuncCall_Params)
 }
 
 
-TEST(Exec, FuncCall_ParamsWithParent)
+TEST(ExecStack, FuncCall_ParamsWithParent)
 {
   const std::string_view src = R"(
     z := 20;
@@ -252,7 +252,7 @@ TEST(Exec, FuncCall_ParamsWithParent)
 }
 
 
-TEST(Exec, FuncCall_ParamsWithReturn)
+TEST(ExecStack, FuncCall_ParamsWithReturn)
 {
   const std::string_view src = R"(
     z := foo(10, 20);
@@ -290,7 +290,7 @@ TEST(Exec, FuncCall_ParamsWithReturn)
 }
 
 
-TEST(Exec, FuncCall_AssignParent)
+TEST(ExecStack, FuncCall_AssignParent)
 {
   const std::string_view src = R"(
     a := "hello";
@@ -330,7 +330,7 @@ TEST(Exec, FuncCall_AssignParent)
 }
 
 
-TEST(Exec, FuncCall_If)
+TEST(ExecStack, FuncCall_If)
 {
   const std::string_view src = R"(
     fn foo(a: int)
@@ -369,7 +369,7 @@ TEST(Exec, FuncCall_If)
 }
 
 
-TEST(Exec, FuncCall_Else)
+TEST(ExecStack, FuncCall_Else)
 {
   const std::string_view src = R"(
     fn foo(a: int)
@@ -411,7 +411,7 @@ TEST(Exec, FuncCall_Else)
 }
 
 
-TEST(Exec, FuncCall_ElseIf)
+TEST(ExecStack, FuncCall_ElseIf)
 {
   const std::string_view src = R"(
     fn foo(a: int)
@@ -454,7 +454,7 @@ TEST(Exec, FuncCall_ElseIf)
 }
 
 
-TEST(Exec, FuncCall_IfLocal)
+TEST(ExecStack, FuncCall_IfLocal)
 {
   const std::string_view src = R"(
     fn foo(a: int) -> int
@@ -499,7 +499,7 @@ TEST(Exec, FuncCall_IfLocal)
 }
 
 
-TEST(Exec, FuncCall_ConditionVarious)
+TEST(ExecStack, FuncCall_ConditionVarious)
 {
   // not pretty because we must escape formatting '{' and '}' placeholders
   static const std::string src_template = R"(
@@ -612,7 +612,7 @@ TEST(Exec, FuncCall_ConditionVarious)
 }
 
 
-TEST(Exec, FuncCall_ReturnFromIf)
+TEST(ExecStack, FuncCall_ReturnFromIf)
 {
   const std::string_view src = R"(
     a := foo();
@@ -650,7 +650,7 @@ TEST(Exec, FuncCall_ReturnFromIf)
 }
 
 
-TEST(Exec, FuncCall_ConditionDelcVarInIf)
+TEST(ExecStack, FuncCall_ConditionDelcVarInIf)
 {
   const std::string_view src = R"(
     a := true;
@@ -687,7 +687,7 @@ TEST(Exec, FuncCall_ConditionDelcVarInIf)
 }
 
 
-TEST(Exec, FuncCall_ConditionDelcVarInNestedIf)
+TEST(ExecStack, FuncCall_ConditionDelcVarInNestedIf)
 {
   const std::string_view src = R"(
     a := true;
@@ -732,7 +732,7 @@ TEST(Exec, FuncCall_ConditionDelcVarInNestedIf)
 }
 
 
-TEST(Exec, FuncCall_ParamRef)
+TEST(ExecStack, FuncCall_ParamRef)
 {
   {
     const std::string_view src = R"(
@@ -889,7 +889,7 @@ TEST(Exec, FuncCall_ParamRef)
 }
 
 
-TEST(Exec, FuncCall_ParamRefShadowing)
+TEST(ExecStack, FuncCall_ParamRefShadowing)
 {
   {
     const std::string_view src = R"(
@@ -964,7 +964,7 @@ TEST(Exec, FuncCall_ParamRefShadowing)
 }
 
 
-TEST(Exec, Parenthesis_DeclAssign)
+TEST(ExecStack, Parenthesis_DeclAssign)
 {
   {
     const std::string_view src = R"(
@@ -1011,7 +1011,7 @@ TEST(Exec, Parenthesis_DeclAssign)
   }
 }
 
-TEST(Exec, Parenthesis_FuncCall)
+TEST(ExecStack, Parenthesis_FuncCall)
 {
   {
     const std::string_view src = R"(
@@ -1044,7 +1044,7 @@ TEST(Exec, Parenthesis_FuncCall)
   }
 }
 
-TEST(Exec, Operators_DivideByZero)
+TEST(ExecStack, Operators_DivideByZero)
 {
   const std::string_view src = R"(
     z := 0;
@@ -1065,7 +1065,7 @@ TEST(Exec, Operators_DivideByZero)
 }
 
 
-TEST(Exec, Operators_IntegerDivisionOverflow)
+TEST(ExecStack, Operators_IntegerDivisionOverflow)
 {
   const std::string_view src = R"(
     a := -9223372036854775807 - 1;
@@ -1086,7 +1086,7 @@ TEST(Exec, Operators_IntegerDivisionOverflow)
   ASSERT_THROW(exec.execute(script.ast->block), RuntimeError);
 }
 
-TEST(Exec, Operators_OutOfRange)
+TEST(ExecStack, Operators_OutOfRange)
 {
   {
     const std::string_view src = R"(
@@ -1134,7 +1134,7 @@ TEST(Exec, Operators_OutOfRange)
   // But need to support this notation
 }
 
-TEST(Exec, UnaryExpressions)
+TEST(ExecStack, UnaryExpressions)
 {
   const std::string_view src = R"(
     a := -4;
@@ -1175,7 +1175,7 @@ TEST(Exec, UnaryExpressions)
   exec.execute(script.ast->block);
 }
 
-TEST(Exec, LoopWhile_Basic)
+TEST(ExecStack, LoopWhile_Basic)
 {
   {
     const std::string_view src = R"(
@@ -1246,7 +1246,7 @@ TEST(Exec, LoopWhile_Basic)
   exec.execute(script.ast->block);
 }
 
-TEST(Exec, LoopWhile_FuncCond)
+TEST(ExecStack, LoopWhile_FuncCond)
 {
   const std::string_view src = R"(
     i := 0;
@@ -1276,7 +1276,7 @@ TEST(Exec, LoopWhile_FuncCond)
 }
 
 
-TEST(Exec, LoopWhile_FuncCondRefLhs)
+TEST(ExecStack, LoopWhile_FuncCondRefLhs)
 {
   const std::string_view src = R"(
     i := 0;
@@ -1309,7 +1309,7 @@ TEST(Exec, LoopWhile_FuncCondRefLhs)
 }
 
 
-TEST(Exec, LoopWhile_FuncCondRefRhs)
+TEST(ExecStack, LoopWhile_FuncCondRefRhs)
 {
   const std::string_view src = R"(
     i := 0;

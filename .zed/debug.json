@@ -22,7 +22,7 @@
       "cwd": "$ZED_WORKTREE_ROOT"
     },
     "program": "$ZED_WORKTREE_ROOT/build/cpy",
-    "args": ["example.cpy"],
+    "args": ["example.cpy", "hello", "world", "666", "1.5", "true", "false"],
     "request": "launch",
     "adapter": "CodeLLDB"
   },

@@ -1,43 +1,19 @@
 #pragma once
 
-#include "cpy/exceptions.hpp"
 #include <cpy/common.hpp>
 
-#include <print>
-#include <type_traits>
-#include <variant>
 
 
 namespace core
 {
-  inline VarValue print(const std::span<const VarValue> args)
-  {
-    for(const auto& val : args)
-    {
-      std::visit([](const auto& val)
-        {
-          using T = std::remove_cvref_t<decltype(val)>;
+  VarValue print(const RuntimeContext&, const std::span<const VarValue> args);
+  VarValue println(const RuntimeContext& ctx, const std::span<const VarValue> args);
+  VarValue exit(const RuntimeContext&, const std::span<const VarValue> args);
 
-            if constexpr (!std::is_same_v<T, std::monostate>) {
-              std::print("{}", val);
-            }
-        },
-        val);
-    }
-
-    return std::monostate{};
-  }
-
-  inline VarValue println(const std::span<const VarValue> args)
-  {
-    print(args);
-    std::println();
-    return std::monostate{};
-  }
-
-  inline VarValue exit(const std::span<const VarValue> args)
-  {
-    const int status = args.empty() ? 0 : static_cast<int>(std::get<CpyInt>(args[0]));
-    throw ScriptExit {status};
-  }
+  // argv //
+  size_t get_argv_index(const RuntimeContext& ctx, const std::span<const VarValue> args);
+  VarValue get_argv_str(const RuntimeContext& ctx, const std::span<const VarValue> args);
+  VarValue get_argv_int(const RuntimeContext& ctx, const std::span<const VarValue> args);
+  VarValue get_argv_dec(const RuntimeContext& ctx, const std::span<const VarValue> args);
+  VarValue get_argv_bool(const RuntimeContext& ctx, const std::span<const VarValue> args);
 }

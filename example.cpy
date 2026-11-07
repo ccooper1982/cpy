@@ -1,20 +1,13 @@
-fn foo(n: int) -> int
-{
-    if (n == 0) {
-        return 42;
-    }
 
-    while (true)
-    {
-        if (n > 0) {
-            return foo(n - 1);
-        }
-    }
+println (argv_str(0));
+println (argv_str(1));
+println (argv_int(2));
+println (argv_dec(3));
+println (argv_bool(4));
+println (argv_bool(5));
 
-    return 99;
+if (argv_bool(4)) {
+    println("yes");
 }
 
-result := foo(5);
-
-println(result);
-println("Finished");
+println(argv_int(2) == 1);

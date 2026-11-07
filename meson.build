@@ -18,7 +18,8 @@ gtest = dependency('gtest')
 gtest_main = dependency('gtest_main')
 
 cpy_sources = files(
-  'src/execute.cpp',
+  'src/exec/core.cpp',
+  'src/exec/executor.cpp',
   'src/main.cpp',
   'src/parser.cpp',
   'src/semantics.cpp',
@@ -36,13 +37,15 @@ executable('cpy', cpy_sources,
 cpy_tests = executable(
   'cpy_tests',
   files('tests/ast.cpp',
-        'tests/execute.cpp',
         'tests/parser.cpp',
         'tests/semantics.cpp',
         'tests/symbol_table.cpp',
+        'tests/execute_stack.cpp',
+        'tests/execute_exit_status.cpp',
         'src/parser.cpp',
         'src/semantics.cpp',
-        'src/execute.cpp',
+        'src/exec/core.cpp',
+        'src/exec/executor.cpp',
         'grammar/src/parser.c'
   ),
   include_directories: include_dirs,
