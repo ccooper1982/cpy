@@ -15,6 +15,7 @@ static Parser parser;
 static Script script;
 static Semantics semantics;
 
+
 static int execute (std::span<char *> argv);
 
 
@@ -35,39 +36,6 @@ static bool startup_valid(const int argc, char **& argv)
   return true;
 }
 
-// static std::vector<VarValue> get_args (const std::span<char *> argv)
-// {
-//   auto to_var_value = [](const std::string_view arg, auto& val) -> bool
-//   {
-//     auto [ptr, ec] = std::from_chars(arg.data(), arg.data() + arg.size(), val);
-//     return ec == std::errc{} && ptr == arg.data() + arg.size();
-//   };
-//
-//   std::vector<VarValue> args;
-//
-//   if (argv.size() > 2)
-//   {
-//     args.reserve(argv.subspan(2).size());
-//
-//     for (const std::string_view arg : argv.subspan(2))
-//     {
-//       if (arg == "true" || arg == "false") {
-//         args.emplace_back(CpyBool{arg == "true"});
-//       }
-//       else if (CpyInt integer{}; to_var_value(arg, integer)) {
-//         args.emplace_back(integer);
-//       }
-//       else if (CpyDec decimal{}; to_var_value(arg, decimal)) {
-//         args.emplace_back(decimal);
-//       }
-//       else {
-//         args.emplace_back(CpyString{arg});
-//       }
-//     }
-//   }
-//
-//   return args;
-// }
 
 static std::vector<std::string> get_args (const std::span<char *> argv)
 {
@@ -83,18 +51,16 @@ static std::vector<std::string> get_args (const std::span<char *> argv)
   return args;
 }
 
+static const constexpr int STATUS_OK = 0;
+static const constexpr int STATUS_INTERNAL_ERR = 1;
+static const constexpr int STATUS_USER_ERR = 2;
 
 // TODO
 //  - separate into libcpy and cpy executable
-
-// return status:
-//    0: good
-//  < 0: compiler error
-//  > 0: user error
 int main (int argc, char ** argv)
 {
   if (!startup_valid(argc, argv)) {
-    return 1;
+    return STATUS_USER_ERR;
   }
 
   Modules::initialise();
@@ -107,14 +73,14 @@ int main (int argc, char ** argv)
   catch (const std::exception& ex)
   {
     std::cerr << ex.what() << '\n';
-    return -1;
+    return STATUS_INTERNAL_ERR;
   }
 
   if (script.issues->have_errors())
   {
     std::cout << "Issues:\n";
     script.issues->dump(std::cout, *script.src);
-    return 1;
+    return STATUS_USER_ERR;
   }
 
   semantics.process(script);
@@ -123,7 +89,7 @@ int main (int argc, char ** argv)
   {
     std::cout << "Issues:\n";
     script.issues->dump(std::cout, *script.src);
-    return 1;
+    return STATUS_USER_ERR;
   }
 
   return execute(std::span<char *> {argv, static_cast<size_t>(argc)});
@@ -132,9 +98,9 @@ int main (int argc, char ** argv)
 
 static int execute (std::span<char *> argv)
 {
-  int exit_status{};
+  int exit_status{STATUS_OK};
 
-  RuntimeContext rt_context {.argv =get_args(argv)};
+  RuntimeContext rt_context {.argv = get_args(argv)};
 
   Executor exec {semantics.symbol_table(), rt_context};
 
@@ -149,17 +115,17 @@ static int execute (std::span<char *> argv)
   catch (const RuntimeError& ex_run)
   {
     std::cerr << "Runtime Error: " << ex_run.what() << '\n';
-    return 1;
+    return STATUS_USER_ERR;
   }
   catch (const std::exception& ex)
   {
     std::cerr << "Internal execution error: " << ex.what() << '\n';
-    return -1;
+    return STATUS_INTERNAL_ERR;
   }
   catch (...)
   {
     std::cerr << "Unknown execution error\n";
-    return -1;
+    return STATUS_INTERNAL_ERR;
   }
 
   return exit_status;

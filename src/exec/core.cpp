@@ -40,6 +40,10 @@ VarValue println(const RuntimeContext& ctx, const std::span<const VarValue> args
 VarValue exit(const RuntimeContext&, const std::span<const VarValue> args)
 {
   const int status = args.empty() ? 0 : static_cast<int>(std::get<CpyInt>(args[0]));
+
+  if (status < 0 || status > 255) {
+    throw RuntimeError{"Exit status must be in range [0,255]"};
+  }
   throw ScriptExit {status};
 }
 
