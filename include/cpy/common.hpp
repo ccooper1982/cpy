@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <string_view>
 #include <ranges>
+#include <vector>
 
 namespace fs = std::filesystem;
 namespace rg = std::ranges;
@@ -16,6 +17,7 @@ using CpyBool = bool;
 using CpyString = std::string;
 
 using VarName = std::string_view;
+using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool>;
 
 // helper type for the visiting
 template<class... Ts>
@@ -71,3 +73,9 @@ std::expected<Expected, CpyError> make_error(const std::string_view msg)
 {
   return std::unexpected(CpyError{msg});
 }
+
+
+struct RuntimeContext
+{
+  std::vector<std::string> argv;
+};

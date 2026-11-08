@@ -42,11 +42,13 @@ private:
   template<typename NodeT>
   using NodeHandler = std::function<void(const NodeT&)>;
 
-  void process_block(Context& ctx, const AstNode& parent, const NodeBlock& block, const bool add_scope = true);
+  void process_block(Context& ctx, const AstNode& parent, const NodeBlock& block, const bool add_scope = true, const bool add_func_vars = true);
 
   // functions
   void process_function_signatures(Context& ctx);
   void process_function_bodies(Context& ctx, const NodeBlock& block);
+  bool process_function_call_argument(Context& ctx, const AstNode& parent, const NodeBlock& block, const FunctionCall& call, const size_t param_index);
+
 
   // variables
   void process_variable_declaration(Context& ctx, const NodeBlock& block, const VariableDecl& decl);
@@ -139,11 +141,7 @@ private:
     switch (expr.expr_type())
     {
       case ExpressionType::FuncCall:
-      {
-        // const auto& func_call = static_cast<const FunctionCall&>(expr);
-        // const auto func_def = m_symbol_table.get_function(func_call.name).ast;
         return process_expression(ctx, parent, block, static_cast<const FunctionCall&>(expr));
-      }
       case ExpressionType::VariableUse:
         return process_expression(ctx, parent, block, static_cast<const VariableUse&>(expr));
       case ExpressionType::Return:

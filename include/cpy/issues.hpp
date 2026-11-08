@@ -186,6 +186,11 @@ namespace issue
     issues.add_error(std::format("Function already defined: {}", func), node.source, ErrorCode::FunctionDuplicate);
   }
 
+  inline void func_core_exists (Issues& issues, const AstNode& node, const std::string_view func)
+  {
+    issues.add_error(std::format("Function defined in core: {}", func), node.source, ErrorCode::FunctionDuplicate);
+  }
+
   inline void func_not_exist (Issues& issues, const AstNode& node, const std::string_view func)
   {
     issues.add_error(std::format("Function does not exist: {}", func), node.source, ErrorCode::FunctionNotExist);

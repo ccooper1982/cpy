@@ -1,6 +1,7 @@
 #pragma once
 
-#include "cpy/ast/ast_node.hpp"
+
+#include "cpy/common.hpp"
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -11,7 +12,7 @@
 #include <vector>
 
 #include <cpy/ast/ast.hpp>
-
+#include <cpy/exec/core.hpp>
 
 
 struct ResolvedSymbol
@@ -22,10 +23,17 @@ struct ResolvedSymbol
   uint32_t position{};
 };
 
+enum class ParamMode
+{
+  Fixed,
+  VariadicAny
+};
+
 struct ResolvedFunction
 {
   std::vector<ResolvedSymbol> params;
   VarType return_type;
+  ParamMode param_mode{ParamMode::Fixed};
   const FunctionDef * ast{};
 };
 
@@ -39,6 +47,106 @@ struct Scope
 
   Scope * parent{};
   ResolvedVariableMap vars{};
+};
+
+
+using CoreFunction = VarValue (*)(const RuntimeContext&, const std::span<const VarValue>);
+
+struct CoreFunctionDef
+{
+  ResolvedFunction signature;
+  CoreFunction implementation;
+  size_t min_args{};
+};
+
+inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
+  {
+    "print",
+    {
+      {
+        {},
+        BuiltInType::Void,
+        ParamMode::VariadicAny
+      },
+      core::print
+    }
+  },
+  {
+    "println",
+    {
+      {
+        {},
+        BuiltInType::Void,
+        ParamMode::VariadicAny
+      },
+      core::println
+    }
+  },
+  {
+    "exit",
+    {
+      {
+        {
+          {"status", BuiltInType::Int}
+        },
+        BuiltInType::Void,
+        ParamMode::Fixed
+      },
+      core::exit
+    }
+  },
+  {
+    "argv_str",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::String,
+        ParamMode::Fixed
+      },
+      core::get_argv_str
+    }
+  },
+  {
+    "argv_int",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::Int,
+        ParamMode::Fixed
+      },
+      core::get_argv_int
+    }
+  },
+  {
+    "argv_dec",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::Decimal,
+        ParamMode::Fixed
+      },
+      core::get_argv_dec
+    }
+  },
+  {
+    "argv_bool",
+    {
+      {
+        {
+          {"index", BuiltInType::Int}
+        },
+        BuiltInType::Bool,
+        ParamMode::Fixed
+      },
+      core::get_argv_bool
+    }
+  }
 };
 
 /// Maps function:
@@ -98,6 +206,11 @@ public:
     return m_resolved_functions.contains(name);
   }
 
+  bool has_core_function(const std::string_view name) const
+  {
+    return CoreFunctions.contains(name);
+  }
+
   void add_variable(const std::string_view name, const VarType type, const uint32_t position)
   {
     if (m_scope_tracker.empty())
@@ -135,9 +248,20 @@ public:
     return it->second;
   }
 
-  const ResolvedFunction& get_function(const std::string_view func) const
+  const ResolvedFunction& get_function(const std::string_view name) const
   {
-    return m_resolved_functions.find(func)->second;
+    const auto& user_it = m_resolved_functions.find(name);
+    if (user_it != m_resolved_functions.cend()) {
+      return user_it->second;
+    }
+    else {
+     return CoreFunctions.find(name)->second.signature;
+    }
+  }
+
+  size_t get_core_function_min_args(const std::string_view name) const
+  {
+    return CoreFunctions.find(name)->second.min_args;
   }
 
   /// Gets a resolved variable, checking the NodeBlock's scope, then checking each

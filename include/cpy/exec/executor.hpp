@@ -11,6 +11,7 @@
 #include <optional>
 #include <stdexcept>
 #include <utility>
+#include <variant>
 
 
 inline static VarValue value_from_type (const VarType type)
@@ -149,11 +150,22 @@ private:
   StackEntry * m_parent{};
 };
 
+struct ExecutionResult
+{
+  ExecutionResult() = default;
+
+  ExecutionResult(VarValue val)
+    : value(std::move(val))
+  {}
+
+  VarValue value{std::monostate{}};
+  bool returned{};
+};
 
 class Executor
 {
 public:
-  Executor(const SymbolTable& sym_table);
+  Executor(const SymbolTable& sym_table, const RuntimeContext& rt_context);
 
   #ifdef CPY_UNIT_TESTS
     virtual ~Executor(){}
@@ -161,22 +173,21 @@ public:
     ~Executor() = default;
   #endif
 
-  VarValue execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {}, const bool add_stack = true);
+  ExecutionResult execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args = {});
 
 private:
   void execute (const NodeBlock& block, const VariableAssign& assign);
   void execute (const NodeBlock& block, const VariableDecl& decl);
-  VarValue execute (const NodeBlock& block, const Expression& expr);
-  VarValue execute (const NodeBlock& block, const ConditionIf& cond);
-  VarValue execute (const NodeBlock& block, const LoopWhile& loop);
+  ExecutionResult execute (const NodeBlock& block, const Expression& expr);
+  ExecutionResult execute (const NodeBlock& block, const ConditionIf& cond);
+  ExecutionResult execute (const NodeBlock& block, const LoopWhile& loop);
+  ExecutionResult execute (const NodeBlock& block, const FunctionCall& call);
 
   // operators //
   VarValue apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op);
   VarValue apply_operator(const NodeBlock& block, const Expression& operand, const UnaryOperator op);
 
-
   // variables //
-
   Variable& get_variable (const VarName name);
 
 #ifdef CPY_UNIT_TESTS
@@ -196,6 +207,7 @@ private:
 
 private:
   const SymbolTable& m_sym_table;
+  const RuntimeContext& m_rt_context;
 };
 
 
@@ -210,14 +222,14 @@ class TestExecutor : public Executor
 {
 public:
   TestExecutor(const SymbolTable& sym_table, OnStackPush on_push, OnStackPop on_pop)
-    : Executor(sym_table)
+    : Executor(sym_table, RuntimeContext{})
     , m_on_push(on_push)
     , m_on_pop(on_pop)
     {
     }
 
     TestExecutor(const SymbolTable& sym_table, OnStackPop on_pop)
-      : Executor(sym_table)
+      : Executor(sym_table, RuntimeContext{})
       , m_on_push()
       , m_on_pop(on_pop)
       {

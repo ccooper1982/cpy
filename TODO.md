@@ -1,5 +1,7 @@
 # TODO
 
+## Logical Operators
+- `&&`, `||`
 
 ## String Concatenation
 ```

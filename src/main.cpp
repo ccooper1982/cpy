@@ -1,93 +1,132 @@
-#include "cpy/exceptions.hpp"
-#include <cpy/exec/executor.hpp>
 #include <cpy/ast/ast_node.hpp>
+#include <cpy/common.hpp>
+#include <cpy/exceptions.hpp>
+#include <cpy/exec/executor.hpp>
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
 #include <cpy/semantics.hpp>
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <string_view>
 
-int a{};
-void f()
+
+static Parser parser;
+static Script script;
+static Semantics semantics;
+
+
+static int execute (std::span<char *> argv);
+
+
+static bool startup_valid(const int argc, char **& argv)
 {
-  a = 5;
+  if (argc < 2)
+  {
+    std::cerr << "No input source file:\n";
+    return false;
+  }
+
+  if (const fs::path file = argv[1]; !fs::exists(file))
+  {
+    std::cerr << "File does not exist: " << file.string() << '\n';
+    return false;
+  }
+
+  return true;
 }
 
+
+static std::vector<std::string> get_args (const std::span<char *> argv)
+{
+  std::vector<std::string> args;
+
+  if (argv.size() > 2)
+  {
+    for (const std::string_view arg : argv.subspan(2)){
+      args.emplace_back(arg);
+    }
+  }
+
+  return args;
+}
+
+static const constexpr int STATUS_OK = 0;
+static const constexpr int STATUS_INTERNAL_ERR = 1;
+static const constexpr int STATUS_USER_ERR = 2;
 
 // TODO
 //  - separate into libcpy and cpy executable
 int main (int argc, char ** argv)
 {
-  if (argc != 2)
-  {
-    std::cerr << "Need input source file:\n";
-    return 1;
-  }
-
-  const fs::path file = argv[1];
-
-  if (!fs::exists(file))
-  {
-    std::cerr << "File does not exist: " << file.string() << '\n';
-    return 1;
+  if (!startup_valid(argc, argv)) {
+    return STATUS_USER_ERR;
   }
 
   Modules::initialise();
 
-  Parser parser;
-  Script script;
-
   try
   {
+    const fs::path file = argv[1];
     script = parser.parse(file);
   }
   catch (const std::exception& ex)
   {
     std::cerr << ex.what() << '\n';
-    return 1;
+    return STATUS_INTERNAL_ERR;
   }
 
-  // std::cout << "AST:";
-  // script.ast->dump(std::cout);
-
-  // errors here if tree-sitter found syntax errors
-  if (!script.issues->have_errors())
+  if (script.issues->have_errors())
   {
-    Semantics sems;
-    sems.process(script);
-
-    // std::cout << "Sym Table:\n";
-    // sems.symbol_table().dump(std::cout);
-
-    if (!script.issues->have_errors())
-    {
-      Executor exec {sems.symbol_table()};
-
-      try
-      {
-        exec.execute(script.ast->block);
-      }
-      catch (const RuntimeError& ex_run)
-      {
-        std::cerr << "Runtime Error: " << ex_run.what() << '\n';
-        return 1;
-      }
-      catch (const std::exception& ex)
-      {
-        std::cerr << "Internal execution error: " << ex.what() << '\n';
-        return -1;
-      }
-      catch (...)
-      {
-        std::cerr << "Unknown execution error\n";
-        return -1;
-      }
-    }
+    std::cout << "Issues:\n";
+    script.issues->dump(std::cout, *script.src);
+    return STATUS_USER_ERR;
   }
 
-  std::cout << "Issues:\n";
-  script.issues->dump(std::cout, *script.src);
+  semantics.process(script);
 
-  return script.issues->have_errors() ? 1 : 0;
+  if (script.issues->have_errors())
+  {
+    std::cout << "Issues:\n";
+    script.issues->dump(std::cout, *script.src);
+    return STATUS_USER_ERR;
+  }
+
+  return execute(std::span<char *> {argv, static_cast<size_t>(argc)});
+}
+
+
+static int execute (std::span<char *> argv)
+{
+  int exit_status{STATUS_OK};
+
+  RuntimeContext rt_context {.argv = get_args(argv)};
+
+  Executor exec {semantics.symbol_table(), rt_context};
+
+  try
+  {
+    exec.execute(script.ast->block);
+  }
+  catch (const ScriptExit& exit)
+  {
+    exit_status = exit.exit_status();
+  }
+  catch (const RuntimeError& ex_run)
+  {
+    std::cerr << "Runtime Error: " << ex_run.what() << '\n';
+    return STATUS_USER_ERR;
+  }
+  catch (const std::exception& ex)
+  {
+    std::cerr << "Internal execution error: " << ex.what() << '\n';
+    return STATUS_INTERNAL_ERR;
+  }
+  catch (...)
+  {
+    std::cerr << "Unknown execution error\n";
+    return STATUS_INTERNAL_ERR;
+  }
+
+  return exit_status;
 }

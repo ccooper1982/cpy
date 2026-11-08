@@ -1,9 +1,13 @@
+#include "cpy/ast/ast.hpp"
 #include "cpy/ast/expressions.hpp"
 #include "cpy/common.hpp"
 #include "cpy/exec/operators.hpp"
+#include <algorithm>
 #include <cpy/exec/executor.hpp>
+#include <ranges>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 
 static VarValue value_from_literal_expr(const Expression& expr)
@@ -32,22 +36,25 @@ static VarValue value_from_literal_expr(const Expression& expr)
     return b != nullptr && *b;
 }
 
+[[nodiscard]] static bool is_true(const ExecutionResult& result)
+{
+  return is_true(result.value);
+}
 
-Executor::Executor(const SymbolTable& sym_table)
+
+Executor::Executor(const SymbolTable& sym_table, const RuntimeContext& rt_context)
   : m_sym_table(sym_table)
+  , m_rt_context(rt_context)
 {
 
 }
 
 
-VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args, const bool add_stack)
+ExecutionResult Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&& func_args)
 {
-  VarValue result;
+  ExecutionResult result;
 
-  if (add_stack) {
-    push_stack(block, std::move(func_args));
-  }
-
+  push_stack(block, std::move(func_args));
 
   for(const auto& node : block.nodes() | vw::filter(is_node_executable))
   {
@@ -71,53 +78,56 @@ VarValue Executor::execute(const NodeBlock& block, std::map<VarName, Variable>&&
       default:
         throw std::runtime_error{"Unexpected node type in block"};
     }
+
+    if (result.returned) {
+      break;
+    }
   }
 
-  if (add_stack) {
-    pop_stack();
-  }
+  pop_stack();
 
   return result;
 }
 
 
-VarValue Executor::execute (const NodeBlock& block, const LoopWhile& loop)
+ExecutionResult Executor::execute (const NodeBlock& block, const LoopWhile& loop)
 {
-  // - execute the loop's condition expression on each iteration
-  // - the block's variables are pushed onto the stack once, and only popped
-  //   when the loop is exited
-  VarValue result;
+  // execute the loop's condition expression on each iteration
+  ExecutionResult result;
 
   while (is_true(execute(block, *loop.expr)))
   {
-    result = execute(loop.body, {}, true);
+    if (result = execute(loop.body); result.returned) {
+      break;
+    }
   }
 
   return result;
 }
 
 
-VarValue Executor::execute (const NodeBlock& block, const ConditionIf& cond)
+ExecutionResult Executor::execute (const NodeBlock& block, const ConditionIf& cond)
 {
-  VarValue result;
+  ExecutionResult result;
 
-  auto cond_result = execute(block, *cond.if_.condition);
+  auto if_result = execute(block, *cond.if_.condition);
 
-  if (is_true(cond_result)) {
+  if (is_true(if_result)) {
     result = execute(cond.if_body());
   }
   else
   {
-    for(const auto& [cond, body] : cond.else_if)
+    auto condition_true = [this, &block](const ConditionIf::Condition& cb)
     {
-      if (cond_result = execute(block, *cond); is_true(cond_result))
-      {
-        result = execute(body);
-        break;
-      }
-    }
+      return is_true(execute(block, *cb.condition));
+    };
 
-    if (!is_true(cond_result) && cond.have_else()) {
+    const auto it = rg::find_if(cond.else_if, condition_true);
+
+    if (it != rg::end(cond.else_if)) {
+      result = execute(it->body);
+    }
+    else if (cond.have_else()) {
       result = execute(*cond.else_body);
     }
   }
@@ -134,7 +144,7 @@ void Executor::execute (const NodeBlock& block, const VariableDecl& decl)
     var.value() = value_from_literal_expr(*decl.initialiser);
   }
   else if (decl.has_initialiser()) {
-    var.value() = execute(block, *decl.initialiser);
+    var.value() = execute(block, *decl.initialiser).value;
   }
 }
 
@@ -147,47 +157,20 @@ void Executor::execute (const NodeBlock& block, const VariableAssign& assign)
     var.value() = value_from_literal_expr(*assign.expr);
   }
   else {
-    var.value() = execute(block, *assign.expr);
+    var.value() = execute(block, *assign.expr).value;
   }
 }
 
 
-VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
+ExecutionResult Executor::execute (const NodeBlock& block, const Expression& expr)
 {
-  VarValue result;
+  ExecutionResult result;
 
   if (expr.is_literal()) {
     result = value_from_literal_expr(expr);
   }
-  else if (expr.is_expr_type(ExpressionType::FuncCall))
-  {
-    const auto& call = static_cast<const FunctionCall&>(expr);
-    const auto& def = m_sym_table.get_function(call.name);
-
-    std::map<VarName, Variable> args;
-
-    for (size_t i = 0 ; i < call.args.size() ; ++i)
-    {
-      auto val = execute(block, *call.args[i].expr);
-
-      Variable variable;
-
-      if (def.params[i].is_ref)
-      {
-        // a: int;
-        // foo (ref a);
-        // we need to find variable a
-        const auto& var_ref = static_cast<const VariableUse&>(*call.args[i].expr);
-        variable.set_ref_target(&get_variable(var_ref.name));
-      }
-      else {
-        variable.value() = val;
-      }
-
-      args.emplace(def.params[i].name, std::move(variable));
-    }
-
-    result = execute(def.ast->body, std::move(args));
+  else if (expr.is_expr_type(ExpressionType::FuncCall)) {
+    result = execute(block, static_cast<const FunctionCall&>(expr));
   }
   else if (expr.is_expr_type(ExpressionType::Unary))
   {
@@ -210,6 +193,7 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
         result = execute(block, *ret.return_expr);
       }
     }
+    result.returned = true;
   }
   else if (expr.is_expr_type(ExpressionType::VariableUse))
   {
@@ -221,6 +205,49 @@ VarValue Executor::execute (const NodeBlock& block, const Expression& expr)
   return result;
 }
 
+
+ExecutionResult Executor::execute (const NodeBlock& block, const FunctionCall& call)
+{
+  const auto& def = m_sym_table.get_function(call.name);
+
+  if (m_sym_table.has_core_function(call.name))
+  {
+    std::vector<VarValue> values;
+
+    for (size_t i = 0 ; i < call.args.size() ; ++i)
+    {
+      auto frame = execute(block, *call.args[i].expr);
+      values.push_back(std::move(frame.value));
+    }
+
+    return CoreFunctions.at(call.name).implementation(m_rt_context, values);
+  }
+  else
+  {
+    std::map<VarName, Variable> args;
+
+    for (size_t i = 0 ; i < call.args.size() ; ++i)
+    {
+      Variable variable;
+
+      if (def.params[i].is_ref)
+      {
+        //  a: int;
+        //  foo (ref a);
+        // we need to find `a`
+        const auto& var_ref = static_cast<const VariableUse&>(*call.args[i].expr);
+        variable.set_ref_target(&get_variable(var_ref.name));
+      }
+      else {
+        variable.value() = execute(block, *call.args[i].expr).value;
+      }
+
+      args.emplace(def.params[i].name, std::move(variable));
+    }
+
+    return execute(def.ast->body, std::move(args));
+  }
+}
 
 void Executor::push_stack (const NodeBlock& block, std::map<VarName, Variable> func_args)
 {
@@ -273,18 +300,18 @@ Variable& Executor::get_variable (const VarName name)
 
 VarValue Executor::apply_operator(const NodeBlock& block, const Expression& operand, const UnaryOperator op)
 {
-  VarValue val = execute(block, operand);
+  ExecutionResult frame = execute(block, operand);
 
   switch (op)
   {
     using enum UnaryOperator;
 
     case Not:
-      return !val;
+      return !frame.value;
     case Negate:
-      return -val;
+      return -frame.value;
     case BitwiseNot:
-      return ~val;
+      return ~frame.value;
   }
   std::unreachable();
 }
@@ -292,8 +319,8 @@ VarValue Executor::apply_operator(const NodeBlock& block, const Expression& oper
 
 VarValue Executor::apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op)
 {
-  VarValue lhs_val = execute(block, lhs);
-  VarValue rhs_val = execute(block, rhs);
+  auto lhs_val = execute(block, lhs).value;
+  auto rhs_val = execute(block, rhs).value;
 
   switch (op)
   {

@@ -26,6 +26,7 @@ class Modules
 public:
   static void initialise()
   {
+    m_modules.emplace_back(""); // global built-in functions
     m_modules.emplace_back("file");
 
     rg::sort(m_modules, std::less<>{}, &Module::name);
