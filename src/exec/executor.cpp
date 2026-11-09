@@ -319,8 +319,8 @@ VarValue Executor::apply_operator(const NodeBlock& block, const Expression& oper
 
 VarValue Executor::apply_operator(const NodeBlock& block, const Expression& lhs, const Expression& rhs, const BinaryOperator op)
 {
-  auto lhs_val = execute(block, lhs).value;
-  auto rhs_val = execute(block, rhs).value;
+  const auto& lhs_val = execute(block, lhs).value;
+  const auto& rhs_val = execute(block, rhs).value;
 
   switch (op)
   {
@@ -346,6 +346,9 @@ VarValue Executor::apply_operator(const NodeBlock& block, const Expression& lhs,
       return lhs_val == rhs_val;
     case NotEqual:
       return lhs_val != rhs_val;
+    case LogicalAnd:
+      return lhs_val && rhs_val;
+    case LogicalOr:
+      return lhs_val || rhs_val;
   }
-  std::unreachable();
 }

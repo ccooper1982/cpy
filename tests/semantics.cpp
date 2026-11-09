@@ -663,3 +663,42 @@ TEST(Semantics, LoopWhile_Invalid)
   ASSERT_TRUE(script.issues->have_errors());
   ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 4);
 }
+
+TEST(Semantics, LogicalOperators)
+{
+  {
+    const std::string_view src = R"(
+      a := true;
+      b := false;
+      c := a && b;
+
+      while (c) {}
+      while (a || b){ a = false; }
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
+
+  {
+    const std::string_view src = R"(
+      a := true;
+      b := a && 2;
+      c := a || "true";
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 2);
+  }
+}

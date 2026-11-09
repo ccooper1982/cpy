@@ -1,3 +1,4 @@
+#include "cpy/ast/ast_node.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
@@ -509,6 +510,12 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
         valid = !(left_type == Bool || left_type == String);
         result_type = Bool;
         break;
+
+      case LogicalAnd:
+      case LogicalOr:
+        valid = left_type == Bool;
+        result_type = Bool;
+        break;
     }
 
     if (!valid) {
@@ -518,17 +525,18 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
 
   if (valid && expr.op == BinaryOperator::Divide && is_numeric_literal_expression(*expr.rhs))
   {
-    bool by_zero{};
+    bool div_by_zero{};
 
     // TODO 'v', really?
     if (expr.rhs->is_expr_type(ExpressionType::Int)) {
-      by_zero = static_cast<const IntegerLiteral&>(*expr.rhs).v == 0;
+      div_by_zero = static_cast<const IntegerLiteral&>(*expr.rhs).v == 0;
     }
     else {
-      by_zero = static_cast<const DecimalLiteral&>(*expr.rhs).v == 0.0;
+      div_by_zero = static_cast<const DecimalLiteral&>(*expr.rhs).v == 0.0;
     }
 
-    if (by_zero) {
+    if (div_by_zero)
+    {
       issue::expr_divide_by_zero(ctx.issues, expr);
       valid = false;
     }

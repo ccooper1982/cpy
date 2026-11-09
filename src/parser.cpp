@@ -38,8 +38,10 @@ static BinaryOperator get_binary_operator(const std::string_view op)
   if (op == ">")  return BinaryOperator::Greater;
   if (op == "<=") return BinaryOperator::LessEqual;
   if (op == ">=") return BinaryOperator::GreaterEqual;
+  if (op == "&&") return BinaryOperator::LogicalAnd;
+  if (op == "||") return BinaryOperator::LogicalOr;
 
-  std::unreachable();
+  throw std::runtime_error{"Unhandled binary operator"};
 }
 
 static UnaryOperator get_unary_operator(const std::string_view op)

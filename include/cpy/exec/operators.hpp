@@ -88,6 +88,7 @@ constexpr VarValue do_binary_arithmetic (auto& val_l, auto& val_r, OpF op)
   return op(val_l, val_r);
 }
 
+
 template<class OpF>
 inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, OpF op)
 {
@@ -97,15 +98,19 @@ inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, Op
     using R = std::decay_t<decltype(val_r)>;
 
     constexpr bool is_arithmetic = AreCpyArithmetic<L,R>;
+    constexpr bool is_boolean = IsCpyBoolean<L> && IsCpyBoolean<R>;
     constexpr bool is_strings = IsCpyString<L> && IsCpyString<R> && (std::is_same_v<OpF, std::plus<>> || std::is_same_v<OpF, std::equal_to<>>);
 
     // TODO allow strings here for future, the semantic analyser disallows it for now
-    if constexpr (!is_arithmetic && !is_strings) {
+    if constexpr (!is_arithmetic && !is_strings && !is_boolean) {
       throw std::logic_error{"Called do_binary_operator() on unsupported type"};
     }
     else
     {
-      if constexpr (is_arithmetic){
+      if constexpr (is_boolean) {
+        return op(val_l, val_r);
+      }
+      else if constexpr (is_arithmetic){
         return do_binary_arithmetic(val_l, val_r, op);
       }
 
@@ -166,6 +171,15 @@ inline VarValue operator!=(const VarValue& lhs, const VarValue& rhs)
   return do_binary_operator(lhs, rhs, std::not_equal_to<>{});
 }
 
+inline VarValue operator&&(const VarValue& lhs, const VarValue& rhs)
+{
+  return do_binary_operator(lhs, rhs, std::logical_and<>{});
+}
+
+inline VarValue operator||(const VarValue& lhs, const VarValue& rhs)
+{
+  return do_binary_operator(lhs, rhs, std::logical_or<>{});
+}
 
 // unary //
 
