@@ -1,43 +1,18 @@
 #pragma once
 
 
-#include "cpy/common.hpp"
 #include <cstdint>
 #include <map>
 #include <optional>
 #include <ostream>
 #include <stack>
-#include <stdexcept>
 #include <string_view>
 #include <vector>
 
 #include <cpy/ast/ast.hpp>
 #include <cpy/exec/core.hpp>
+#include <cpy/functional.hpp>
 
-
-struct ResolvedSymbol
-{
-  std::string_view name;
-  VarType type;
-  bool is_ref{};
-  uint32_t position{};
-};
-
-enum class ParamMode
-{
-  Fixed,
-  VariadicAny
-};
-
-struct ResolvedFunction
-{
-  std::vector<ResolvedSymbol> params;
-  VarType return_type;
-  ParamMode param_mode{ParamMode::Fixed};
-  const FunctionDef * ast{};
-};
-
-using ResolvedVariableMap = std::map<std::string_view, const ResolvedSymbol>;
 
 struct Scope
 {
@@ -49,116 +24,6 @@ struct Scope
   ResolvedVariableMap vars{};
 };
 
-
-using CoreFunction = VarValue (*)(const RuntimeContext&, const std::span<const VarValue>);
-
-struct CoreFunctionDef
-{
-  ResolvedFunction signature;
-  CoreFunction implementation;
-  size_t min_args{};
-};
-
-inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
-  {
-    "print",
-    {
-      {
-        {},
-        BuiltInType::Void,
-        ParamMode::VariadicAny
-      },
-      core::print
-    }
-  },
-  {
-    "println",
-    {
-      {
-        {},
-        BuiltInType::Void,
-        ParamMode::VariadicAny
-      },
-      core::println
-    }
-  },
-  {
-    "exit",
-    {
-      {
-        {
-          {"status", BuiltInType::Int}
-        },
-        BuiltInType::Void,
-        ParamMode::Fixed
-      },
-      core::exit
-    }
-  },
-  {
-    "arg_count",
-    {
-      {
-        {{}},
-        BuiltInType::Int,
-        ParamMode::Fixed
-      },
-      core::get_argc
-    }
-  },
-  {
-    "arg_str",
-    {
-      {
-        {
-          {"index", BuiltInType::Int}
-        },
-        BuiltInType::String,
-        ParamMode::Fixed
-      },
-      core::get_argv_str
-    }
-  },
-  {
-    "arg_int",
-    {
-      {
-        {
-          {"index", BuiltInType::Int}
-        },
-        BuiltInType::Int,
-        ParamMode::Fixed
-      },
-      core::get_argv_int
-    }
-  },
-  {
-    "arg_dec",
-    {
-      {
-        {
-          {"index", BuiltInType::Int}
-        },
-        BuiltInType::Decimal,
-        ParamMode::Fixed
-      },
-      core::get_argv_dec
-    }
-  },
-  {
-    "arg_bool",
-    {
-      {
-        {
-          {"index", BuiltInType::Int}
-        },
-        BuiltInType::Bool,
-        ParamMode::Fixed
-      },
-      core::get_argv_bool
-    }
-  }
-};
 
 /// Maps function:
 ///  return type, param types
@@ -202,15 +67,7 @@ public:
   SymbolTable& operator=(SymbolTable&&) = default;
 
 
-  void add_function (const FunctionDef& def, std::vector<ResolvedSymbol> params, VarType return_type)
-  {
-    m_resolved_functions.emplace(def.name,
-                                 ResolvedFunction{
-                                   .params = std::move(params),
-                                   .return_type = return_type,
-                                   .ast = &def
-                                 });
-  }
+  void add_function (const FunctionDef& def, std::vector<ResolvedSymbol> params, VarType return_type);
 
   bool has_function(const std::string_view name) const
   {
@@ -222,13 +79,7 @@ public:
     return CoreFunctions.contains(name);
   }
 
-  void add_variable(const std::string_view name, const VarType type, const uint32_t position)
-  {
-    if (m_scope_tracker.empty())
-      throw std::runtime_error{"SymbolTable::add_variable(): scope tracker is empty"};
-
-    m_scope_tracker.top()->vars.emplace(name, ResolvedSymbol{.name = name, .type = type, .position = position});
-  }
+  void add_variable(const std::string_view name, const VarType type, const uint32_t position);
 
   void add_variable(const FunctionParam& param, const uint32_t position)
   {
@@ -244,31 +95,11 @@ public:
   // Checks if a variable is visible from the given block.
   // If not present in `block`, checks parents, until the variable is found.
   // Returns false if not found.
-  bool has_visible_variable(const std::string_view name, const NodeBlock& block, const uint32_t position) const
-  {
-    const auto resolved = get_resolved_variable(name, &block, true);
-    return resolved != nullptr && resolved->position < position;
-  }
+  bool has_visible_variable(const std::string_view name, const NodeBlock& block, const uint32_t position) const;
 
-  std::optional<BuiltInType> get_type(const std::string_view type_name) const
-  {
-    const auto it = BuiltInTypes.find(type_name) ;
-    if (it == rg::end(BuiltInTypes))
-     return std::nullopt;
+  std::optional<BuiltInType> get_type(const std::string_view type_name) const;
 
-    return it->second;
-  }
-
-  const ResolvedFunction& get_function(const std::string_view name) const
-  {
-    const auto& user_it = m_resolved_functions.find(name);
-    if (user_it != m_resolved_functions.cend()) {
-      return user_it->second;
-    }
-    else {
-     return CoreFunctions.find(name)->second.signature;
-    }
-  }
+  const ResolvedFunction& get_function(const std::string_view name) const;
 
   size_t get_core_function_min_args(const std::string_view name) const
   {
@@ -279,95 +110,18 @@ public:
   /// parent until it is found.
   /// Throws if the variable does not exist: has_visible_variable() should return
   /// true prior to calling get_variable().
-  const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const
-  {
-    if (const auto * symbol = get_resolved_variable(name, &block, true); symbol)
-      return *symbol;
+  const ResolvedSymbol& get_variable(const std::string_view name, const NodeBlock& block) const;
 
-    throw std::runtime_error{"SymbolTable::get_variable() - var does not exist"};
-  }
+  std::optional<ResolvedVariableMap> get_variables (const NodeBlock& block) const;
 
-  std::optional<ResolvedVariableMap> get_variables (const NodeBlock& block) const
-  {
-    std::optional<ResolvedVariableMap> result;
+  void enter_scope(const NodeBlock * node);
+  void exit_scope();
 
-    if (const auto it = m_scopes.find(&block); it != m_scopes.cend())
-      result = it->second->vars;
-
-    return result;
-  }
-
-  void enter_scope(const NodeBlock * node)
-  {
-    const auto parent = m_scope_tracker.empty() ? nullptr : m_scope_tracker.top();
-    auto [it, emplaced] = m_scopes.emplace(node, std::make_unique<Scope>(parent));
-    m_scope_tracker.push(it->second.get());
-  }
-
-  void exit_scope()
-  {
-    if (!m_scope_tracker.empty()) {
-      m_scope_tracker.pop();
-    }
-  }
-
-  void dump (std::ostream& os) const
-  {
-    os << "-- Functions --\n";
-    for(const auto& [name, resolved] : m_resolved_functions)
-    {
-      os << name << '\n';
-      os << "  - return: "<< to_string(resolved.return_type) << '\n' ;
-      os << "  - params:\n";
-      for(const auto& symbol : resolved.params) {
-        os << std::setw(8) << symbol.name << " : " << (symbol.is_ref ? "ref " : "") << to_string(symbol.type) << '\n';
-      }
-    }
-
-    // this can only dump variables at the top level because we use
-    // a stack, so they are popped
-    os << "\n-- Variables --\n";
-
-    for (const auto& [block, scope] : m_scopes)
-    {
-      std::cout << "Block: [" << block->source.start << ", " << block->source.end <<  "]\n";
-      for (const auto& [var, resolved] : scope->vars) {
-        std::cout << resolved.name << ":" << (resolved.is_ref ? "ref" : "") << to_string(resolved.type) << "\n";
-      }
-    }
-  }
+  void dump (std::ostream& os) const;
 
 
 private:
-  const ResolvedSymbol * get_resolved_variable(const std::string_view name, const NodeBlock * block, const bool visit_parents) const
-  {
-    auto in_scope = [&name](const Scope * scope) -> const ResolvedSymbol*
-    {
-      const auto it = scope->vars.find(name);
-      return it == scope->vars.cend() ? nullptr : &it->second;
-    };
-
-    const auto it_scopes = m_scopes.find(block) ;
-    if (it_scopes == m_scopes.cend()) {
-      return nullptr;
-    }
-
-    // check NodeBlock's scope
-    const Scope * scope = it_scopes->second.get();
-    const auto resolved = in_scope(scope);
-
-    if (!visit_parents || resolved) {
-      return resolved;
-    }
-
-    // travel up parents
-    for (scope = scope->parent; scope ; scope = scope->parent)
-    {
-      if (const auto resolved = in_scope(scope); resolved)
-        return resolved;
-    }
-    return nullptr;
-  }
+  const ResolvedSymbol * get_resolved_variable(const std::string_view name, const NodeBlock * block, const bool visit_parents) const;
 
 private:
   std::map<std::string_view, const ResolvedFunction> m_resolved_functions;

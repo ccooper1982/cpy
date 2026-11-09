@@ -23,6 +23,7 @@ cpy_sources = files(
   'src/main.cpp',
   'src/parser.cpp',
   'src/semantics.cpp',
+  'src/symbol_table.cpp',
   'grammar/src/parser.c',
 )
 
@@ -44,6 +45,7 @@ cpy_tests = executable(
         'tests/execute_exit_status.cpp',
         'src/parser.cpp',
         'src/semantics.cpp',
+        'src/symbol_table.cpp',
         'src/exec/core.cpp',
         'src/exec/executor.cpp',
         'grammar/src/parser.c'
