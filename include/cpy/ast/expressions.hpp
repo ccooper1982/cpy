@@ -27,6 +27,8 @@ enum class UnaryOperator
   Not,
   Negate,
   BitwiseNot,
+  PreIncrement,
+  PreDecrement
 };
 
 enum class ExpressionType
@@ -443,18 +445,18 @@ inline std::string_view to_string(const BinaryOperator op)
     case BinaryOperator::LogicalAnd:    return "&&";
     case BinaryOperator::LogicalOr:     return "||";
   }
-  std::unreachable();
 }
 
 inline std::string_view to_string(const UnaryOperator op)
 {
   switch (op)
   {
-    case UnaryOperator::Not:        return "!";
-    case UnaryOperator::Negate:     return "-";
-    case UnaryOperator::BitwiseNot: return "~";
+    case UnaryOperator::Not:          return "!";
+    case UnaryOperator::Negate:       return "-";
+    case UnaryOperator::BitwiseNot:   return "~";
+    case UnaryOperator::PreIncrement: return "++";
+    case UnaryOperator::PreDecrement: return "--";
   }
-  std::unreachable();
 }
 
 inline std::string_view to_string(const Expression& expr)
@@ -482,6 +484,4 @@ inline std::string_view to_string(const Expression& expr)
     case Return:
       return "Return";
   }
-
-  std::unreachable();
 }

@@ -4,6 +4,7 @@
 #include "cpy/exec/operators.hpp"
 #include <algorithm>
 #include <cpy/exec/executor.hpp>
+#include <functional>
 #include <ranges>
 #include <stdexcept>
 #include <utility>
@@ -176,6 +177,17 @@ ExecutionResult Executor::execute (const NodeBlock& block, const Expression& exp
   {
     const auto& unary_expr = static_cast<const UnaryExpression&>(expr);
     result = apply_operator(block, *unary_expr.operand, unary_expr.op);
+
+    if (unary_expr.op == UnaryOperator::PreDecrement || unary_expr.op == UnaryOperator::PreIncrement)
+    {
+      // semantic checker should only allow `++a`, but for sanity we confirm
+      if (unary_expr.operand->expr_type() == ExpressionType::VariableUse)
+      {
+        const auto& var_name = static_cast<const VariableUse&>(*unary_expr.operand).name;
+        auto& var = get_variable(var_name);
+        var = result.value;
+      }
+    }
   }
   else if (expr.is_expr_type(ExpressionType::Binary))
   {
@@ -300,20 +312,23 @@ Variable& Executor::get_variable (const VarName name)
 
 VarValue Executor::apply_operator(const NodeBlock& block, const Expression& operand, const UnaryOperator op)
 {
-  ExecutionResult frame = execute(block, operand);
+  ExecutionResult result = execute(block, operand);
 
   switch (op)
   {
     using enum UnaryOperator;
 
     case Not:
-      return !frame.value;
+      return !result.value;
     case Negate:
-      return -frame.value;
+      return -result.value;
     case BitwiseNot:
-      return ~frame.value;
+      return ~result.value;
+    case PreDecrement:
+      return result.value - 1;
+    case PreIncrement:
+      return result.value + 1;
   }
-  std::unreachable();
 }
 
 

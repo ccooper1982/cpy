@@ -1,13 +1,9 @@
 
-fn get_x() -> int
-{
-    return 5;
-}
-
-a := true;
 i := 0;
 
-while (a && i < get_x()) {
-    println (i);
-    i = i+1;
+while (i < arg_count())
+{
+    v := "I found this: " + arg_str(i);
+    println(v);
+    ++i;
 }

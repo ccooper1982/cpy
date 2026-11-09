@@ -53,6 +53,7 @@ export default grammar({
             field("var_decl", $.var_decl),
             field("var_assign", $.var_assign),
             field("return", $.return),
+            field("increment", $.increment_statement),
           ),
           ";"
         ),
@@ -161,7 +162,7 @@ export default grammar({
 
     unary_expression: $ =>
       prec.right(6, seq(
-        field("op", choice("-", "!", "~")),
+        field("op", choice("-", "!", "~", "++", "--")),
         field("expr", $.expression)
     )),
 
@@ -205,5 +206,8 @@ export default grammar({
 
     parenthesized_expression: ($) =>
       seq("(", $.expression, ")"),
+
+    increment_statement: ($) =>
+        field("expr", $.unary_expression),
   },
 });

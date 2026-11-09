@@ -1,19 +1,5 @@
 # TODO
 
-## Logical Operators
-- `&&`, `||`
-
-## String Concatenation
-```
-a := "hello";
-b := " cpy" ;
-c = a + b;
-```
-
-- `operators.hpp` provide `operator+()` concatenation when `VarValue` is `std::string_view`
-- Literal strings are stored in the AST as `std::string_view` but creating the new string returns a `std::string` (`CpyString`)
-
-
 ## Comments
 ```
 # single line

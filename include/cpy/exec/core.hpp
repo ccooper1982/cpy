@@ -16,4 +16,5 @@ namespace core
   VarValue get_argv_int(const RuntimeContext& ctx, const std::span<const VarValue> args);
   VarValue get_argv_dec(const RuntimeContext& ctx, const std::span<const VarValue> args);
   VarValue get_argv_bool(const RuntimeContext& ctx, const std::span<const VarValue> args);
+  VarValue get_argc(const RuntimeContext& ctx, const std::span<const VarValue> args);
 }

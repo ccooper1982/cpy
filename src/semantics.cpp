@@ -324,6 +324,12 @@ bool Semantics::process_function_call_argument(Context& ctx, const AstNode& pare
       return false;
     }
   }
+  else if (arg_expr.is_expr_type(ExpressionType::Unary))
+  {
+    const auto& expr = static_cast<const UnaryExpression&>(arg_expr);
+    if (!process_expression(ctx, parent, block, expr))
+      return false;
+  }
   else if (arg_expr.is_expr_type(ExpressionType::Binary))
   {
     const auto& expr = static_cast<const BinaryExpression&>(arg_expr);
@@ -431,7 +437,6 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 
 VarType Semantics::process_operator(Context& ctx, const VarType& operand_type, const UnaryExpression& expr)
 {
-  using enum UnaryOperator;
   using enum BuiltInType;
 
   bool valid{};
@@ -443,14 +448,21 @@ VarType Semantics::process_operator(Context& ctx, const VarType& operand_type, c
   {
     switch (expr.op)
     {
-      case UnaryOperator::Negate:
-        valid = operand_type == Decimal || operand_type == Int;
+      using enum UnaryOperator;
+
+      case Negate:
+        valid = operand_type == Int || operand_type == Decimal;
         break;
-      case UnaryOperator::Not:
+      case Not:
         valid = operand_type == Bool;
         break;
-      case UnaryOperator::BitwiseNot:
+      case BitwiseNot:
         valid = operand_type == Int;
+        break;
+      case PreIncrement:
+      case PreDecrement:
+        valid = expr.operand->is_expr_type(ExpressionType::VariableUse) &&
+                (operand_type == Int || operand_type == Decimal);
         break;
     }
 
@@ -492,8 +504,7 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
       case Subtract:
       case Multiply:
       case Divide:
-        // TODO string concatenation
-        valid = left_type == Int || left_type == Decimal ;//|| a == String;
+        valid = left_type == Int || left_type == Decimal || left_type == String;
         result_type = left_type;
         break;
 

@@ -96,7 +96,18 @@ inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
     }
   },
   {
-    "argv_str",
+    "arg_count",
+    {
+      {
+        {{}},
+        BuiltInType::Int,
+        ParamMode::Fixed
+      },
+      core::get_argc
+    }
+  },
+  {
+    "arg_str",
     {
       {
         {
@@ -109,7 +120,7 @@ inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
     }
   },
   {
-    "argv_int",
+    "arg_int",
     {
       {
         {
@@ -122,7 +133,7 @@ inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
     }
   },
   {
-    "argv_dec",
+    "arg_dec",
     {
       {
         {
@@ -135,7 +146,7 @@ inline const std::map<std::string_view, CoreFunctionDef> CoreFunctions {
     }
   },
   {
-    "argv_bool",
+    "arg_bool",
     {
       {
         {
