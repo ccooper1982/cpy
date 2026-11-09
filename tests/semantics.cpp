@@ -562,26 +562,50 @@ TEST(Semantics, Parenthesis)
 
 TEST(Semantics, UnaryExpressions)
 {
-  const std::string_view src = R"(
-    a := !3;
-    b := ~true;
-    c := ~1.5;
-    d := -false;
-    e := !(4);
-    f := !foo();
+  {
+    const std::string_view src = R"(
+      a := !3;
+      b := ~true;
+      c := ~1.5;
+      d := -false;
+      e := !(4);
+      f := !foo();
 
-    fn foo() {}
-  )";
+      fn foo() {}
+    )";
 
-  Parser parser;
-  Semantics sem;
+    Parser parser;
+    Semantics sem;
 
-  auto script = parser.parse(src);
-  sem.process(script);
+    auto script = parser.parse(src);
+    sem.process(script);
 
-  ASSERT_TRUE(script.issues->have_errors());
-  ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandInvalid), 5);
-  ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandVoid), 1);
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandInvalid), 5);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandVoid), 1);
+  }
+
+  {
+    const std::string_view src = R"(
+      fn foo() -> int { return 1; }
+      fn foo_void() { }
+
+      a := 0;
+      ++(a + 1);
+      ++foo();
+      ++foo_void();
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandInvalid), 2);
+    ASSERT_EQ(script.issues->get_count(ErrorCode::UnaryOperandVoid), 1);
+  }
 }
 
 
@@ -662,4 +686,43 @@ TEST(Semantics, LoopWhile_Invalid)
 
   ASSERT_TRUE(script.issues->have_errors());
   ASSERT_EQ(script.issues->get_count(ErrorCode::ConditionNotBool), 4);
+}
+
+TEST(Semantics, LogicalOperators)
+{
+  {
+    const std::string_view src = R"(
+      a := true;
+      b := false;
+      c := a && b;
+
+      while (c) {}
+      while (a || b){ a = false; }
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_FALSE(script.issues->have_errors());
+  }
+
+  {
+    const std::string_view src = R"(
+      a := true;
+      b := a && 2;
+      c := a || "true";
+    )";
+
+    Parser parser;
+    Semantics sem;
+
+    auto script = parser.parse(src);
+    sem.process(script);
+
+    ASSERT_TRUE(script.issues->have_errors());
+    ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 2);
+  }
 }

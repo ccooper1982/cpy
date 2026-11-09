@@ -67,8 +67,7 @@ int main (int argc, char ** argv)
 
   try
   {
-    const fs::path file = argv[1];
-    script = parser.parse(file);
+    script = parser.parse(fs::path{argv[1]});
   }
   catch (const std::exception& ex)
   {
@@ -115,17 +114,17 @@ static int execute (std::span<char *> argv)
   catch (const RuntimeError& ex_run)
   {
     std::cerr << "Runtime Error: " << ex_run.what() << '\n';
-    return STATUS_USER_ERR;
+    exit_status = STATUS_USER_ERR;
   }
   catch (const std::exception& ex)
   {
     std::cerr << "Internal execution error: " << ex.what() << '\n';
-    return STATUS_INTERNAL_ERR;
+    exit_status = STATUS_INTERNAL_ERR;
   }
   catch (...)
   {
     std::cerr << "Unknown execution error\n";
-    return STATUS_INTERNAL_ERR;
+    exit_status = STATUS_INTERNAL_ERR;
   }
 
   return exit_status;

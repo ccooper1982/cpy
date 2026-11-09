@@ -7,4 +7,4 @@ fn fibonacci(n: int) -> int
     return fibonacci(n - 1) + fibonacci(n - 2);
 }
 
-exit(fibonacci(argv_int(0)));
+exit(fibonacci(arg_int(0)));

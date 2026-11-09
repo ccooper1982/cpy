@@ -1,13 +1,9 @@
 
-println (argv_str(0));
-println (argv_str(1));
-println (argv_int(2));
-println (argv_dec(3));
-println (argv_bool(4));
-println (argv_bool(5));
+i := 0;
 
-if (argv_bool(4)) {
-    println("yes");
+while (i < arg_count())
+{
+    v := "I found this: " + arg_str(i);
+    println(v);
+    ++i;
 }
-
-println(argv_int(2) == 1);

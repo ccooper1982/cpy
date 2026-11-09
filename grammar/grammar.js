@@ -53,6 +53,7 @@ export default grammar({
             field("var_decl", $.var_decl),
             field("var_assign", $.var_assign),
             field("return", $.return),
+            field("increment", $.increment_statement),
           ),
           ";"
         ),
@@ -159,38 +160,54 @@ export default grammar({
       $.parenthesized_expression,
     ),
 
-    unary_expression: $ => prec(4, seq(
-        field("op", choice("-", "!", "~")),
+    unary_expression: $ =>
+      prec.right(6, seq(
+        field("op", choice("-", "!", "~", "++", "--")),
         field("expr", $.expression)
     )),
 
     binary_expression: ($) => choice(
-        prec.left(3, seq(
+        prec.left(5, seq(
             field("lhs", $.expression),
             field("op", choice("*", "/")),
             field("rhs", $.expression),
         )),
 
-        prec.left(2, seq(
+        prec.left(4, seq(
             field("lhs", $.expression),
             field("op", choice("+", "-")),
             field("rhs", $.expression),
         )),
 
-        prec.left(1, seq(
+        prec.left(3, seq(
             field("lhs", $.expression),
             field("op", choice(">", "<", ">=", "<=")),
             field("rhs", $.expression),
         )),
 
-        prec.left(0, seq(
+        prec.left(2, seq(
             field("lhs", $.expression),
             field("op", choice("==", "!=")),
+            field("rhs", $.expression),
+        )),
+
+        prec.left(1, seq(
+            field("lhs", $.expression),
+            field("op", "&&"),
+            field("rhs", $.expression),
+        )),
+
+        prec.left(0, seq(
+            field("lhs", $.expression),
+            field("op", "||"),
             field("rhs", $.expression),
         )),
     ),
 
     parenthesized_expression: ($) =>
       seq("(", $.expression, ")"),
+
+    increment_statement: ($) =>
+        field("expr", $.unary_expression),
   },
 });

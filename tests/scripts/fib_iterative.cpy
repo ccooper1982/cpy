@@ -19,4 +19,4 @@ fn fibonacci(n: int) -> int
     return b;
 }
 
-exit(fibonacci(argv_int(0)));
+exit(fibonacci(arg_int(0)));

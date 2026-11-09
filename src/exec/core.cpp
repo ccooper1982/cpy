@@ -107,4 +107,9 @@ VarValue get_argv_bool(const RuntimeContext& ctx, const std::span<const VarValue
   throw RuntimeError{std::format("argv {} cannot be parsed as a boolean", index)};
 }
 
+VarValue get_argc(const RuntimeContext& ctx, const std::span<const VarValue>)
+{
+  return static_cast<CpyInt>(ctx.argv.size());
+}
+
 } // ns core

@@ -38,8 +38,10 @@ static BinaryOperator get_binary_operator(const std::string_view op)
   if (op == ">")  return BinaryOperator::Greater;
   if (op == "<=") return BinaryOperator::LessEqual;
   if (op == ">=") return BinaryOperator::GreaterEqual;
+  if (op == "&&") return BinaryOperator::LogicalAnd;
+  if (op == "||") return BinaryOperator::LogicalOr;
 
-  std::unreachable();
+  throw std::runtime_error{"Unhandled binary operator"};
 }
 
 static UnaryOperator get_unary_operator(const std::string_view op)
@@ -47,8 +49,10 @@ static UnaryOperator get_unary_operator(const std::string_view op)
   if (op == "!")  return UnaryOperator::Not;
   if (op == "-")  return UnaryOperator::Negate;
   if (op == "~")  return UnaryOperator::BitwiseNot;
+  if (op == "--")  return UnaryOperator::PreDecrement;
+  if (op == "++")  return UnaryOperator::PreIncrement;
 
-  std::unreachable();
+  throw std::runtime_error{"Unhandled unary operator"};
 }
 
 static void set_source_region (const TSNode& ts_node, AstNode& ast_node)
@@ -266,6 +270,7 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
   const auto var_assign = child_by_field_name(ts_statement, "var_assign");
   const auto return_ = child_by_field_name(ts_statement, "return");
   const auto loop_while = child_by_field_name(ts_statement, "loop_while");
+  const auto increment = child_by_field_name(ts_statement, "increment");
 
   NodePtr<AstNode> node;
 
@@ -289,6 +294,9 @@ NodePtr<AstNode> Parser::parse_statement (const TSNode& ts_statement)
   }
   else if(!ts_node_is_null(loop_while)) {
     node = parse_loop_while(loop_while);
+  }
+  else if(!ts_node_is_null(increment)) {
+    node = parse_expression(increment);
   }
 
   return node;
