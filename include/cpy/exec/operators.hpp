@@ -6,7 +6,6 @@
 #include <cpy/common.hpp>
 #include <cpy/exceptions.hpp>
 
-
 template<typename T>
 concept IsCpyDecimal = std::is_same_v<T, CpyDec>;
 
@@ -29,7 +28,7 @@ template<typename T1, typename T2>
 concept AreCpyDecimal = IsCpyDecimal<T1> && IsCpyDecimal<T2>;
 
 template<typename T1, typename T2>
-concept AreCpyArithmetic = AreCpyInteger<T1, T2> || AreCpyDecimal<T1, T2>;
+concept AreCpyArithmetic = IsCpyArithmetic<T1> && IsCpyArithmetic<T2> ;
 
 
 // binary //
@@ -101,20 +100,17 @@ inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, Op
     constexpr bool is_boolean = IsCpyBoolean<L> && IsCpyBoolean<R>;
     constexpr bool is_strings = IsCpyString<L> && IsCpyString<R> && (std::is_same_v<OpF, std::plus<>> || std::is_same_v<OpF, std::equal_to<>>);
 
-    // TODO allow strings here for future, the semantic analyser disallows it for now
-    if constexpr (!is_arithmetic && !is_strings && !is_boolean) {
+    if constexpr (!(is_arithmetic || is_strings || is_boolean)) {
       throw std::logic_error{"Called do_binary_operator() on unsupported type"};
     }
-    else
-    {
-      if constexpr (is_boolean) {
-        return op(val_l, val_r);
-      }
-      else if constexpr (is_arithmetic){
-        return do_binary_arithmetic(val_l, val_r, op);
-      }
-
+    else if constexpr (is_boolean) {
       return op(val_l, val_r);
+    }
+    else if constexpr (is_arithmetic) {
+      return do_binary_arithmetic(val_l, val_r, op);
+    }
+    else {
+      return op(val_l, val_r); // string
     }
   };
 
