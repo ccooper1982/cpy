@@ -232,7 +232,7 @@ ExecutionResult Executor::execute (const NodeBlock& block, const FunctionCall& c
       values.push_back(std::move(frame.value));
     }
 
-    return CoreFunctions.at(call.name).implementation(m_rt_context, values);
+    return NativeFunctions.at(call.name).implementation(m_rt_context, values);
   }
   else
   {

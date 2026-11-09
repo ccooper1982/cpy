@@ -76,7 +76,7 @@ public:
 
   bool has_core_function(const std::string_view name) const
   {
-    return CoreFunctions.contains(name);
+    return NativeFunctions.contains(name);
   }
 
   void add_variable(const std::string_view name, const VarType type, const uint32_t position);
@@ -103,7 +103,7 @@ public:
 
   size_t get_core_function_min_args(const std::string_view name) const
   {
-    return CoreFunctions.find(name)->second.min_args;
+    return NativeFunctions.find(name)->second.min_args;
   }
 
   /// Gets a resolved variable, checking the NodeBlock's scope, then checking each

@@ -42,7 +42,7 @@ const ResolvedFunction& SymbolTable::get_function(const std::string_view name) c
     return user_it->second;
   }
   else {
-   return CoreFunctions.find(name)->second.signature;
+   return NativeFunctions.find(name)->second.signature;
   }
 }
 
