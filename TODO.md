@@ -1,15 +1,5 @@
 # TODO
 
-## Comments
-```
-# single line
-/#
-multiple
-lines
-#/
-```
-
-
 ## for
 ```
 for ([init_expr] ; <condition_expr:bool> ; [iteration_expr])

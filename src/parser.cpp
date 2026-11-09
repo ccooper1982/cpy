@@ -502,14 +502,17 @@ void Parser::parse_script(const TSNode& ts_root)
     {
       const std::string_view type = ts_node_type(node) ;
 
-      if (type == "function_def") {
-        m_ast->block.add_node(parse_function_def(node));
-      }
-      else if (type == "statement") {
+      if (type == "statement") [[likely]] {
         m_ast->block.add_node(parse_statement(node));
       }
+      else if (type == "function_def") {
+        m_ast->block.add_node(parse_function_def(node));
+      }
+      else if (type == "comment") {
+        continue;
+      }
       else {
-        throw std::runtime_error{std::format("Uknown node type {}", type)};
+        throw std::runtime_error{std::format("Unknown node type {}", type)};
       }
     }
   }

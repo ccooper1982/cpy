@@ -1,10 +1,21 @@
 export default grammar({
   name: "cpy",
 
+  extras: $ => [
+    /\s/,
+    $.comment,
+  ],
+
   rules: {
+
     source_file: ($) => repeat(choice(
       $.function_def,
       $.statement,
+    )),
+
+    comment: $ => token(choice(
+      seq("#", /[^\r\n]*/),
+      seq("/#", /([^#]|#+[^#/])*#\//),
     )),
 
     function_def: ($) =>
