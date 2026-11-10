@@ -24,13 +24,13 @@ namespace core
 
 inline const std::map<std::string_view, NativeFunctionDef> NativeCoreFunctions
 {
-  create_function<core::print>("print", {}, BuiltInType::Void, ParamMode::VariadicAny),
-  create_function<core::println>("println", {}, BuiltInType::Void, ParamMode::VariadicAny),
-  create_function<core::exit>("exit", {{"status", BuiltInType::Int}},BuiltInType::Void, ParamMode::Fixed),
+  create_function<core::print>("print", {}, NativeType::Void, ParamMode::VariadicAny),
+  create_function<core::println>("println", {}, NativeType::Void, ParamMode::VariadicAny),
+  create_function<core::exit>("exit", {{"status", NativeType::Int}},NativeType::Void, ParamMode::Fixed),
   // argv
-  create_function<core::get_argc>("arg_count", {}, BuiltInType::Int, ParamMode::Fixed),
-  create_function<core::get_argv_str>("arg_str", {{"index", BuiltInType::Int}}, BuiltInType::String, ParamMode::Fixed),
-  create_function<core::get_argv_int>("arg_int", {{"index", BuiltInType::Int}}, BuiltInType::Int, ParamMode::Fixed),
-  create_function<core::get_argv_dec>("arg_dec", {{"index", BuiltInType::Int}}, BuiltInType::Decimal, ParamMode::Fixed),
-  create_function<core::get_argv_bool>("arg_bool", {{"index", BuiltInType::Int}}, BuiltInType::Bool, ParamMode::Fixed)
+  create_function<core::get_argc>("arg_count", {}, NativeType::Int, ParamMode::Fixed),
+  create_function<core::get_argv_str>("arg_str", {{"index", NativeType::Int}}, NativeType::String, ParamMode::Fixed),
+  create_function<core::get_argv_int>("arg_int", {{"index", NativeType::Int}}, NativeType::Int, ParamMode::Fixed),
+  create_function<core::get_argv_dec>("arg_dec", {{"index", NativeType::Int}}, NativeType::Decimal, ParamMode::Fixed),
+  create_function<core::get_argv_bool>("arg_bool", {{"index", NativeType::Int}}, NativeType::Bool, ParamMode::Fixed)
 };

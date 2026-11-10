@@ -17,13 +17,13 @@
 
 inline static VarValue value_from_type (const VarType type)
 {
-  if (!type.is_type<BuiltInType>()) {
+  if (!type.is_type<NativeType>()) {
     throw std::runtime_error{"Unsupported VarType"};
   }
 
-  switch (*type.value_as<BuiltInType>())
+  switch (*type.value_as<NativeType>())
   {
-    using enum BuiltInType;
+    using enum NativeType;
 
     case Int:
       return int64_t{};
@@ -36,7 +36,7 @@ inline static VarValue value_from_type (const VarType type)
     case Proc:
       return Process{};
     default:
-      throw std::runtime_error{"BuiltInType is invalid"};
+      throw std::runtime_error{"NativeType is invalid"};
       break;
   }
 }

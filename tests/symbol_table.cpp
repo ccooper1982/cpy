@@ -32,16 +32,16 @@ TEST(SymbolTable, FunctionDef)
   const auto& resolved_foo = sym_table.get_function("foo");
   ASSERT_EQ(resolved_foo.params.size(), 1);
   ASSERT_EQ(resolved_foo.params[0].name, "a");
-  ASSERT_EQ(resolved_foo.params[0].type, VarType{BuiltInType::Int});
-  ASSERT_EQ(resolved_foo.return_type, VarType{BuiltInType::Void});
+  ASSERT_EQ(resolved_foo.params[0].type, VarType{NativeType::Int});
+  ASSERT_EQ(resolved_foo.return_type, VarType{NativeType::Void});
 
   const auto& resolved_bar = sym_table.get_function("bar");
   ASSERT_EQ(resolved_bar.params.size(), 2);
   ASSERT_EQ(resolved_bar.params[0].name, "a");
   ASSERT_EQ(resolved_bar.params[1].name, "b");
-  ASSERT_EQ(resolved_bar.params[0].type, VarType{BuiltInType::String});
-  ASSERT_EQ(resolved_bar.params[1].type, VarType{BuiltInType::Decimal});
-  ASSERT_EQ(resolved_bar.return_type, VarType{BuiltInType::Bool});
+  ASSERT_EQ(resolved_bar.params[0].type, VarType{NativeType::String});
+  ASSERT_EQ(resolved_bar.params[1].type, VarType{NativeType::Decimal});
+  ASSERT_EQ(resolved_bar.return_type, VarType{NativeType::Bool});
 }
 
 
@@ -68,10 +68,10 @@ TEST(SymbolTable, VarDecl)
     ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
     ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
 
-    ASSERT_EQ(sym_table.get_function("foo").return_type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_function("foo").return_type, VarType{NativeType::Int});
 
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
-    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
+    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{NativeType::Int});
   }
 
   {
@@ -126,7 +126,7 @@ TEST(SymbolTable, VarDecl)
     ASSERT_FALSE(sym_table.scope_has_variable("b", script.ast->block));
     ASSERT_FALSE(sym_table.scope_has_variable("c", script.ast->block));
 
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsVoid), 1);
   }
@@ -153,8 +153,8 @@ TEST(SymbolTable, VarDecl_Operation)
   ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
   ASSERT_FALSE(sym_table.scope_has_variable("c", script.ast->block));
 
-  ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
-  ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::Bool});
+  ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
+  ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{NativeType::Bool});
 }
 
 
@@ -202,7 +202,7 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
     ASSERT_TRUE(sym_table.has_function("foo1"));
     ASSERT_TRUE(sym_table.has_function("foo2"));
     ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::String});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::String});
   }
 
   {
@@ -226,7 +226,7 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
     ASSERT_TRUE(sym_table.has_function("foo2"));
     ASSERT_TRUE(sym_table.has_function("foo3"));
     ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
   }
 
   {
@@ -250,7 +250,7 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
     ASSERT_TRUE(sym_table.has_function("foo2"));
     ASSERT_TRUE(sym_table.has_function("foo3"));
     ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
   }
 
   {
@@ -276,7 +276,7 @@ TEST(SymbolTable, VarDecl_NestedFuncCall)
     ASSERT_TRUE(sym_table.has_function("foo3"));
     ASSERT_TRUE(sym_table.has_function("foo4"));
     ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
   }
 }
 
@@ -308,7 +308,7 @@ TEST(SymbolTable, VarDecl_BinExpr)
   ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
   ASSERT_FALSE(sym_table.scope_has_variable("b", script.ast->block));
 
-  ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
+  ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
   ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
 }
 
@@ -433,11 +433,11 @@ TEST(SymbolTable, VariableDecl_ScopeIf)
     const auto& first_if = dynamic_cast<ConditionIf&>(*root_block.nodes()[2]);
     const auto& second_if = dynamic_cast<ConditionIf&>(*first_if.if_.body.nodes()[1]);
 
-    ASSERT_EQ(sem.symbol_table().get_variable("a", root_block).type, BuiltInType::Bool);
-    ASSERT_EQ(sem.symbol_table().get_variable("b", root_block).type, BuiltInType::Int);
-    ASSERT_EQ(sem.symbol_table().get_variable("c", root_block).type, BuiltInType::String);
-    ASSERT_EQ(sem.symbol_table().get_variable("c", first_if.if_.body).type, BuiltInType::Int);
-    ASSERT_EQ(sem.symbol_table().get_variable("a", second_if.if_.body).type, BuiltInType::String);
+    ASSERT_EQ(sem.symbol_table().get_variable("a", root_block).type, NativeType::Bool);
+    ASSERT_EQ(sem.symbol_table().get_variable("b", root_block).type, NativeType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", root_block).type, NativeType::String);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", first_if.if_.body).type, NativeType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("a", second_if.if_.body).type, NativeType::String);
   }
 }
 
@@ -512,11 +512,11 @@ TEST(SymbolTable, VariableDecl_ScopeIfElseIf)
     ASSERT_EQ(second_if.else_if_count(), 1);
     ASSERT_EQ(second_if.else_if[0].body.node_count(), 1); // c: str
 
-    ASSERT_EQ(sem.symbol_table().get_variable("a", root).type, BuiltInType::Bool);
-    ASSERT_EQ(sem.symbol_table().get_variable("b", first_if.if_.body).type, BuiltInType::Int);
-    ASSERT_EQ(sem.symbol_table().get_variable("c", first_if.if_.body).type, BuiltInType::Bool);
-    ASSERT_EQ(sem.symbol_table().get_variable("c", second_if.if_.body).type, BuiltInType::Int);
-    ASSERT_EQ(sem.symbol_table().get_variable("c", second_if.else_if[0].body).type, BuiltInType::String);
+    ASSERT_EQ(sem.symbol_table().get_variable("a", root).type, NativeType::Bool);
+    ASSERT_EQ(sem.symbol_table().get_variable("b", first_if.if_.body).type, NativeType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", first_if.if_.body).type, NativeType::Bool);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", second_if.if_.body).type, NativeType::Int);
+    ASSERT_EQ(sem.symbol_table().get_variable("c", second_if.else_if[0].body).type, NativeType::String);
   }
 }
 
@@ -563,7 +563,7 @@ TEST(SymbolTable, FuncCall_VarRef)
     ASSERT_TRUE(sym_table.has_function("foo1"));
     ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
 
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::String});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgType), 1);
     ASSERT_EQ(script.issues->get_count(ErrorCode::VariableUnknown), 1);
   }
@@ -590,8 +590,8 @@ TEST(SymbolTable, FuncCall_VarRef)
     ASSERT_TRUE(sym_table.scope_has_variable("a", script.ast->block));
     ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
 
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
-    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::String});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
+    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{NativeType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::FunctionCallArgType), 1);
   }
 
@@ -623,8 +623,8 @@ TEST(SymbolTable, FuncCall_VarRef)
     ASSERT_TRUE(sym_table.scope_has_variable("b", script.ast->block));
     ASSERT_TRUE(script.issues->have_errors());
 
-    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{BuiltInType::Int});
-    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{BuiltInType::String});
+    ASSERT_EQ(sym_table.get_variable("a", script.ast->block).type, VarType{NativeType::Int});
+    ASSERT_EQ(sym_table.get_variable("b", script.ast->block).type, VarType{NativeType::String});
     ASSERT_EQ(script.issues->get_count(ErrorCode::BinaryOperandsInvalid), 1);
   }
 }
@@ -683,8 +683,8 @@ TEST(SymbolTable, FuncCall_VarAssign)
     ASSERT_TRUE(sym_table.scope_has_variable("a", root));
     ASSERT_TRUE(sym_table.scope_has_variable("a", if_));
 
-    ASSERT_EQ(sym_table.get_variable("a", root).type, BuiltInType::Int);
-    ASSERT_EQ(sym_table.get_variable("a", if_).type, BuiltInType::Bool);
+    ASSERT_EQ(sym_table.get_variable("a", root).type, NativeType::Int);
+    ASSERT_EQ(sym_table.get_variable("a", if_).type, NativeType::Bool);
 
     const auto& assign_root = dynamic_cast<const VariableAssign&>(*root.nodes()[2]);
     ASSERT_TRUE(assign_root.expr->is_expr_type(ExpressionType::Int));

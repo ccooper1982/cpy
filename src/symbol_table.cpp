@@ -27,10 +27,10 @@ bool SymbolTable::has_visible_variable(const std::string_view name, const NodeBl
   return resolved != nullptr && resolved->position < position;
 }
 
-std::optional<BuiltInType> SymbolTable::get_type(const std::string_view type_name) const
+std::optional<NativeType> SymbolTable::get_type(const std::string_view type_name) const
 {
-  const auto it = BuiltInTypes.find(type_name) ;
-  if (it == rg::end(BuiltInTypes))
+  const auto it = NativeTypes.find(type_name) ;
+  if (it == rg::end(NativeTypes))
    return std::nullopt;
 
   return it->second;

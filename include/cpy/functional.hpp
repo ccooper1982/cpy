@@ -29,7 +29,7 @@ using VarName = std::string_view;
 using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process>;
 
 
-enum class BuiltInType
+enum class NativeType
 {
   Unset,
   Int,
@@ -40,7 +40,7 @@ enum class BuiltInType
   Proc
 };
 
-inline constexpr const auto unresolved_type = BuiltInType::Unset;
+inline constexpr const auto unresolved_type = NativeType::Unset;
 
 
 struct UserType
@@ -50,10 +50,10 @@ struct UserType
 
 struct VarType
 {
-  VarType() : type (BuiltInType::Unset)
+  VarType() : type (NativeType::Unset)
   {}
 
-  VarType(const BuiltInType t) : type (t)
+  VarType(const NativeType t) : type (t)
   {}
 
   const auto& value() const
@@ -70,23 +70,23 @@ struct VarType
   }
 
   template<typename T>
-  bool is_type() const requires(std::is_same_v<T, BuiltInType>)
+  bool is_type() const requires(std::is_same_v<T, NativeType>)
   {
     return std::holds_alternative<T>(type);
   }
 
-  bool is_type(const BuiltInType t) const
+  bool is_type(const NativeType t) const
   {
-    return is_type<BuiltInType>() && *(value_as<BuiltInType>()) == t;
+    return is_type<NativeType>() && *(value_as<NativeType>()) == t;
   }
 
   explicit operator bool() const
   {
-    return !is_type(BuiltInType::Unset);
+    return !is_type(NativeType::Unset);
   }
 
 private:
-  std::variant<BuiltInType, UserType> type;
+  std::variant<NativeType, UserType> type;
 };
 
 
@@ -102,11 +102,11 @@ inline bool operator==(const VarType& a, const VarType& b)
 }
 
 
-inline std::string_view to_string(const BuiltInType t)
+inline std::string_view to_string(const NativeType t)
 {
   switch (t)
   {
-    using enum BuiltInType;
+    using enum NativeType;
 
     case Int:
       return "int";
@@ -128,8 +128,8 @@ inline std::string_view to_string(const BuiltInType t)
 
 inline std::string_view to_string(const VarType& t)
 {
-  if (t.is_type<BuiltInType>()) {
-    return to_string(std::get<BuiltInType>(t.value()));
+  if (t.is_type<NativeType>()) {
+    return to_string(std::get<NativeType>(t.value()));
   }
   else {
      throw std::runtime_error{"UserType not implemented"};
@@ -182,7 +182,7 @@ struct NativeFunctionDef
 
 
 template<auto F>
-auto create_function(std::string_view name, std::initializer_list<ResolvedSymbol> params, BuiltInType return_type, ParamMode param_mode, size_t min_args = 0)
+auto create_function(std::string_view name, std::initializer_list<ResolvedSymbol> params, NativeType return_type, ParamMode param_mode, size_t min_args = 0)
 {
   using FunctionEntry = std::pair<std::string_view, NativeFunctionDef>;
 

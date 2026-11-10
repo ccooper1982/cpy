@@ -50,12 +50,12 @@ struct Scope
 /// exit_scope() pops from the stack.
 class SymbolTable
 {
-  inline static const std::map<const std::string_view, const BuiltInType> BuiltInTypes = {
-    {"int",   BuiltInType::Int},
-    {"dec",   BuiltInType::Decimal},
-    {"bool",  BuiltInType::Bool},
-    {"str",   BuiltInType::String},
-    {"void",  BuiltInType::Void}
+  inline static const std::map<const std::string_view, const NativeType> NativeTypes = {
+    {"int",   NativeType::Int},
+    {"dec",   NativeType::Decimal},
+    {"bool",  NativeType::Bool},
+    {"str",   NativeType::String},
+    {"void",  NativeType::Void}
   };
 
 public:
@@ -98,7 +98,7 @@ public:
   // Returns false if not found.
   bool has_visible_variable(const std::string_view name, const NodeBlock& block, const uint32_t position) const;
 
-  std::optional<BuiltInType> get_type(const std::string_view type_name) const;
+  std::optional<NativeType> get_type(const std::string_view type_name) const;
 
   const ResolvedFunction& get_function(const std::string_view name) const;
 
