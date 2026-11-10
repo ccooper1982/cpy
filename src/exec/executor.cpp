@@ -222,7 +222,7 @@ ExecutionResult Executor::execute (const NodeBlock& block, const FunctionCall& c
 {
   const auto& def = m_sym_table.get_function(call.name);
 
-  if (m_sym_table.has_core_function(call.name))
+  if (m_sym_table.has_native_function(call.name))
   {
     std::vector<VarValue> values;
 
@@ -232,7 +232,7 @@ ExecutionResult Executor::execute (const NodeBlock& block, const FunctionCall& c
       values.push_back(std::move(frame.value));
     }
 
-    return NativeFunctions.at(call.name).implementation(m_rt_context, values);
+    return m_sym_table.get_native_function(call.name).implementation(m_rt_context, values);
   }
   else
   {
@@ -287,8 +287,8 @@ void Executor::pop_stack ()
     m_stack.pop();
   }
   else {
-    // this shouldn't happen, but if so, we're not managing the stack correctly
-    throw std::logic_error{"Executor stack called on empty stack"};
+    // not managing the stack correctly
+    throw std::logic_error{"Executor:;pop_stack() called on empty stack"};
   }
 }
 

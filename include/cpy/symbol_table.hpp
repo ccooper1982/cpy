@@ -11,6 +11,7 @@
 
 #include <cpy/ast/ast.hpp>
 #include <cpy/exec/core.hpp>
+#include <cpy/exec/proc.hpp>
 #include <cpy/functional.hpp>
 
 
@@ -74,9 +75,9 @@ public:
     return m_resolved_functions.contains(name);
   }
 
-  bool has_core_function(const std::string_view name) const
+  bool has_native_function(const std::string_view name) const
   {
-    return NativeFunctions.contains(name);
+    return NativeCoreFunctions.contains(name) || NativeProcFunctions.contains(name);
   }
 
   void add_variable(const std::string_view name, const VarType type, const uint32_t position);
@@ -101,9 +102,26 @@ public:
 
   const ResolvedFunction& get_function(const std::string_view name) const;
 
-  size_t get_core_function_min_args(const std::string_view name) const
+  size_t get_native_function_min_args(const std::string_view name) const
   {
-    return NativeFunctions.find(name)->second.min_args;
+    return get_native_function(name).min_args;
+  }
+
+  const NativeFunctionDef& get_native_function(const std::string_view name) const
+  {
+    auto get_native = [&name](const std::map<std::string_view, NativeFunctionDef>& natives) -> auto
+    {
+      return natives.find(name);
+    };
+
+    if (auto it = get_native(NativeCoreFunctions); it != rg::end(NativeCoreFunctions)) {
+      return it->second;
+    }
+    else if (it = get_native(NativeProcFunctions); it != rg::end(NativeProcFunctions)) {
+      return it->second;
+    }
+
+    throw std::runtime_error{std::format("get_function() called unexpectedly with: {}", name)};
   }
 
   /// Gets a resolved variable, checking the NodeBlock's scope, then checking each
@@ -122,6 +140,8 @@ public:
 
 private:
   const ResolvedSymbol * get_resolved_variable(const std::string_view name, const NodeBlock * block, const bool visit_parents) const;
+
+
 
 private:
   std::map<std::string_view, const ResolvedFunction> m_resolved_functions;

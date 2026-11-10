@@ -3,7 +3,7 @@
 #include <cmath>
 #include <functional>
 #include <variant>
-#include <cpy/common.hpp>
+#include <cpy/functional.hpp>
 #include <cpy/exceptions.hpp>
 
 template<typename T>
@@ -99,8 +99,9 @@ inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, Op
     constexpr bool is_arithmetic = AreCpyArithmetic<L,R>;
     constexpr bool is_boolean = IsCpyBoolean<L> && IsCpyBoolean<R>;
     constexpr bool is_strings = IsCpyString<L> && IsCpyString<R> && (std::is_same_v<OpF, std::plus<>> || std::is_same_v<OpF, std::equal_to<>>);
+    constexpr bool is_proc = std::is_same_v<L, Process> && std::is_same_v<R, Process> && std::is_same_v<OpF, std::equal_to<>>;
 
-    if constexpr (!(is_arithmetic || is_strings || is_boolean)) {
+    if constexpr (!(is_arithmetic || is_strings || is_boolean || is_proc)) {
       throw std::logic_error{"Called do_binary_operator() on unsupported type"};
     }
     else if constexpr (is_boolean) {
@@ -110,7 +111,7 @@ inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, Op
       return do_binary_arithmetic(val_l, val_r, op);
     }
     else {
-      return op(val_l, val_r); // string
+      return op(val_l, val_r);
     }
   };
 
@@ -157,24 +158,28 @@ inline VarValue operator>=(const VarValue& lhs, const VarValue& rhs)
   return do_binary_operator(lhs, rhs, std::greater_equal<>{});
 }
 
-inline VarValue operator==(const VarValue& lhs, const VarValue& rhs)
+inline bool operator==(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::equal_to<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::equal_to<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator!=(const VarValue& lhs, const VarValue& rhs)
+inline bool operator!=(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::not_equal_to<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::not_equal_to<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator&&(const VarValue& lhs, const VarValue& rhs)
+inline bool operator&&(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::logical_and<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::logical_and<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator||(const VarValue& lhs, const VarValue& rhs)
+inline bool operator||(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::logical_or<>{});
+  const auto result =  do_binary_operator(lhs, rhs, std::logical_or<>{});
+  return std::get<CpyBool>(result);
 }
 
 // unary //

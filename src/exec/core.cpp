@@ -20,7 +20,10 @@ VarValue print(const RuntimeContext&, const std::span<const VarValue> args)
       {
         using T = std::remove_cvref_t<decltype(val)>;
 
-        if constexpr (!std::is_same_v<T, std::monostate>) {
+        if constexpr (std::is_same_v<T, Process>) {
+          std::print("Executable: {} , Args: {}", val.executable, val.args.size()); // TODO lazy
+        }
+        else if constexpr (!std::is_same_v<T, std::monostate>) {
           std::print("{}", val);
         }
       },

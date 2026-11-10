@@ -4,7 +4,138 @@
 #include <vector>
 
 #include <cpy/common.hpp>
-#include <cpy/ast/ast.hpp>
+
+struct FunctionDef; // forward decl
+
+struct Process
+{
+  std::string executable;
+  std::vector<std::string> args{};
+
+  bool operator==(const Process& p) const
+  {
+    // TODO incomplete
+    return p.executable == executable && p.args.size() ==  args.size();
+  };
+};
+
+
+using CpyInt = int64_t;
+using CpyDec = double;
+using CpyBool = bool;
+using CpyString = std::string;
+
+using VarName = std::string_view;
+using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process>;
+
+
+enum class BuiltInType
+{
+  Unset,
+  Int,
+  Decimal,
+  Bool,
+  String,
+  Void,
+  Proc
+};
+
+inline constexpr const auto unresolved_type = BuiltInType::Unset;
+
+
+struct UserType
+{
+  std::string_view name;
+};
+
+struct VarType
+{
+  VarType() : type (BuiltInType::Unset)
+  {}
+
+  VarType(const BuiltInType t) : type (t)
+  {}
+
+  const auto& value() const
+  {
+    return type;
+  }
+
+  template<typename T>
+  const std::optional<T> value_as() const
+  {
+    if (const auto param_type = std::get_if<T>(&type); param_type)
+      return *param_type;
+    return std::nullopt;
+  }
+
+  template<typename T>
+  bool is_type() const requires(std::is_same_v<T, BuiltInType>)
+  {
+    return std::holds_alternative<T>(type);
+  }
+
+  bool is_type(const BuiltInType t) const
+  {
+    return is_type<BuiltInType>() && *(value_as<BuiltInType>()) == t;
+  }
+
+  explicit operator bool() const
+  {
+    return !is_type(BuiltInType::Unset);
+  }
+
+private:
+  std::variant<BuiltInType, UserType> type;
+};
+
+
+
+inline bool operator==([[maybe_unused]] const UserType& a, [[maybe_unused]] const UserType& b)
+{
+  throw std::runtime_error{"Comparing unsupported UserType"};
+}
+
+inline bool operator==(const VarType& a, const VarType& b)
+{
+  return a.value() == b.value();
+}
+
+
+inline std::string_view to_string(const BuiltInType t)
+{
+  switch (t)
+  {
+    using enum BuiltInType;
+
+    case Int:
+      return "int";
+    case Decimal:
+      return "dec";
+    case Bool:
+      return "bool";
+    case String:
+      return "str";
+    case Void:
+      return "void";
+    case Proc:
+      return "Process";
+    default:
+      return "Unknown";
+  }
+}
+
+
+inline std::string_view to_string(const VarType& t)
+{
+  if (t.is_type<BuiltInType>()) {
+    return to_string(std::get<BuiltInType>(t.value()));
+  }
+  else {
+     throw std::runtime_error{"UserType not implemented"};
+  }
+}
+
 
 
 struct ResolvedSymbol
@@ -21,6 +152,7 @@ enum class ParamMode
   VariadicAny
 };
 
+
 struct ResolvedFunction
 {
   std::vector<ResolvedSymbol> params;
@@ -36,3 +168,25 @@ struct RuntimeContext
 {
   std::vector<std::string> argv;
 };
+
+
+
+using NativeFunction = VarValue (*)(const RuntimeContext&, const std::span<const VarValue>);
+
+struct NativeFunctionDef
+{
+  ResolvedFunction signature;
+  NativeFunction implementation;
+  size_t min_args{};
+};
+
+
+template<auto F>
+auto create_function(std::string_view name, std::initializer_list<ResolvedSymbol> params, BuiltInType return_type, ParamMode param_mode, size_t min_args = 0)
+{
+  using FunctionEntry = std::pair<std::string_view, NativeFunctionDef>;
+
+  ResolvedFunction func {std::vector<ResolvedSymbol>{params}, return_type, param_mode};
+
+  return FunctionEntry {name, {std::move(func), F, min_args}};
+}

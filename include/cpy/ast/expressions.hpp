@@ -2,6 +2,7 @@
 
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/common.hpp>
+#include <cpy/functional.hpp>
 #include <memory>
 #include <vector>
 

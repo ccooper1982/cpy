@@ -1,4 +1,5 @@
 #include <cpy/symbol_table.hpp>
+#include <stdexcept>
 
 
 void SymbolTable::add_function (const FunctionDef& def, std::vector<ResolvedSymbol> params, VarType return_type)
@@ -38,11 +39,12 @@ std::optional<BuiltInType> SymbolTable::get_type(const std::string_view type_nam
 const ResolvedFunction& SymbolTable::get_function(const std::string_view name) const
 {
   const auto& user_it = m_resolved_functions.find(name);
+
   if (user_it != m_resolved_functions.cend()) {
     return user_it->second;
   }
   else {
-   return NativeFunctions.find(name)->second.signature;
+    return get_native_function(name).signature;
   }
 }
 

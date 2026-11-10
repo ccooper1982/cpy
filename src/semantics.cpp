@@ -125,7 +125,7 @@ void Semantics::process_function_signatures(Context& ctx)
       return;
     }
 
-    if (m_symbol_table.has_core_function(def.name))
+    if (m_symbol_table.has_native_function(def.name))
     {
       issue::func_core_exists(ctx.issues, def, def.name);
       return;
@@ -234,9 +234,9 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_type;
   }
 
-  const bool is_core_function = m_symbol_table.has_core_function(call.name);
+  const bool is_native_function = m_symbol_table.has_native_function(call.name);
 
-  if (!m_symbol_table.has_function(call.name) && !is_core_function)
+  if (!m_symbol_table.has_function(call.name) && !is_native_function)
   {
     issue::func_not_exist(ctx.issues, call, call.name);
     return unresolved_type;
@@ -246,9 +246,9 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   const bool is_variadic = resolved_func.param_mode == ParamMode::VariadicAny;
   const auto supplied_arg_count = call.args.size();
 
-  if (is_core_function)
+  if (is_native_function)
   {
-    if (!is_variadic && supplied_arg_count < m_symbol_table.get_core_function_min_args(call.name))
+    if (is_variadic && supplied_arg_count < m_symbol_table.get_native_function_min_args(call.name))
     {
       issue::func_arg_count(ctx.issues, call);
       return unresolved_type;

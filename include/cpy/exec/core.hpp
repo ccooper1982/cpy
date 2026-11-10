@@ -22,27 +22,7 @@ namespace core
 }
 
 
-using NativeFunction = VarValue (*)(const RuntimeContext&, const std::span<const VarValue>);
-
-struct NativeFunctionDef
-{
-  ResolvedFunction signature;
-  NativeFunction implementation;
-  size_t min_args{};
-};
-
-
-template<auto F>
-auto create_function(std::string_view name, std::initializer_list<ResolvedSymbol> params, BuiltInType return_type, ParamMode param_mode)
-{
-  using FunctionEntry = std::pair<std::string_view, NativeFunctionDef>;
-
-  ResolvedFunction func {std::vector<ResolvedSymbol>{params}, return_type, param_mode};
-
-  return FunctionEntry {name, {std::move(func), F}};
-}
-
-inline const std::map<std::string_view, NativeFunctionDef> NativeFunctions
+inline const std::map<std::string_view, NativeFunctionDef> NativeCoreFunctions
 {
   create_function<core::print>("print", {}, BuiltInType::Void, ParamMode::VariadicAny),
   create_function<core::println>("println", {}, BuiltInType::Void, ParamMode::VariadicAny),
