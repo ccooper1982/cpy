@@ -172,43 +172,49 @@ export default grammar({
     ),
 
     unary_expression: $ =>
-      prec.right(6, seq(
+      prec.right(10, seq(
         field("op", choice("-", "!", "~", "++", "--")),
         field("expr", $.expression)
     )),
 
     binary_expression: ($) => choice(
-        prec.left(5, seq(
+        prec.left(8, seq(
             field("lhs", $.expression),
             field("op", choice("*", "/")),
             field("rhs", $.expression),
         )),
 
-        prec.left(4, seq(
+        prec.left(7, seq(
             field("lhs", $.expression),
             field("op", choice("+", "-")),
             field("rhs", $.expression),
         )),
 
-        prec.left(3, seq(
+        prec.left(6, seq(
             field("lhs", $.expression),
             field("op", choice(">", "<", ">=", "<=")),
             field("rhs", $.expression),
         )),
 
-        prec.left(2, seq(
+        prec.left(5, seq(
             field("lhs", $.expression),
             field("op", choice("==", "!=")),
             field("rhs", $.expression),
         )),
 
-        prec.left(1, seq(
+        prec.left(4, seq(
+            field("lhs", $.expression),
+            field("op", "|"),
+            field("rhs", $.expression),
+        )),
+
+        prec.left(3, seq(
             field("lhs", $.expression),
             field("op", "&&"),
             field("rhs", $.expression),
         )),
 
-        prec.left(0, seq(
+        prec.left(2, seq(
             field("lhs", $.expression),
             field("op", "||"),
             field("rhs", $.expression),

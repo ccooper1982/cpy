@@ -40,6 +40,7 @@ static BinaryOperator get_binary_operator(const std::string_view op)
   if (op == ">=") return BinaryOperator::GreaterEqual;
   if (op == "&&") return BinaryOperator::LogicalAnd;
   if (op == "||") return BinaryOperator::LogicalOr;
+  if (op == "|") return BinaryOperator::Pipe;
 
   throw std::runtime_error{"Unhandled binary operator"};
 }

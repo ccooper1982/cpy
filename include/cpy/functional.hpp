@@ -12,13 +12,15 @@ struct Process
   std::string executable;
   std::vector<std::string> args{};
 
-  bool operator==(const Process& p) const
-  {
-    // TODO incomplete
-    return p.executable == executable && p.args.size() ==  args.size();
-  };
+  bool operator==(const Process& p) const = default;
 };
 
+struct Pipeline
+{
+    std::vector<Process> processes;
+
+    bool operator==(const Pipeline&) const = default;
+};
 
 using CpyInt = int64_t;
 using CpyDec = double;
@@ -26,7 +28,7 @@ using CpyBool = bool;
 using CpyString = std::string;
 
 using VarName = std::string_view;
-using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process>;
+using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process, Pipeline>;
 
 
 enum class NativeType
@@ -37,7 +39,8 @@ enum class NativeType
   Bool,
   String,
   Void,
-  Proc
+  Process,
+  Pipeline
 };
 
 inline constexpr const auto unresolved_type = NativeType::Unset;
@@ -118,10 +121,12 @@ inline std::string_view to_string(const NativeType t)
       return "str";
     case Void:
       return "void";
-    case Proc:
+    case Process:
       return "Process";
-    default:
-      return "Unknown";
+    case Pipeline:
+      return "Pipeline";
+    case Unset:
+      return "Unset";
   }
 }
 

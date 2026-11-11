@@ -20,7 +20,8 @@ enum class BinaryOperator
   LessEqual,
   GreaterEqual,
   LogicalAnd,
-  LogicalOr
+  LogicalOr,
+  Pipe,
 };
 
 enum class UnaryOperator
@@ -433,18 +434,19 @@ inline std::string_view to_string(const BinaryOperator op)
 {
   switch (op)
   {
-    case BinaryOperator::Add:         return "+";
-    case BinaryOperator::Subtract:    return "-";
-    case BinaryOperator::Multiply:    return "*";
-    case BinaryOperator::Divide:      return "/";
-    case BinaryOperator::Equal:       return "==";
-    case BinaryOperator::NotEqual:    return "!=";
-    case BinaryOperator::Less:        return "<";
-    case BinaryOperator::Greater:     return ">";
-    case BinaryOperator::LessEqual:   return "<=";
+    case BinaryOperator::Add:           return "+";
+    case BinaryOperator::Subtract:      return "-";
+    case BinaryOperator::Multiply:      return "*";
+    case BinaryOperator::Divide:        return "/";
+    case BinaryOperator::Equal:         return "==";
+    case BinaryOperator::NotEqual:      return "!=";
+    case BinaryOperator::Less:          return "<";
+    case BinaryOperator::Greater:       return ">";
+    case BinaryOperator::LessEqual:     return "<=";
     case BinaryOperator::GreaterEqual:  return ">=";
     case BinaryOperator::LogicalAnd:    return "&&";
     case BinaryOperator::LogicalOr:     return "||";
+    case BinaryOperator::Pipe:          return "|";
   }
 }
 

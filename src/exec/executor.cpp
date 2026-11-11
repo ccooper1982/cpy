@@ -1,14 +1,14 @@
-#include "cpy/ast/ast.hpp"
-#include "cpy/ast/expressions.hpp"
-#include "cpy/common.hpp"
-#include "cpy/exec/operators.hpp"
+#include "cpy/functional.hpp"
 #include <algorithm>
-#include <cpy/exec/executor.hpp>
-#include <functional>
 #include <ranges>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include <cpy/ast/ast.hpp>
+#include <cpy/exec/executor.hpp>
+#include <cpy/ast/expressions.hpp>
+#include <cpy/exec/operators.hpp>
 
 
 static VarValue value_from_literal_expr(const Expression& expr)
@@ -365,5 +365,7 @@ VarValue Executor::apply_operator(const NodeBlock& block, const Expression& lhs,
       return lhs_val && rhs_val;
     case LogicalOr:
       return lhs_val || rhs_val;
+    case Pipe:
+      return lhs_val | rhs_val;
   }
 }

@@ -1,4 +1,5 @@
 #include "cpy/ast/ast_node.hpp"
+#include "cpy/functional.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
@@ -493,7 +494,7 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
   if (left_type == Void || right_type == Void) {
     issue::binary_operands_void(ctx.issues, expr);
   }
-  else if (left_type != right_type) {
+  else if (expr.op != Pipe && left_type != right_type) {
     issue::binary_operands_invalid(ctx.issues, expr);
   }
   else
@@ -527,6 +528,11 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
         valid = left_type == Bool;
         result_type = Bool;
         break;
+
+      case Pipe:
+        valid = (left_type == Process || left_type == Pipeline) &&
+                (right_type == Process || right_type == Pipeline);
+        result_type = Pipeline;
     }
 
     if (!valid) {

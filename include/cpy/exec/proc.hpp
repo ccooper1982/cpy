@@ -26,5 +26,5 @@ inline VarValue create (const RuntimeContext&, const std::span<const VarValue> a
 
 inline const std::map<std::string_view, NativeFunctionDef> NativeProcFunctions
 {
-  create_function<proc::create>("proc", {}, NativeType::Proc, ParamMode::VariadicAny, 1)
+  create_function<proc::create>("proc", {}, NativeType::Process, ParamMode::VariadicAny, 1)
 };
