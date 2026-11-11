@@ -126,29 +126,6 @@ inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, Op
   return std::visit(handle, lhs, rhs);
 }
 
-
-// inline VarValue do_pipes_operator (const VarValue& lhs, const VarValue& rhs)
-// {
-//   auto handle = [&](const auto& val_l, const auto& val_r) -> VarValue
-//   {
-//     using L = std::decay_t<decltype(val_l)>;
-//     using R = std::decay_t<decltype(val_r)>;
-//
-//     if constexpr (AreSame<L,R,Process>)
-//     {
-//       Pipeline pipe;
-//       pipe.processes.emplace_back(val_l);
-//       pipe.processes.emplace_back(val_r);
-//       return pipe;
-//     }
-//     else {
-//       throw std::logic_error{"Called do_pipes_operator() on unsupported type"};
-//     }
-//   };
-//
-//   return std::visit(handle, lhs, rhs);
-// }
-
 inline VarValue operator+(const VarValue& lhs, const VarValue& rhs)
 {
   return do_binary_operator(lhs, rhs, std::plus<>{});
@@ -253,7 +230,7 @@ inline VarValue operator|(const VarValue& lhs, const VarValue& rhs)
     },
     [&](const auto&, const auto&) -> VarValue
     {
-      throw std::logic_error{"Called do_pipes_operator() on unsupported type "};
+      throw std::logic_error{"Called do_pipes_operator() on unsupported type"};
     }
   };
 
