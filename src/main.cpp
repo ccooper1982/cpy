@@ -5,11 +5,13 @@
 #include <cpy/parser.hpp>
 #include <cpy/modules.hpp>
 #include <cpy/semantics.hpp>
+
 #include <exception>
 #include <filesystem>
 #include <iostream>
 #include <string_view>
 
+#include <unistd.h>
 
 static Parser parser;
 static Script script;
@@ -21,6 +23,12 @@ static int execute (std::span<char *> argv);
 
 static bool startup_valid(const int argc, char **& argv)
 {
+  if (geteuid() == 0)
+  {
+    std::cerr << "You may regret this, so it's currently disallowed\n";
+    return false;
+  }
+
   if (argc < 2)
   {
     std::cerr << "No input source file:\n";
