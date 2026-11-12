@@ -22,13 +22,21 @@ struct Pipeline
     bool operator==(const Pipeline&) const = default;
 };
 
+struct ExecResult
+{
+  std::string stdout;
+  int exit_status{};
+
+  bool operator==(const ExecResult&) const = default;
+};
+
 using CpyInt = int64_t;
 using CpyDec = double;
 using CpyBool = bool;
 using CpyString = std::string;
 
 using VarName = std::string_view;
-using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process, Pipeline>;
+using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process, Pipeline, ExecResult>;
 
 
 enum class NativeType
@@ -40,7 +48,8 @@ enum class NativeType
   String,
   Void,
   Process,
-  Pipeline
+  Pipeline,
+  ExecResult
 };
 
 inline constexpr const auto unresolved_type = NativeType::Unset;
@@ -125,6 +134,8 @@ inline std::string_view to_string(const NativeType t)
       return "Process";
     case Pipeline:
       return "Pipeline";
+    case ExecResult:
+      return "ExecResult";
     case Unset:
       return "Unset";
   }

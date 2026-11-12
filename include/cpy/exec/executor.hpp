@@ -37,6 +37,8 @@ inline static VarValue value_from_type (const VarType type)
       return ::Process{};
     case Pipeline:
       return ::Pipeline{};
+    case ExecResult:
+      return ::ExecResult{};
     default:
       throw std::runtime_error{"NativeType is invalid"};
       break;

@@ -19,6 +19,7 @@ gtest_main = dependency('gtest_main')
 
 cpy_sources = files(
   'src/exec/core.cpp',
+  'src/exec/proc.cpp',
   'src/exec/executor.cpp',
   'src/main.cpp',
   'src/parser.cpp',
@@ -47,6 +48,7 @@ cpy_tests = executable(
         'src/semantics.cpp',
         'src/symbol_table.cpp',
         'src/exec/core.cpp',
+        'src/exec/proc.cpp',
         'src/exec/executor.cpp',
         'grammar/src/parser.c'
   ),

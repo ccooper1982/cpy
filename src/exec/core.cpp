@@ -24,13 +24,11 @@ VarValue print(const RuntimeContext&, const std::span<const VarValue> args)
         if constexpr (std::is_same_v<T, Process>) {
           std::print("Executable: {} , Args: {}", val.executable, val.args.size()); // TODO lazy
         }
-        else if constexpr (std::is_same_v<T, Pipeline>)
-        {
+        else if constexpr (std::is_same_v<T, Pipeline>) {
           std::print("Pipeline: Processes: {} ", val.processes.size());
-
-          // for (const auto& proc : val.processes) {
-          //   std::print("Pipeline: Processes: {} ", proc.executable.size());
-          // }
+        }
+        else if constexpr (std::is_same_v<T, ExecResult>) {
+          std::print("{}", val.stdout);
         }
         else if constexpr (!std::is_same_v<T, std::monostate>) {
           std::print("{}", val);

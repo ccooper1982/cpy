@@ -1,8 +1,11 @@
-# p1 := proc("cat", "/etc/fstab");
-p1 := proc("env");
+p1 := proc("cat", "/etc/hosts");
+p1_result := exec(p1);
 
-println(p1);
+println ("Result: ", exit_status(p1_result));
 
-println("Status: ", proc_run(p1));
-println(proc_run(proc("true")));   # 0
-println(proc_run(proc("false")));  # 1
+if (exit_status(p1_result) == 0) {
+    println (p1_result);
+}
+else {
+    println ("It failed");
+}
