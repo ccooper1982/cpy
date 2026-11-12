@@ -3,6 +3,20 @@ C++ Pythony, an alternative to shell script.
 
 Mostly experimenting with Tree-sitter and creating an AST.
 
+```
+p1 := proc("cat", "/etc/hosts");
+p1_result := exec(p1);
+
+println ("Result: ", exit_status(p1_result));
+
+if (exit_status(p1_result) == 0) {
+    println (p1_result);
+}
+else {
+    println ("It failed");
+}
+```
+
 # Aim
 - A programmer friendly scripting language
 - No config files or virtual environment required
@@ -26,19 +40,7 @@ meson test -C build
 
 ---
 
-# Ideas
-- Statically typed
-- Language has knowledge of procceses, files, etc
-
-## Modules
-- file
-  - search, exist, create, delete, etc
-- env (environment vars)
-  - exist, set, search
-- proc (processes)
-  - run, pipe, redirect output
-
-Access with `<module_name>::<function>`, i.e. `file::exist("foo.txt")`
+# TODO
 
 ## Files
 - exists
@@ -49,51 +51,12 @@ Access with `<module_name>::<function>`, i.e. `file::exist("foo.txt")`
 - copy
 - move
 
-```
-dir := file::list("some/dir");
-for (file in dir) {
-  cout << file.name() << " @ " << file.size() << " bytes";
-}
-
-file::create("some/file.txt");
-```
-
-## Control Flow
-- conditional: `if`
-- loops: `for`, `while`
-- return: `return`, `return_if`
-
-```
-if (!file::exist("some/file.txt")) {
-  return_if !file::create("some/file.txt");
-
-  return parse_file("some/file.txt");
-}
-```
-
-## Processes
-- Execution
-- Exit code
-- stdout, stderr
-- redirection
-
-```
-grep_debug := proc::grep("log.txt", "^\[DEBUG\]");
-cout << grep_debug | proc::line_count;
-```
-
-```
-grep_debug := proc::grep("log.txt", "^\[DEBUG\]");
-grep_result := grep_debug.run();
-file::create("result.txt", grep_result);
-```
-
 ## Environment Vars
 - Get
 - Set
 - Search
 
 ```
-home := env::get("HOME");
-env::create("BUILD_DIR", home + "/projects/blah/build");
+home := env_get("HOME");
+env_create("BUILD_DIR", home + "/projects/blah/build");
 ```

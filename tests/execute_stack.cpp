@@ -16,6 +16,9 @@ VarValue make_value (T v)
   if constexpr (std::is_same_v<T, CpyBool>) {
     return CpyBool(v);
   }
+  else if constexpr (std::is_same_v<T, Process>) {
+    return Process{};
+  }
   else if constexpr (std::is_integral_v<T>) {
     return CpyInt(v);
   }

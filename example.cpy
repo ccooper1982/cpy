@@ -1,9 +1,11 @@
+p1 := proc("cat", "/etc/hosts");
+p1_result := exec(p1);
 
-i := 0;
+println ("Result: ", exit_status(p1_result));
 
-while (i < arg_count())
-{
-    v := "I found this: " + arg_str(i);
-    println(v);
-    ++i;
+if (exit_status(p1_result) == 0) {
+    println (p1_result);
+}
+else {
+    println ("It failed");
 }

@@ -1,10 +1,16 @@
 #pragma once
 
+#include "cpy/common.hpp"
 #include <cmath>
 #include <functional>
+#include <stdexcept>
 #include <variant>
-#include <cpy/common.hpp>
+#include <cpy/functional.hpp>
 #include <cpy/exceptions.hpp>
+
+
+template<typename T1, typename T2, typename CpyType>
+concept AreSame = std::is_same_v<T1, CpyType> && std::is_same_v<T2, CpyType> ;
 
 template<typename T>
 concept IsCpyDecimal = std::is_same_v<T, CpyDec>;
@@ -22,10 +28,13 @@ template<typename T>
 concept IsCpyString = std::is_same_v<T, CpyString>;
 
 template<typename T1, typename T2>
-concept AreCpyInteger = IsCpyInteger<T1> && IsCpyInteger<T2>;
+concept AreCpyInteger = AreSame<T1, T2, CpyInt>;
 
 template<typename T1, typename T2>
-concept AreCpyDecimal = IsCpyDecimal<T1> && IsCpyDecimal<T2>;
+concept AreCpyDecimal = AreSame<T1, T2, CpyDec>;
+
+template<typename T1, typename T2>
+concept AreCpyString = AreSame<T1, T2, CpyString>;
 
 template<typename T1, typename T2>
 concept AreCpyArithmetic = IsCpyArithmetic<T1> && IsCpyArithmetic<T2> ;
@@ -96,21 +105,21 @@ inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, Op
     using L = std::decay_t<decltype(val_l)>;
     using R = std::decay_t<decltype(val_r)>;
 
+    // not all combinations are valid C++, and some are valid C++ but invalid cpy
+    // if invalid cpy, the semantic checker will raise an issue, preventing execution
     constexpr bool is_arithmetic = AreCpyArithmetic<L,R>;
-    constexpr bool is_boolean = IsCpyBoolean<L> && IsCpyBoolean<R>;
-    constexpr bool is_strings = IsCpyString<L> && IsCpyString<R> && (std::is_same_v<OpF, std::plus<>> || std::is_same_v<OpF, std::equal_to<>>);
+    constexpr bool is_boolean = AreSame<L,R,CpyBool>;
+    constexpr bool is_strings = AreSame<L,R,CpyString> && (std::is_same_v<OpF, std::plus<>> || std::is_same_v<OpF, std::equal_to<>>);
+
 
     if constexpr (!(is_arithmetic || is_strings || is_boolean)) {
       throw std::logic_error{"Called do_binary_operator() on unsupported type"};
-    }
-    else if constexpr (is_boolean) {
-      return op(val_l, val_r);
     }
     else if constexpr (is_arithmetic) {
       return do_binary_arithmetic(val_l, val_r, op);
     }
     else {
-      return op(val_l, val_r); // string
+      return op(val_l, val_r);
     }
   };
 
@@ -137,44 +146,95 @@ inline VarValue operator*(const VarValue& lhs, const VarValue& rhs)
   return do_binary_operator(lhs, rhs, std::multiplies<>{});
 }
 
-inline VarValue operator<(const VarValue& lhs, const VarValue& rhs)
+inline bool operator<(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::less<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::less<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator<=(const VarValue& lhs, const VarValue& rhs)
+// binary comparison //
+
+inline bool operator<=(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::less_equal<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::less_equal<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator>(const VarValue& lhs, const VarValue& rhs)
+inline bool operator>(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::greater<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::greater<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator>=(const VarValue& lhs, const VarValue& rhs)
+inline bool operator>=(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::greater_equal<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::greater_equal<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator==(const VarValue& lhs, const VarValue& rhs)
+inline bool operator==(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::equal_to<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::equal_to<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator!=(const VarValue& lhs, const VarValue& rhs)
+inline bool operator!=(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::not_equal_to<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::not_equal_to<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator&&(const VarValue& lhs, const VarValue& rhs)
+// logical //
+
+inline bool operator&&(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::logical_and<>{});
+  const auto result = do_binary_operator(lhs, rhs, std::logical_and<>{});
+  return std::get<CpyBool>(result);
 }
 
-inline VarValue operator||(const VarValue& lhs, const VarValue& rhs)
+inline bool operator||(const VarValue& lhs, const VarValue& rhs)
 {
-  return do_binary_operator(lhs, rhs, std::logical_or<>{});
+  const auto result =  do_binary_operator(lhs, rhs, std::logical_or<>{});
+  return std::get<CpyBool>(result);
+}
+
+// pipes //
+
+inline VarValue operator|(const VarValue& lhs, const VarValue& rhs)
+{
+  auto handle = overloads
+  {
+    [&](const Process& left, const Process& right) -> VarValue
+    {
+      Pipeline pipe;
+      pipe.processes = {left, right};
+      return pipe;
+    },
+    [&](const Pipeline& left, const Process& right) -> VarValue
+    {
+      Pipeline result = left;
+      result.processes.emplace_back(right);
+      return result;
+    },
+    [&](const Process& left, const Pipeline& right) -> VarValue
+    {
+      Pipeline result {right};
+      result.processes.insert(result.processes.begin(), left);
+      return result;
+    },
+    [&](const Pipeline& left, const Pipeline& right) -> VarValue
+    {
+        Pipeline result {left};
+        result.processes.insert_range(result.processes.end(), right.processes);
+        return result;
+    },
+    [&](const auto&, const auto&) -> VarValue
+    {
+      throw std::logic_error{"Called do_pipes_operator() on unsupported type"};
+    }
+  };
+
+  return std::visit(handle, lhs, rhs);
 }
 
 // unary //

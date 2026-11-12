@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cpy/functional.hpp"
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/ast/ast.hpp>
@@ -16,32 +17,30 @@
 
 inline static VarValue value_from_type (const VarType type)
 {
-  if (!type.is_type<BuiltInType>()) {
+  if (!type.is_type<NativeType>()) {
     throw std::runtime_error{"Unsupported VarType"};
   }
 
-  switch (*type.value_as<BuiltInType>())
+  switch (*type.value_as<NativeType>())
   {
-    using enum BuiltInType;
+    using enum NativeType;
 
     case Int:
       return int64_t{};
-      break;
-
     case Decimal:
       return double{};
-      break;
-
     case Bool:
       return bool{};
-      break;
-
     case String:
       return std::string{};
-      break;
-
+    case Process:
+      return ::Process{};
+    case Pipeline:
+      return ::Pipeline{};
+    case ExecResult:
+      return ::ExecResult{};
     default:
-      throw std::runtime_error{"BuiltInType is invalid"};
+      throw std::runtime_error{"NativeType is invalid"};
       break;
   }
 }

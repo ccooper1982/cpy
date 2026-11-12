@@ -1,14 +1,14 @@
-#include "cpy/ast/ast.hpp"
-#include "cpy/ast/expressions.hpp"
-#include "cpy/common.hpp"
-#include "cpy/exec/operators.hpp"
+#include "cpy/functional.hpp"
 #include <algorithm>
-#include <cpy/exec/executor.hpp>
-#include <functional>
 #include <ranges>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include <cpy/ast/ast.hpp>
+#include <cpy/exec/executor.hpp>
+#include <cpy/ast/expressions.hpp>
+#include <cpy/exec/operators.hpp>
 
 
 static VarValue value_from_literal_expr(const Expression& expr)
@@ -222,7 +222,7 @@ ExecutionResult Executor::execute (const NodeBlock& block, const FunctionCall& c
 {
   const auto& def = m_sym_table.get_function(call.name);
 
-  if (m_sym_table.has_core_function(call.name))
+  if (m_sym_table.has_native_function(call.name))
   {
     std::vector<VarValue> values;
 
@@ -232,7 +232,7 @@ ExecutionResult Executor::execute (const NodeBlock& block, const FunctionCall& c
       values.push_back(std::move(frame.value));
     }
 
-    return NativeFunctions.at(call.name).implementation(m_rt_context, values);
+    return m_sym_table.get_native_function(call.name).implementation(m_rt_context, values);
   }
   else
   {
@@ -287,8 +287,8 @@ void Executor::pop_stack ()
     m_stack.pop();
   }
   else {
-    // this shouldn't happen, but if so, we're not managing the stack correctly
-    throw std::logic_error{"Executor stack called on empty stack"};
+    // not managing the stack correctly
+    throw std::logic_error{"Executor:;pop_stack() called on empty stack"};
   }
 }
 
@@ -365,5 +365,7 @@ VarValue Executor::apply_operator(const NodeBlock& block, const Expression& lhs,
       return lhs_val && rhs_val;
     case LogicalOr:
       return lhs_val || rhs_val;
+    case Pipe:
+      return lhs_val | rhs_val;
   }
 }

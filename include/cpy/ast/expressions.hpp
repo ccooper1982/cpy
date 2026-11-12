@@ -2,6 +2,7 @@
 
 #include <cpy/ast/ast_node.hpp>
 #include <cpy/common.hpp>
+#include <cpy/functional.hpp>
 #include <memory>
 #include <vector>
 
@@ -19,7 +20,8 @@ enum class BinaryOperator
   LessEqual,
   GreaterEqual,
   LogicalAnd,
-  LogicalOr
+  LogicalOr,
+  Pipe,
 };
 
 enum class UnaryOperator
@@ -62,7 +64,7 @@ struct Expression : public AstNode
   bool is_expr_type(const ExpressionType t) const { return t == expr_type(); }
   bool is_literal () const { return m_is_literal; };
 
-  virtual bool is_convertible_to([[maybe_unused]] const BuiltInType t) const { return false; }
+  virtual bool is_convertible_to([[maybe_unused]] const NativeType t) const { return false; }
   virtual VarType get_var_type() const = 0;
 
   ExpressionType expr_type() const { return m_ex_type; }
@@ -99,7 +101,7 @@ struct Return : public Expression
     // if return_expr is a FunctionCall, the type is taken from the function's definition,
     // FunctionCall::get_var_type() will throw if called. Allow this path so it highlights
     // errors
-    return return_expr ? return_expr->get_var_type() : BuiltInType::Void;
+    return return_expr ? return_expr->get_var_type() : NativeType::Void;
   }
 
   bool has_expression() const
@@ -118,14 +120,14 @@ struct IntegerLiteral : public Expression
   explicit IntegerLiteral(const CpyInt val) : Expression(ExprType, true), v(val)
   {}
 
-  bool is_convertible_to(const BuiltInType t) const override
+  bool is_convertible_to(const NativeType t) const override
   {
-    return t == BuiltInType::Int;
+    return t == NativeType::Int;
   }
 
   VarType get_var_type() const override
   {
-    return BuiltInType::Int;
+    return NativeType::Int;
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -148,14 +150,14 @@ struct StringLiteral : public Expression
   explicit StringLiteral(const std::string_view val) : Expression(ExprType, true), v(val)
   {}
 
-  bool is_convertible_to(const BuiltInType t) const override
+  bool is_convertible_to(const NativeType t) const override
   {
-    return t == BuiltInType::String;
+    return t == NativeType::String;
   }
 
   VarType get_var_type() const override
   {
-    return BuiltInType::String;
+    return NativeType::String;
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -178,14 +180,14 @@ struct DecimalLiteral : public Expression
   explicit DecimalLiteral(const double val) : Expression(ExprType, true), v(val)
   {}
 
-  bool is_convertible_to(const BuiltInType t) const override
+  bool is_convertible_to(const NativeType t) const override
   {
-    return t == BuiltInType::Decimal;
+    return t == NativeType::Decimal;
   }
 
   VarType get_var_type() const override
   {
-    return BuiltInType::Decimal;
+    return NativeType::Decimal;
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -208,14 +210,14 @@ struct BooleanLiteral : public Expression
   explicit BooleanLiteral(const bool val) : Expression(ExprType, true), v(val)
   {}
 
-  bool is_convertible_to(const BuiltInType t) const override
+  bool is_convertible_to(const NativeType t) const override
   {
-    return t == BuiltInType::Bool;
+    return t == NativeType::Bool;
   }
 
   VarType get_var_type() const override
   {
-    return BuiltInType::Bool;
+    return NativeType::Bool;
   }
 
   void dump (std::ostream& os, [[maybe_unused]] const uint8_t tab = 0) const override
@@ -246,7 +248,7 @@ struct BinaryExpression : public Expression
   , rhs(std::move(rhs))
   {}
 
-  bool is_convertible_to(const BuiltInType t) const override
+  bool is_convertible_to(const NativeType t) const override
   {
     return lhs->is_convertible_to(t) && rhs->is_convertible_to(t);
   }
@@ -291,7 +293,7 @@ struct UnaryExpression : public Expression
     , operand(std::move(op_expr))
   {}
 
-  bool is_convertible_to(const BuiltInType t) const override
+  bool is_convertible_to(const NativeType t) const override
   {
     return operand->is_convertible_to(t);
   }
@@ -345,7 +347,7 @@ struct FunctionCall : public Expression
     throw std::runtime_error{"get_var_type() called on FunctionCall"};
   }
 
-  bool is_convertible_to(const BuiltInType) const override
+  bool is_convertible_to(const NativeType) const override
   {
     throw std::runtime_error{"is_convertible_to() called on FunctionCall. Use symbol table"};
   }
@@ -432,18 +434,19 @@ inline std::string_view to_string(const BinaryOperator op)
 {
   switch (op)
   {
-    case BinaryOperator::Add:         return "+";
-    case BinaryOperator::Subtract:    return "-";
-    case BinaryOperator::Multiply:    return "*";
-    case BinaryOperator::Divide:      return "/";
-    case BinaryOperator::Equal:       return "==";
-    case BinaryOperator::NotEqual:    return "!=";
-    case BinaryOperator::Less:        return "<";
-    case BinaryOperator::Greater:     return ">";
-    case BinaryOperator::LessEqual:   return "<=";
+    case BinaryOperator::Add:           return "+";
+    case BinaryOperator::Subtract:      return "-";
+    case BinaryOperator::Multiply:      return "*";
+    case BinaryOperator::Divide:        return "/";
+    case BinaryOperator::Equal:         return "==";
+    case BinaryOperator::NotEqual:      return "!=";
+    case BinaryOperator::Less:          return "<";
+    case BinaryOperator::Greater:       return ">";
+    case BinaryOperator::LessEqual:     return "<=";
     case BinaryOperator::GreaterEqual:  return ">=";
     case BinaryOperator::LogicalAnd:    return "&&";
     case BinaryOperator::LogicalOr:     return "||";
+    case BinaryOperator::Pipe:          return "|";
   }
 }
 

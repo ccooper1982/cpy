@@ -1,4 +1,5 @@
 #include "cpy/ast/ast_node.hpp"
+#include "cpy/functional.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/issues.hpp>
@@ -59,7 +60,7 @@ void Semantics::process_block(Context& ctx, const AstNode& parent, const NodeBlo
       if (m_symbol_table.has_function(def.name))
       {
         const auto& resolved_func = m_symbol_table.get_function(def.name);
-        const bool expect_return_expr = resolved_func.return_type != BuiltInType::Void &&
+        const bool expect_return_expr = resolved_func.return_type != NativeType::Void &&
                                         resolved_func.return_type != unresolved_type;
 
         if (expect_return_expr && expression_count<Return>(def.body) == 0) {
@@ -125,7 +126,7 @@ void Semantics::process_function_signatures(Context& ctx)
       return;
     }
 
-    if (m_symbol_table.has_core_function(def.name))
+    if (m_symbol_table.has_native_function(def.name))
     {
       issue::func_core_exists(ctx.issues, def, def.name);
       return;
@@ -178,7 +179,7 @@ void Semantics::process_variable_declaration(Context& ctx, const NodeBlock& bloc
       issue::unknown_variable_type(ctx.issues, decl);
       return;
     }
-    else if (type == BuiltInType::Void) {
+    else if (type == NativeType::Void) {
       issue::var_init_void(ctx.issues, decl);
     }
     else {
@@ -190,7 +191,7 @@ void Semantics::process_variable_declaration(Context& ctx, const NodeBlock& bloc
   {
     init_type = handle_expression(ctx, decl, block, *decl.initialiser);
 
-    if (init_type == BuiltInType::Void) {
+    if (init_type == NativeType::Void) {
       issue::var_init_void(ctx.issues, decl);
       return;
     }
@@ -234,9 +235,9 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_type;
   }
 
-  const bool is_core_function = m_symbol_table.has_core_function(call.name);
+  const bool is_native_function = m_symbol_table.has_native_function(call.name);
 
-  if (!m_symbol_table.has_function(call.name) && !is_core_function)
+  if (!m_symbol_table.has_function(call.name) && !is_native_function)
   {
     issue::func_not_exist(ctx.issues, call, call.name);
     return unresolved_type;
@@ -246,9 +247,9 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
   const bool is_variadic = resolved_func.param_mode == ParamMode::VariadicAny;
   const auto supplied_arg_count = call.args.size();
 
-  if (is_core_function)
+  if (is_native_function)
   {
-    if (!is_variadic && supplied_arg_count < m_symbol_table.get_core_function_min_args(call.name))
+    if (is_variadic && supplied_arg_count < m_symbol_table.get_native_function_min_args(call.name))
     {
       issue::func_arg_count(ctx.issues, call);
       return unresolved_type;
@@ -275,7 +276,7 @@ bool Semantics::process_function_call_argument(Context& ctx, const AstNode& pare
 {
   const auto& resolved_func = m_symbol_table.get_function(call.name);
   const bool is_variadic = resolved_func.param_mode == ParamMode::VariadicAny;
-  const auto arg_type = is_variadic ? unresolved_type : resolved_func.params[param_index].type.value_as<BuiltInType>();
+  const auto arg_type = is_variadic ? unresolved_type : resolved_func.params[param_index].type.value_as<NativeType>();
   const auto param_name = is_variadic ? std::to_string(param_index) : std::string(resolved_func.params[param_index].name);
 
   if (!is_variadic && !arg_type) {
@@ -313,7 +314,7 @@ bool Semantics::process_function_call_argument(Context& ctx, const AstNode& pare
     if (const auto ret_type = process_expression(ctx, call, block, func_call); !ret_type) {
       return false;
     }
-    else if (ret_type == BuiltInType::Void)
+    else if (ret_type == NativeType::Void)
     {
       issue::func_arg_void(ctx.issues, arg_expr, param_name);
       return false;
@@ -412,7 +413,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
     return unresolved_type;
   }
 
-  VarType ret_type {BuiltInType::Void};
+  VarType ret_type {NativeType::Void};
 
   const auto& func_def = static_cast<const FunctionDef&>(parent);
   const auto& resolved_func = m_symbol_table.get_function(func_def.name);
@@ -437,7 +438,7 @@ VarType Semantics::process_expression(Context& ctx, const AstNode& parent, const
 
 VarType Semantics::process_operator(Context& ctx, const VarType& operand_type, const UnaryExpression& expr)
 {
-  using enum BuiltInType;
+  using enum NativeType;
 
   bool valid{};
 
@@ -484,7 +485,7 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
   }
 
   using enum BinaryOperator;
-  using enum BuiltInType;
+  using enum NativeType;
 
   VarType result_type{};
   bool valid{};
@@ -493,7 +494,7 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
   if (left_type == Void || right_type == Void) {
     issue::binary_operands_void(ctx.issues, expr);
   }
-  else if (left_type != right_type) {
+  else if (expr.op != Pipe && left_type != right_type) {
     issue::binary_operands_invalid(ctx.issues, expr);
   }
   else
@@ -527,6 +528,11 @@ VarType Semantics::process_operator(Context& ctx, const VarType& left_type, cons
         valid = left_type == Bool;
         result_type = Bool;
         break;
+
+      case Pipe:
+        valid = (left_type == Process || left_type == Pipeline) &&
+                (right_type == Process || right_type == Pipeline);
+        result_type = Pipeline;
     }
 
     if (!valid) {
@@ -570,7 +576,7 @@ void Semantics::process_condition(Context& ctx, const AstNode& parent, const Nod
     if (!cond_if_result) {
       return false;
     }
-    else if (cond_if_result != BuiltInType::Bool)
+    else if (cond_if_result != NativeType::Bool)
     {
       issue::condition_not_bool(ctx.issues, *cb.condition);
       return false;
@@ -602,7 +608,7 @@ void Semantics::process_while(Context& ctx, const AstNode& parent, const NodeBlo
 {
   const auto condition_expr_type = handle_expression(ctx, parent, block, *loop.expr);
 
-  if (condition_expr_type != BuiltInType::Bool) {
+  if (condition_expr_type != NativeType::Bool) {
     issue::condition_not_bool(ctx.issues, *loop.expr);
   }
   else {

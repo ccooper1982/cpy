@@ -1,6 +1,5 @@
 #pragma once
 
-#include "cpy/ast/ast_node.hpp"
 #include <cpy/common.hpp>
 #include <cpy/functional.hpp>
 #include <initializer_list>
@@ -22,35 +21,15 @@ namespace core
 }
 
 
-using NativeFunction = VarValue (*)(const RuntimeContext&, const std::span<const VarValue>);
-
-struct NativeFunctionDef
+inline const std::map<std::string_view, NativeFunctionDef> NativeCoreFunctions
 {
-  ResolvedFunction signature;
-  NativeFunction implementation;
-  size_t min_args{};
-};
-
-
-template<auto F>
-auto create_function(std::string_view name, std::initializer_list<ResolvedSymbol> params, BuiltInType return_type, ParamMode param_mode)
-{
-  using FunctionEntry = std::pair<std::string_view, NativeFunctionDef>;
-
-  ResolvedFunction func {std::vector<ResolvedSymbol>{params}, return_type, param_mode};
-
-  return FunctionEntry {name, {std::move(func), F}};
-}
-
-inline const std::map<std::string_view, NativeFunctionDef> NativeFunctions
-{
-  create_function<core::print>("print", {}, BuiltInType::Void, ParamMode::VariadicAny),
-  create_function<core::println>("println", {}, BuiltInType::Void, ParamMode::VariadicAny),
-  create_function<core::exit>("exit", {{"status", BuiltInType::Int}},BuiltInType::Void, ParamMode::Fixed),
+  create_function<core::print>("print", {}, NativeType::Void, ParamMode::VariadicAny),
+  create_function<core::println>("println", {}, NativeType::Void, ParamMode::VariadicAny),
+  create_function<core::exit>("exit", {{"status", NativeType::Int}},NativeType::Void, ParamMode::Fixed),
   // argv
-  create_function<core::get_argc>("arg_count", {}, BuiltInType::Int, ParamMode::Fixed),
-  create_function<core::get_argv_str>("arg_str", {{"index", BuiltInType::Int}}, BuiltInType::String, ParamMode::Fixed),
-  create_function<core::get_argv_int>("arg_int", {{"index", BuiltInType::Int}}, BuiltInType::Int, ParamMode::Fixed),
-  create_function<core::get_argv_dec>("arg_dec", {{"index", BuiltInType::Int}}, BuiltInType::Decimal, ParamMode::Fixed),
-  create_function<core::get_argv_bool>("arg_bool", {{"index", BuiltInType::Int}}, BuiltInType::Bool, ParamMode::Fixed)
+  create_function<core::get_argc>("arg_count", {}, NativeType::Int, ParamMode::Fixed),
+  create_function<core::get_argv_str>("arg_str", {{"index", NativeType::Int}}, NativeType::String, ParamMode::Fixed),
+  create_function<core::get_argv_int>("arg_int", {{"index", NativeType::Int}}, NativeType::Int, ParamMode::Fixed),
+  create_function<core::get_argv_dec>("arg_dec", {{"index", NativeType::Int}}, NativeType::Decimal, ParamMode::Fixed),
+  create_function<core::get_argv_bool>("arg_bool", {{"index", NativeType::Int}}, NativeType::Bool, ParamMode::Fixed)
 };

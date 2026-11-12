@@ -10,6 +10,7 @@
 #include <string_view>
 #include <vector>
 
+#include <cpy/functional.hpp>
 #include <cpy/ast/expressions.hpp>
 #include <cpy/ast/ast_node.hpp>
 

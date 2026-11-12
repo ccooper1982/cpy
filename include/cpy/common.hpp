@@ -10,14 +10,6 @@ namespace rg = std::ranges;
 namespace vw = std::views;
 
 
-using CpyInt = int64_t;
-using CpyDec = double;
-using CpyBool = bool;
-using CpyString = std::string;
-
-using VarName = std::string_view;
-using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool>;
-
 // helper type for the visiting
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
