@@ -1,43 +1,11 @@
 #pragma once
 
-#include "cpy/common.hpp"
 #include <cmath>
 #include <functional>
 #include <stdexcept>
 #include <variant>
 #include <cpy/functional.hpp>
 #include <cpy/exceptions.hpp>
-
-
-template<typename T1, typename T2, typename CpyType>
-concept AreSame = std::is_same_v<T1, CpyType> && std::is_same_v<T2, CpyType> ;
-
-template<typename T>
-concept IsCpyDecimal = std::is_same_v<T, CpyDec>;
-
-template<typename T>
-concept IsCpyInteger = std::is_same_v<T, CpyInt>;
-
-template<typename T>
-concept IsCpyArithmetic = IsCpyInteger<T> || IsCpyDecimal<T>;
-
-template<typename T>
-concept IsCpyBoolean = std::is_same_v<T, CpyBool>;
-
-template<typename T>
-concept IsCpyString = std::is_same_v<T, CpyString>;
-
-template<typename T1, typename T2>
-concept AreCpyInteger = AreSame<T1, T2, CpyInt>;
-
-template<typename T1, typename T2>
-concept AreCpyDecimal = AreSame<T1, T2, CpyDec>;
-
-template<typename T1, typename T2>
-concept AreCpyString = AreSame<T1, T2, CpyString>;
-
-template<typename T1, typename T2>
-concept AreCpyArithmetic = IsCpyArithmetic<T1> && IsCpyArithmetic<T2> ;
 
 
 // binary //

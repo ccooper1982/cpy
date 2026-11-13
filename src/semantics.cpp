@@ -1,4 +1,4 @@
-#include "cpy/ast/ast_node.hpp"
+#include <cpy/ast/ast_node.hpp>
 #include "cpy/functional.hpp"
 #include <cpy/ast/ast.hpp>
 #include <cpy/ast/expressions.hpp>

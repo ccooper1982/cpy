@@ -1,7 +1,6 @@
 
-
-pipeline := proc("seq", "1", "100000")
-          | proc("grep", "5")
+pipeline := proc("seq", 1, 100000)
+          | proc("grep", 5)
           | proc("sort", "-r")
           | proc("wc", "-l");
 

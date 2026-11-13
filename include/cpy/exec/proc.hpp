@@ -12,9 +12,7 @@ namespace proc {
 
   struct Pipe
   {
-    Pipe () = default;
-
-    Pipe (const int read_fd, const int write_fd)
+    Pipe (const int read_fd = -1, const int write_fd = -1)
       : read(read_fd)
       , write(write_fd)
     {

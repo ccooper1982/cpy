@@ -33,26 +33,12 @@ namespace proc {
     return argv;
   }
 
-  static VarValue exec_pipeline (const Pipeline& pl)
+  static std::vector<pid_t> start_processes(const std::vector<Process> processes, const std::vector<Pipe>& pipes)
   {
-    std::vector<Pipe> pipes;
     std::vector<pid_t> pids;
+    pids.reserve(processes.size());
 
-    pipes.reserve(pl.processes.size()-1);
-    pids.reserve(pl.processes.size());
-
-    for (size_t i = 0 ; i < pl.processes.size(); ++i)
-    {
-      int fds[2];
-
-      if (pipe(fds) == -1) {
-        throw RuntimeError{"pipe() failed"};
-      }
-      pipes.emplace_back(fds[0], fds[1]);
-    }
-
-    // A -> B -> C --> cpy
-    for (size_t i = 0 ; i < pl.processes.size(); ++i)
+    for (size_t i = 0 ; i < processes.size(); ++i)
     {
       posix_spawn_file_actions_t actions;
       posix_spawn_file_actions_init(&actions);
@@ -69,7 +55,7 @@ namespace proc {
         posix_spawn_file_actions_addclose(&actions, p.write);
       }
 
-      const auto& proc = pl.processes[i];
+      const auto& proc = processes[i];
       auto cmd = make_command(proc);
       pid_t pid{};
 
@@ -83,6 +69,41 @@ namespace proc {
 
       pids.push_back(pid);
     }
+
+    return pids;
+  }
+
+  static int wait_for_process (const pid_t pid)
+  {
+    int status{};
+    while (waitpid(pid, &status, 0) == -1)
+    {
+      if (errno == EINTR) {
+        continue;
+      }
+
+      throw RuntimeError{std::format("start_proc(): waitpid failed: {}", std::string(std::strerror(errno)))};
+    }
+    return status;
+  }
+
+  static VarValue exec_pipeline (const Pipeline& pl)
+  {
+    std::vector<Pipe> pipes;
+    pipes.reserve(pl.processes.size()-1);
+
+
+    for (size_t i = 0 ; i < pl.processes.size(); ++i)
+    {
+      int fds[2];
+
+      if (pipe(fds) == -1) {
+        throw RuntimeError{"pipe() failed"};
+      }
+      pipes.emplace_back(fds[0], fds[1]);
+    }
+
+    const std::vector<pid_t> pids = start_processes(pl.processes, pipes);
 
     for (size_t i = 0; i < pipes.size(); ++i)
     {
@@ -111,61 +132,42 @@ namespace proc {
 
     close(pipes.back().read);
 
-    auto wait_for_process = [](const pid_t pid) -> int
-    {
-      int status{};
-      while (waitpid(pid, &status, 0) == -1)
-      {
-        if (errno == EINTR) {
-          continue;
-        }
-
-        throw RuntimeError{std::format("start_proc(): waitpid failed: {}", std::string(std::strerror(errno)))};
-      }
-      return status;
-    };
-
-    int status{};
+    int exit_status{}; // exit status of the last process
     for (const auto& pid : pids)
     {
-      try
-      {
-        status = wait_for_process(pid);
+      try {
+        exit_status = wait_for_process(pid);
       }
-      catch (const std::exception& ex)
-      {
+      catch (const std::exception& ex){
         std::println(stderr, "{}", ex.what());
       }
     }
 
-    if (WIFEXITED(status))
+    if (WIFEXITED(exit_status))
     {
-      result.exit_status = WEXITSTATUS(status);
+      result.exit_status = WEXITSTATUS(exit_status);
       return result;
     }
 
-    if (WIFSIGNALED(status))
+    if (WIFSIGNALED(exit_status))
     {
-      result.exit_status = 128 + WTERMSIG(status);
+      result.exit_status = 128 + WTERMSIG(exit_status);
       return result;
     }
 
-    throw RuntimeError{"start_proc(): Unexpected process termination"};
-
-    return result;
+    throw std::runtime_error{"start_proc(): Unexpected process termination"};
   }
 
   VarValue create_proc (const RuntimeContext&, const std::span<const VarValue> args)
   {
     Process proc {.executable = std::get<CpyString>(args[0])};
 
-    // TODO prefer not to throw, but may be the only option
     if (proc.executable.empty()) {
       throw RuntimeError{"Cannot have empty executable in proc()"};
     }
 
     for (const auto& arg : args.subspan(1)) {
-      proc.args.emplace_back(std::get<CpyString>(arg));
+      proc.args.emplace_back(to_string(arg));
     }
 
     return proc;

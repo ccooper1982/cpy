@@ -1,6 +1,8 @@
 #pragma once
 
 #include <map>
+#include <string>
+#include <variant>
 #include <vector>
 
 #include <cpy/common.hpp>
@@ -37,6 +39,38 @@ using CpyString = std::string;
 
 using VarName = std::string_view;
 using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process, Pipeline, ExecResult>;
+
+
+template<typename T1, typename T2, typename CpyType>
+concept AreSame = std::is_same_v<T1, CpyType> && std::is_same_v<T2, CpyType> ;
+
+template<typename T>
+concept IsCpyDecimal = std::is_same_v<T, CpyDec>;
+
+template<typename T>
+concept IsCpyInteger = std::is_same_v<T, CpyInt>;
+
+template<typename T>
+concept IsCpyArithmetic = IsCpyInteger<T> || IsCpyDecimal<T>;
+
+template<typename T>
+concept IsCpyBoolean = std::is_same_v<T, CpyBool>;
+
+template<typename T>
+concept IsCpyString = std::is_same_v<T, CpyString>;
+
+template<typename T1, typename T2>
+concept AreCpyInteger = AreSame<T1, T2, CpyInt>;
+
+template<typename T1, typename T2>
+concept AreCpyDecimal = AreSame<T1, T2, CpyDec>;
+
+template<typename T1, typename T2>
+concept AreCpyString = AreSame<T1, T2, CpyString>;
+
+template<typename T1, typename T2>
+concept AreCpyArithmetic = IsCpyArithmetic<T1> && IsCpyArithmetic<T2> ;
+
 
 
 enum class NativeType
@@ -153,6 +187,28 @@ inline std::string_view to_string(const VarType& t)
 }
 
 
+
+inline std::string to_string(const VarValue& v)
+{
+  return std::visit([](const auto val) -> std::string
+  {
+    using T = std::remove_cvref_t<decltype(val)>;
+
+    if constexpr (IsCpyBoolean<T>) {
+      return val ? "1" : "0";
+    }
+    else if constexpr (IsCpyArithmetic<T>) {
+      return std::to_string(val);
+    }
+    else if constexpr (IsCpyString<T>) {
+      return val;
+    }
+    else {
+      throw std::runtime_error{"to_string(const VarValue&) called with invalid type"};
+    }
+  },
+  v);
+}
 
 struct ResolvedSymbol
 {

@@ -64,3 +64,13 @@ std::expected<Expected, CpyError> make_error(const std::string_view msg)
 {
   return std::unexpected(CpyError{msg});
 }
+
+
+// bool string_to_number (const std::string_view src, auto& v)
+// {
+//   v = {};
+//   const auto end = src.data()+src.size();
+//   const auto [ptr, ec] = std::from_chars(src.data(), end, v);
+//
+//   return ec != std::errc::result_out_of_range && ec != std::errc::invalid_argument && ptr == end;
+// }
