@@ -65,6 +65,17 @@ std::expected<Expected, CpyError> make_error(const std::string_view msg)
   return std::unexpected(CpyError{msg});
 }
 
+inline std::string_view trim_ws(std::string_view str)
+{
+  const auto pos = str.find_last_not_of(" \t\n\r\f\v");
+
+  if (pos == std::string_view::npos) {
+    return str;
+  }
+
+  return str.substr(0, pos + 1);
+}
+
 
 // bool string_to_number (const std::string_view src, auto& v)
 // {

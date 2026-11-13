@@ -7,31 +7,7 @@
 #include <cpy/semantics.hpp>
 #include <cpy/symbol_table.hpp>
 #include <string_view>
-#include <type_traits>
 
-
-template<typename T>
-VarValue make_value (T v)
-{
-  if constexpr (std::is_same_v<T, CpyBool>) {
-    return CpyBool(v);
-  }
-  else if constexpr (std::is_same_v<T, Process>) {
-    return Process{};
-  }
-  else if constexpr (std::is_integral_v<T>) {
-    return CpyInt(v);
-  }
-  else if constexpr (std::floating_point<T>) {
-    return CpyDec(v);
-  }
-  else if constexpr (std::is_convertible_v<T, CpyString>) {
-    return CpyString(v);
-  }
-  else {
-    static_assert(false, "Unsupported VarValue type");
-  }
-}
 
 TEST(ExecStack, Basic)
 {

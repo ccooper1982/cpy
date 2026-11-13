@@ -90,8 +90,7 @@ namespace proc {
   static VarValue exec_pipeline (const Pipeline& pl)
   {
     std::vector<Pipe> pipes;
-    pipes.reserve(pl.processes.size()-1);
-
+    pipes.reserve(pl.processes.size());
 
     for (size_t i = 0 ; i < pl.processes.size(); ++i)
     {
@@ -191,6 +190,11 @@ namespace proc {
   VarValue exit_status (const RuntimeContext&, const std::span<const VarValue> args)
   {
     return static_cast<CpyInt>(std::get<ExecResult>(args[0]).exit_status);
+  }
+
+  VarValue exec_stdout (const RuntimeContext&, const std::span<const VarValue> args)
+  {
+    return std::get<ExecResult>(args[0]).stdout; // TODO this copies
   }
 
 } // ns proc

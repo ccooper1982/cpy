@@ -4,6 +4,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <type_traits>
 
 #include <cpy/common.hpp>
 
@@ -58,6 +59,12 @@ concept IsCpyBoolean = std::is_same_v<T, CpyBool>;
 
 template<typename T>
 concept IsCpyString = std::is_same_v<T, CpyString>;
+
+template<typename T>
+concept IsCpySimpleType = std::disjunction_v<std::is_same<T, CpyString>, std::is_same<T, CpyInt>, std::is_same<T, CpyDec>, std::is_same<T, CpyBool>>;
+
+template<typename T>
+concept IsCpyType = IsCpySimpleType<T> || std::disjunction_v<std::is_same<T, Process>, std::is_same<T, Pipeline>, std::is_same<T, ExecResult>>;
 
 template<typename T1, typename T2>
 concept AreCpyInteger = AreSame<T1, T2, CpyInt>;
@@ -208,6 +215,29 @@ inline std::string to_string(const VarValue& v)
     }
   },
   v);
+}
+
+template<typename T>
+VarValue make_value (T v)
+{
+  if constexpr (std::is_same_v<T, CpyBool>) {
+    return CpyBool(v);
+  }
+  else if constexpr (std::is_same_v<T, Process>) {
+    return Process{};
+  }
+  else if constexpr (std::is_integral_v<T>) {
+    return CpyInt(v);
+  }
+  else if constexpr (std::floating_point<T>) {
+    return CpyDec(v);
+  }
+  else if constexpr (std::is_convertible_v<T, CpyString>) {
+    return CpyString(v);
+  }
+  else {
+    static_assert(false, "Unsupported VarValue type");
+  }
 }
 
 struct ResolvedSymbol
