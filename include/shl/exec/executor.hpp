@@ -1,12 +1,13 @@
 #pragma once
 
-#include "cpy/functional.hpp"
-#include <cpy/ast/ast_node.hpp>
-#include <cpy/ast/expressions.hpp>
-#include <cpy/ast/ast.hpp>
-#include <cpy/common.hpp>
-#include <cpy/exec/operators.hpp>
-#include <cpy/symbol_table.hpp>
+
+#include <shl/ast/ast_node.hpp>
+#include <shl/ast/expressions.hpp>
+#include <shl/ast/ast.hpp>
+#include <shl/common.hpp>
+#include <shl/exec/operators.hpp>
+#include <shl/functional.hpp>
+#include <shl/symbol_table.hpp>
 #include <cstdint>
 #include <memory>
 #include <optional>

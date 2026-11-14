@@ -1,14 +1,14 @@
-#include "cpy/functional.hpp"
+#include "shl/functional.hpp"
 #include <algorithm>
 #include <ranges>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
-#include <cpy/ast/ast.hpp>
-#include <cpy/exec/executor.hpp>
-#include <cpy/ast/expressions.hpp>
-#include <cpy/exec/operators.hpp>
+#include <shl/ast/ast.hpp>
+#include <shl/exec/executor.hpp>
+#include <shl/ast/expressions.hpp>
+#include <shl/exec/operators.hpp>
 
 
 static VarValue value_from_literal_expr(const Expression& expr)

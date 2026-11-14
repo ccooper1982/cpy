@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "test_common.hpp"
-#include <cpy/parser.hpp>
+#include <shl/parser.hpp>
 #include <stdexcept>
 
 /*
@@ -24,12 +24,12 @@ TEST(Parser, File_Exist)
   Parser parser;
   Script script;
 
-  ASSERT_NO_THROW(script = parser.parse(TestScriptsDir / "simple.cpy"));
+  ASSERT_NO_THROW(script = parser.parse(TestScriptsDir / "simple.shl"));
   ASSERT_TRUE(script.ast->block.node_count() > 0);
 }
 
 TEST(Parser, File_NotExist)
 {
   Parser parser;
-  ASSERT_THROW(parser.parse(TestScriptsDir / "dont_exist.cpy"), std::runtime_error);
+  ASSERT_THROW(parser.parse(TestScriptsDir / "dont_exist.shl"), std::runtime_error);
 }

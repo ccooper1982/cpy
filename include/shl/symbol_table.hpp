@@ -9,10 +9,10 @@
 #include <string_view>
 #include <vector>
 
-#include <cpy/ast/ast.hpp>
-#include <cpy/exec/core.hpp>
-#include <cpy/exec/proc.hpp>
-#include <cpy/functional.hpp>
+#include <shl/ast/ast.hpp>
+#include <shl/exec/core.hpp>
+#include <shl/exec/proc.hpp>
+#include <shl/functional.hpp>
 
 
 struct Scope

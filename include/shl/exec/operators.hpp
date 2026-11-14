@@ -4,8 +4,8 @@
 #include <functional>
 #include <stdexcept>
 #include <variant>
-#include <cpy/functional.hpp>
-#include <cpy/exceptions.hpp>
+#include <shl/functional.hpp>
+#include <shl/exceptions.hpp>
 
 
 // binary //

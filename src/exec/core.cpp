@@ -1,8 +1,8 @@
-#include "cpy/functional.hpp"
-#include <cpy/exec/core.hpp>
+#include "shl/functional.hpp"
+#include <shl/exec/core.hpp>
 
-#include <cpy/common.hpp>
-#include <cpy/exceptions.hpp>
+#include <shl/common.hpp>
+#include <shl/exceptions.hpp>
 
 #include <cstdlib>
 #include <cstring>

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cpy/ast/ast_node.hpp>
-#include <cpy/common.hpp>
-#include <cpy/functional.hpp>
+#include <shl/ast/ast_node.hpp>
+#include <shl/common.hpp>
+#include <shl/functional.hpp>
 #include <memory>
 #include <vector>
 

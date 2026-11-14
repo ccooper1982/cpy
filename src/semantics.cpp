@@ -1,10 +1,10 @@
-#include <cpy/ast/ast_node.hpp>
-#include "cpy/functional.hpp"
-#include <cpy/ast/ast.hpp>
-#include <cpy/ast/expressions.hpp>
-#include <cpy/issues.hpp>
-#include <cpy/modules.hpp>
-#include <cpy/semantics.hpp>
+#include <shl/ast/ast_node.hpp>
+#include "shl/functional.hpp"
+#include <shl/ast/ast.hpp>
+#include <shl/ast/expressions.hpp>
+#include <shl/issues.hpp>
+#include <shl/modules.hpp>
+#include <shl/semantics.hpp>
 
 #include <cstddef>
 #include <exception>

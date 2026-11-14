@@ -1,11 +1,11 @@
 {
-  "name": "tree-sitter-cpy",
+  "name": "tree-sitter-shl",
   "version": "0.1.0",
   "description": "A child of C++ and Python",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tree-sitter/tree-sitter-cpy.git"
+    "url": "git+https://github.com/tree-sitter/tree-sitter-shl.git"
   },
   "funding": "",
   "license": "MIT",
@@ -19,7 +19,7 @@
     "incremental",
     "parsing",
     "tree-sitter",
-    "cpy"
+    "shl"
   ],
   "files": [
     "grammar.js",

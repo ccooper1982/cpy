@@ -1,10 +1,10 @@
-#include "cpy/ast/ast.hpp"
-#include "cpy/ast/expressions.hpp"
+#include "shl/ast/ast.hpp"
+#include "shl/ast/expressions.hpp"
 #include <algorithm>
 #include <gtest/gtest.h>
 
-#include <cpy/ast/ast_node.hpp>
-#include <cpy/parser.hpp>
+#include <shl/ast/ast_node.hpp>
+#include <shl/parser.hpp>
 #include <string_view>
 
 /// The AST tests confirm the AST contains expected node types.

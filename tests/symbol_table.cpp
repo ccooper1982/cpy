@@ -1,11 +1,11 @@
-#include <cpy/ast/ast_node.hpp>
-#include <cpy/ast/expressions.hpp>
+#include <shl/ast/ast_node.hpp>
+#include <shl/ast/expressions.hpp>
 #include <gtest/gtest.h>
 
-#include <cpy/ast/ast.hpp>
-#include <cpy/issues.hpp>
-#include <cpy/parser.hpp>
-#include <cpy/semantics.hpp>
+#include <shl/ast/ast.hpp>
+#include <shl/issues.hpp>
+#include <shl/parser.hpp>
+#include <shl/semantics.hpp>
 
 
 TEST(SymbolTable, FunctionDef)

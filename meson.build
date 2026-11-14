@@ -1,5 +1,5 @@
 project(
-  'cpy',
+  'shl',
   ['c', 'cpp'],
   version: '0.1.0',
   default_options: [
@@ -30,7 +30,7 @@ cpy_sources = files(
 
 include_dirs = include_directories('grammar/src','include')
 
-executable('cpy', cpy_sources,
+executable('shl', cpy_sources,
   include_directories: include_dirs,
   dependencies: [tree_sitter],
   install: false
@@ -57,4 +57,4 @@ cpy_tests = executable(
   cpp_args: ['-DCPY_UNIT_TESTS'],
 )
 
-test('cpy tests', cpy_tests, workdir: meson.project_source_root())
+test('shl tests', cpy_tests, workdir: meson.project_source_root())
