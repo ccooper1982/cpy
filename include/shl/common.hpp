@@ -38,11 +38,11 @@ struct SourceRegion
   uint32_t start{}, end{};
 };
 
-struct CpyError
+struct ShlError
 {
-  CpyError() = default;
+  ShlError() = default;
 
-  CpyError(const std::string_view msg) : m_msg(msg)
+  ShlError(const std::string_view msg) : m_msg(msg)
   {}
 
   bool operator()() const
@@ -60,9 +60,9 @@ private:
 };
 
 template<typename Expected>
-std::expected<Expected, CpyError> make_error(const std::string_view msg)
+std::expected<Expected, ShlError> make_error(const std::string_view msg)
 {
-  return std::unexpected(CpyError{msg});
+  return std::unexpected(ShlError{msg});
 }
 
 inline std::string_view trim_ws(std::string_view str)

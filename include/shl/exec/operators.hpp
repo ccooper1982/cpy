@@ -16,17 +16,17 @@ constexpr VarValue do_binary_arithmetic (auto& val_l, auto& val_r, OpF op)
   using L = std::decay_t<decltype(val_l)>;
   using R = std::decay_t<decltype(val_r)>;
 
-  if constexpr (std::is_same_v<OpF, std::divides<>> && AreCpyInteger<L,R>)
+  if constexpr (std::is_same_v<OpF, std::divides<>> && AreShlInteger<L,R>)
   {
     if (val_r == 0) {
       throw RuntimeError{"Divide by 0"};
     }
 
-    if (val_l == std::numeric_limits<CpyInt>::min() && val_r == -1) {
+    if (val_l == std::numeric_limits<ShlInt>::min() && val_r == -1) {
       throw RuntimeError{"Integer division overflow"};
     }
   }
-  else if constexpr (std::is_same_v<OpF, std::plus<>> && AreCpyInteger<L,R>)
+  else if constexpr (std::is_same_v<OpF, std::plus<>> && AreShlInteger<L,R>)
   {
     L result;
     if (__builtin_add_overflow(val_l, val_r, &result)) {
@@ -34,7 +34,7 @@ constexpr VarValue do_binary_arithmetic (auto& val_l, auto& val_r, OpF op)
     }
     return result;
   }
-  else if constexpr (std::is_same_v<OpF, std::minus<>> && AreCpyInteger<L, R>)
+  else if constexpr (std::is_same_v<OpF, std::minus<>> && AreShlInteger<L, R>)
   {
     L result;
     if (__builtin_sub_overflow(val_l, val_r, &result))
@@ -44,7 +44,7 @@ constexpr VarValue do_binary_arithmetic (auto& val_l, auto& val_r, OpF op)
   }
   else if constexpr (std::is_same_v<OpF, std::multiplies<>>)
   {
-    if constexpr (AreCpyInteger<L,R>)
+    if constexpr (AreShlInteger<L,R>)
     {
       L result;
       if (__builtin_mul_overflow(val_l, val_r, &result)) {
@@ -52,7 +52,7 @@ constexpr VarValue do_binary_arithmetic (auto& val_l, auto& val_r, OpF op)
       }
       return result;
     }
-    else if constexpr (AreCpyDecimal<L, R>)
+    else if constexpr (AreShlDecimal<L, R>)
     {
       auto res = op(val_l, val_r);
       if (!std::isfinite(res)) {
@@ -73,11 +73,11 @@ inline VarValue do_binary_operator (const VarValue& lhs, const VarValue& rhs, Op
     using L = std::decay_t<decltype(val_l)>;
     using R = std::decay_t<decltype(val_r)>;
 
-    // not all combinations are valid C++, and some are valid C++ but invalid cpy
-    // if invalid cpy, the semantic checker will raise an issue, preventing execution
-    constexpr bool is_arithmetic = AreCpyArithmetic<L,R>;
-    constexpr bool is_boolean = AreSame<L,R,CpyBool>;
-    constexpr bool is_strings = AreSame<L,R,CpyString> && (std::is_same_v<OpF, std::plus<>> || std::is_same_v<OpF, std::equal_to<>>);
+    // not all combinations are valid C++, and some are valid C++ but invalid shl
+    // if invalid shl, the semantic checker will raise an issue, preventing execution
+    constexpr bool is_arithmetic = AreShlArithmetic<L,R>;
+    constexpr bool is_boolean = AreSame<L,R,ShlBool>;
+    constexpr bool is_strings = AreSame<L,R,ShlString> && (std::is_same_v<OpF, std::plus<>> || std::is_same_v<OpF, std::equal_to<>>);
 
 
     if constexpr (!(is_arithmetic || is_strings || is_boolean)) {
@@ -117,7 +117,7 @@ inline VarValue operator*(const VarValue& lhs, const VarValue& rhs)
 inline bool operator<(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result = do_binary_operator(lhs, rhs, std::less<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 // binary comparison //
@@ -125,31 +125,31 @@ inline bool operator<(const VarValue& lhs, const VarValue& rhs)
 inline bool operator<=(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result = do_binary_operator(lhs, rhs, std::less_equal<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 inline bool operator>(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result = do_binary_operator(lhs, rhs, std::greater<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 inline bool operator>=(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result = do_binary_operator(lhs, rhs, std::greater_equal<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 inline bool operator==(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result = do_binary_operator(lhs, rhs, std::equal_to<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 inline bool operator!=(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result = do_binary_operator(lhs, rhs, std::not_equal_to<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 // logical //
@@ -157,13 +157,13 @@ inline bool operator!=(const VarValue& lhs, const VarValue& rhs)
 inline bool operator&&(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result = do_binary_operator(lhs, rhs, std::logical_and<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 inline bool operator||(const VarValue& lhs, const VarValue& rhs)
 {
   const auto result =  do_binary_operator(lhs, rhs, std::logical_or<>{});
-  return std::get<CpyBool>(result);
+  return std::get<ShlBool>(result);
 }
 
 // pipes //
@@ -217,9 +217,9 @@ inline VarValue do_unary_operator (const VarValue& lhs, OpF op)
     // Negate: Dec and Int
     // Not: Bool
     // BitwiseNot: Int
-    constexpr bool valid =  (std::is_same_v<OpF, std::negate<>> && IsCpyArithmetic<L>) ||
-                            (std::is_same_v<OpF, std::logical_not<>> && IsCpyBoolean<L>) ||
-                            (std::is_same_v<OpF, std::bit_not<>> && IsCpyInteger<L>);
+    constexpr bool valid =  (std::is_same_v<OpF, std::negate<>> && IsShlArithmetic<L>) ||
+                            (std::is_same_v<OpF, std::logical_not<>> && IsShlBoolean<L>) ||
+                            (std::is_same_v<OpF, std::bit_not<>> && IsShlInteger<L>);
 
     if constexpr (valid) {
       return op(val);

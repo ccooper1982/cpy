@@ -33,50 +33,50 @@ struct ExecResult
   bool operator==(const ExecResult&) const = default;
 };
 
-using CpyInt = int64_t;
-using CpyDec = double;
-using CpyBool = bool;
-using CpyString = std::string;
+using ShlInt = int64_t;
+using ShlDec = double;
+using ShlBool = bool;
+using ShlString = std::string;
 
 using VarName = std::string_view;
-using VarValue = std::variant<std::monostate, CpyString, CpyInt, CpyDec, CpyBool, Process, Pipeline, ExecResult>;
+using VarValue = std::variant<std::monostate, ShlString, ShlInt, ShlDec, ShlBool, Process, Pipeline, ExecResult>;
 
 
-template<typename T1, typename T2, typename CpyType>
-concept AreSame = std::is_same_v<T1, CpyType> && std::is_same_v<T2, CpyType> ;
-
-template<typename T>
-concept IsCpyDecimal = std::is_same_v<T, CpyDec>;
+template<typename T1, typename T2, typename ShlType>
+concept AreSame = std::is_same_v<T1, ShlType> && std::is_same_v<T2, ShlType> ;
 
 template<typename T>
-concept IsCpyInteger = std::is_same_v<T, CpyInt>;
+concept IsShlDecimal = std::is_same_v<T, ShlDec>;
 
 template<typename T>
-concept IsCpyArithmetic = IsCpyInteger<T> || IsCpyDecimal<T>;
+concept IsShlInteger = std::is_same_v<T, ShlInt>;
 
 template<typename T>
-concept IsCpyBoolean = std::is_same_v<T, CpyBool>;
+concept IsShlArithmetic = IsShlInteger<T> || IsShlDecimal<T>;
 
 template<typename T>
-concept IsCpyString = std::is_same_v<T, CpyString>;
+concept IsShlBoolean = std::is_same_v<T, ShlBool>;
 
 template<typename T>
-concept IsCpySimpleType = std::disjunction_v<std::is_same<T, CpyString>, std::is_same<T, CpyInt>, std::is_same<T, CpyDec>, std::is_same<T, CpyBool>>;
+concept IsShlString = std::is_same_v<T, ShlString>;
 
 template<typename T>
-concept IsCpyType = IsCpySimpleType<T> || std::disjunction_v<std::is_same<T, Process>, std::is_same<T, Pipeline>, std::is_same<T, ExecResult>>;
+concept IsShlSimpleType = std::disjunction_v<std::is_same<T, ShlString>, std::is_same<T, ShlInt>, std::is_same<T, ShlDec>, std::is_same<T, ShlBool>>;
+
+template<typename T>
+concept IsShlType = IsShlSimpleType<T> || std::disjunction_v<std::is_same<T, Process>, std::is_same<T, Pipeline>, std::is_same<T, ExecResult>>;
 
 template<typename T1, typename T2>
-concept AreCpyInteger = AreSame<T1, T2, CpyInt>;
+concept AreShlInteger = AreSame<T1, T2, ShlInt>;
 
 template<typename T1, typename T2>
-concept AreCpyDecimal = AreSame<T1, T2, CpyDec>;
+concept AreShlDecimal = AreSame<T1, T2, ShlDec>;
 
 template<typename T1, typename T2>
-concept AreCpyString = AreSame<T1, T2, CpyString>;
+concept AreShlString = AreSame<T1, T2, ShlString>;
 
 template<typename T1, typename T2>
-concept AreCpyArithmetic = IsCpyArithmetic<T1> && IsCpyArithmetic<T2> ;
+concept AreShlArithmetic = IsShlArithmetic<T1> && IsShlArithmetic<T2> ;
 
 
 
@@ -201,13 +201,13 @@ inline std::string to_string(const VarValue& v)
   {
     using T = std::remove_cvref_t<decltype(val)>;
 
-    if constexpr (IsCpyBoolean<T>) {
+    if constexpr (IsShlBoolean<T>) {
       return val ? "1" : "0";
     }
-    else if constexpr (IsCpyArithmetic<T>) {
+    else if constexpr (IsShlArithmetic<T>) {
       return std::to_string(val);
     }
-    else if constexpr (IsCpyString<T>) {
+    else if constexpr (IsShlString<T>) {
       return val;
     }
     else {
@@ -220,20 +220,20 @@ inline std::string to_string(const VarValue& v)
 template<typename T>
 VarValue make_value (T v)
 {
-  if constexpr (std::is_same_v<T, CpyBool>) {
-    return CpyBool(v);
+  if constexpr (std::is_same_v<T, ShlBool>) {
+    return ShlBool(v);
   }
   else if constexpr (std::is_same_v<T, Process>) {
     return Process{};
   }
   else if constexpr (std::is_integral_v<T>) {
-    return CpyInt(v);
+    return ShlInt(v);
   }
   else if constexpr (std::floating_point<T>) {
-    return CpyDec(v);
+    return ShlDec(v);
   }
-  else if constexpr (std::is_convertible_v<T, CpyString>) {
-    return CpyString(v);
+  else if constexpr (std::is_convertible_v<T, ShlString>) {
+    return ShlString(v);
   }
   else {
     static_assert(false, "Unsupported VarValue type");

@@ -117,7 +117,7 @@ struct IntegerLiteral : public Expression
 {
   static constexpr ExpressionType ExprType = ExpressionType::Int;
 
-  explicit IntegerLiteral(const CpyInt val) : Expression(ExprType, true), v(val)
+  explicit IntegerLiteral(const ShlInt val) : Expression(ExprType, true), v(val)
   {}
 
   bool is_convertible_to(const NativeType t) const override
@@ -140,7 +140,7 @@ struct IntegerLiteral : public Expression
     return v;
   }
 
-  CpyInt v;
+  ShlInt v;
 };
 
 struct StringLiteral : public Expression
@@ -165,9 +165,9 @@ struct StringLiteral : public Expression
     os << "str = \"" << v << '\"';
   }
 
-  CpyString value() const
+  ShlString value() const
   {
-    return CpyString{v};
+    return ShlString{v};
   }
 
   std::string_view v;
@@ -195,12 +195,12 @@ struct DecimalLiteral : public Expression
     os << "dec = " << v;
   }
 
-  CpyDec value() const
+  ShlDec value() const
   {
     return v;
   }
 
-  CpyDec v;
+  ShlDec v;
 };
 
 struct BooleanLiteral : public Expression
@@ -225,12 +225,12 @@ struct BooleanLiteral : public Expression
     os << "bool = " << std::boolalpha << v;
   }
 
-  CpyBool value() const
+  ShlBool value() const
   {
     return v;
   }
 
-  CpyBool v;
+  ShlBool v;
 };
 
 

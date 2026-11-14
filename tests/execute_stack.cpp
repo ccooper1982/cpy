@@ -1134,7 +1134,7 @@ TEST(ExecStack, UnaryExpressions)
   auto script = parser.parse(src);
   sem.process(script);
 
-  // note: CpyInt is signed, hence `~2 == ~(00000010) == (11111101)`
+  // note: ShlInt is signed, hence `~2 == ~(00000010) == (11111101)`
   auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
   {
     if (stack.size() == 1) // end of script

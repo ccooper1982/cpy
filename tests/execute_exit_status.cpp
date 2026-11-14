@@ -9,7 +9,7 @@
 template<typename ...Args>
 int run_script (const fs::path script, Args... args)
 {
-  auto cmd = std::format ("{} {}", CpyBinary.string(), script.string());
+  auto cmd = std::format ("{} {}", ShlBinary.string(), script.string());
   ((cmd += std::format(" {}", std::forward<Args>(args))), ...);
 
   const int status = std::system(cmd.c_str());

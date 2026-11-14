@@ -61,7 +61,7 @@ static std::vector<std::string> get_script_args (const std::span<char *> argv)
 }
 
 // TODO
-//  - separate into libcpy and shl executable
+//  - separate into libshl and shl executable
 int main (int argc, char ** argv)
 {
   if (!startup_valid(argc, argv)) {

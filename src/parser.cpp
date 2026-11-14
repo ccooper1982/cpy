@@ -106,13 +106,13 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
 
   if (expr_type == "integer")
   {
-    CpyInt i;
+    ShlInt i;
     number_from_source(value, i);
     expr = make_node<IntegerLiteral>(i);
   }
   else if (expr_type == "decimal")
   {
-    CpyDec d;
+    ShlDec d;
     number_from_source(value, d);
     expr = make_node<DecimalLiteral>(d);
   }

@@ -33,7 +33,7 @@ static VarValue value_from_literal_expr(const Expression& expr)
 
 [[nodiscard]] static bool is_true(const VarValue& value)
 {
-    const auto * b = std::get_if<CpyBool>(&value);
+    const auto * b = std::get_if<ShlBool>(&value);
     return b != nullptr && *b;
 }
 
