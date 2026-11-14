@@ -1,9 +1,14 @@
 
-#include "cpy/common.hpp"
-#include "cpy/functional.hpp"
+#include "cpy/exceptions.hpp"
+#include <cpy/functional.hpp>
+#include <cstdio>
 #include <cstring>
+#include <exception>
+#include <print>
+#include <stdexcept>
 #include <sys/types.h>
 #include <cpy/exec/proc.hpp>
+#include <unistd.h>
 
 
 extern "C" {
@@ -13,7 +18,7 @@ extern "C" {
 
 namespace proc {
 
-  std::vector<char*> make_command (const Process& proc)
+  static std::vector<char*> make_command (const Process& proc)
   {
     std::vector<char*> argv;
     argv.reserve(proc.args.size() + 2); // executable + nullptr
@@ -28,72 +33,92 @@ namespace proc {
     return argv;
   }
 
-
-  Pipe create_pipe ()
+  static std::vector<pid_t> start_processes(const std::vector<Process> processes, const std::vector<Pipe>& pipes)
   {
-    /*
-    * Before dup2():
-    *   FD new ──────────> stdout
-    *   FD old ──────────> Pipe (write end)
-    *
-    * After dup2():
-    *   FD new ─────┐
-    *               ├────> Pipe (write end)
-    *   FD old ─────┘
-    *
-    * After close():
-    *   FD 1 ──────────> Pipe (write end)
-    *   FD 4             Closed
-    */
+    std::vector<pid_t> pids;
+    pids.reserve(processes.size());
 
-    int fds[2];
+    for (size_t i = 0 ; i < processes.size(); ++i)
+    {
+      posix_spawn_file_actions_t actions;
+      posix_spawn_file_actions_init(&actions);
 
-    if (pipe(fds) == -1) {
-      throw std::runtime_error{"pipe() failed"};
+      posix_spawn_file_actions_adddup2(&actions, pipes[i].write, STDOUT_FILENO);
+
+      if (i > 0) {
+        posix_spawn_file_actions_adddup2(&actions, pipes[i-1].read, STDIN_FILENO);
+      }
+
+      for (const auto& p : pipes)
+      {
+        posix_spawn_file_actions_addclose(&actions, p.read);
+        posix_spawn_file_actions_addclose(&actions, p.write);
+      }
+
+      const auto& proc = processes[i];
+      auto cmd = make_command(proc);
+      pid_t pid{};
+
+      const int error = posix_spawnp(&pid, proc.executable.c_str(), &actions, nullptr, cmd.data(),::environ);
+
+      posix_spawn_file_actions_destroy(&actions);
+
+      if (error != 0) {
+        throw RuntimeError{std::format("spawn of {} failed: {}", proc.executable, std::strerror(errno))};
+      }
+
+      pids.push_back(pid);
     }
 
-    Pipe pipe {fds[0], fds[1]};
-
-    // posix_spawn_file_actions_t actions;
-    posix_spawn_file_actions_init(&pipe.actions);
-
-    // Redirect child's stdout to the pipe's input
-    posix_spawn_file_actions_adddup2(&pipe.actions, pipe.write, STDOUT_FILENO);
-
-    // Child doesn't need the read end.
-    posix_spawn_file_actions_addclose(&pipe.actions, pipe.read);
-    // Now stdout refers to pipe's write, we don't need it
-    posix_spawn_file_actions_addclose(&pipe.actions, pipe.write);
-
-    return pipe;
+    return pids;
   }
 
-
-  VarValue start_proc (const Process& proc)
+  static int wait_for_process (const pid_t pid)
   {
-    auto cmd = make_command(proc);
+    int status{};
+    while (waitpid(pid, &status, 0) == -1)
+    {
+      if (errno == EINTR) {
+        continue;
+      }
 
-    pid_t pid{};
+      throw RuntimeError{std::format("start_proc(): waitpid failed: {}", std::string(std::strerror(errno)))};
+    }
+    return status;
+  }
 
-    Pipe pipe = create_pipe();
+  static VarValue exec_pipeline (const Pipeline& pl)
+  {
+    std::vector<Pipe> pipes;
+    pipes.reserve(pl.processes.size());
 
-    const int error = posix_spawnp(&pid, proc.executable.data(), &pipe.actions, nullptr, cmd.data(), environ);
+    for (size_t i = 0 ; i < pl.processes.size(); ++i)
+    {
+      int fds[2];
 
-    // close FD to the new pipe since we only need the redirected FD (stdout)
-    close(pipe.write);
-
-    if (error != 0) {
-      throw RuntimeError{std::format("start_proc(): Failed to launch {}: {}", proc.executable, std::strerror(error))};
+      if (pipe(fds) == -1) {
+        throw RuntimeError{"pipe() failed"};
+      }
+      pipes.emplace_back(fds[0], fds[1]);
     }
 
+    const std::vector<pid_t> pids = start_processes(pl.processes, pipes);
 
-    // read
+    for (size_t i = 0; i < pipes.size(); ++i)
+    {
+      close(pipes[i].write);
+
+      if (i + 1 < pipes.size()) {
+        close(pipes[i].read);
+      }
+    }
+
     ExecResult result;
     char buffer[4096];
 
     while (true)
     {
-      if (const auto n = read(pipe.read, buffer, sizeof(buffer)); n > 0) {
+      if (const auto n = read(pipes.back().read, buffer, sizeof(buffer)); n > 0) {
         result.stdout.append(buffer, static_cast<size_t>(n));
       }
       else if (n == 0) {
@@ -104,45 +129,44 @@ namespace proc {
       }
     }
 
-    close(pipe.read);
+    close(pipes.back().read);
 
-    int status{};
-    while (waitpid(pid, &status, 0) == -1)
+    int exit_status{}; // exit status of the last process
+    for (const auto& pid : pids)
     {
-      if (errno == EINTR) {
-        continue;
+      try {
+        exit_status = wait_for_process(pid);
       }
-
-      throw RuntimeError{std::format("start_proc(): waitpid failed: {}", std::string(std::strerror(errno)))};
+      catch (const std::exception& ex){
+        std::println(stderr, "{}", ex.what());
+      }
     }
 
-    if (WIFEXITED(status))
+    if (WIFEXITED(exit_status))
     {
-      result.exit_status = WEXITSTATUS(status);
+      result.exit_status = WEXITSTATUS(exit_status);
       return result;
     }
 
-    if (WIFSIGNALED(status))
+    if (WIFSIGNALED(exit_status))
     {
-      result.exit_status = 128 + WTERMSIG(status);
+      result.exit_status = 128 + WTERMSIG(exit_status);
       return result;
     }
 
-    throw RuntimeError{"start_proc(): Unexpected process termination"};
+    throw std::runtime_error{"start_proc(): Unexpected process termination"};
   }
 
-
-  VarValue create (const RuntimeContext&, const std::span<const VarValue> args)
+  VarValue create_proc (const RuntimeContext&, const std::span<const VarValue> args)
   {
     Process proc {.executable = std::get<CpyString>(args[0])};
 
-    // TODO prefer not to throw, but may be the only option
     if (proc.executable.empty()) {
       throw RuntimeError{"Cannot have empty executable in proc()"};
     }
 
     for (const auto& arg : args.subspan(1)) {
-      proc.args.emplace_back(std::get<CpyString>(arg));
+      proc.args.emplace_back(to_string(arg));
     }
 
     return proc;
@@ -150,14 +174,27 @@ namespace proc {
 
   VarValue exec (const RuntimeContext&, const std::span<const VarValue> args)
   {
-    const auto& proc = std::get<Process>(args[0]);
-
-    return start_proc(proc);
+    if (const auto * proc = std::get_if<Process>(&args[0]); proc)
+    {
+      Pipeline pipeline = {{*proc}};
+      return exec_pipeline(pipeline);
+    }
+    else if (const auto * pipeline = std::get_if<Pipeline>(&args[0]); pipeline) {
+      return exec_pipeline(*pipeline);
+    }
+    else {
+      throw std::runtime_error{"exec() called with incompatible type"};
+    }
   }
 
   VarValue exit_status (const RuntimeContext&, const std::span<const VarValue> args)
   {
     return static_cast<CpyInt>(std::get<ExecResult>(args[0]).exit_status);
+  }
+
+  VarValue exec_stdout (const RuntimeContext&, const std::span<const VarValue> args)
+  {
+    return std::get<ExecResult>(args[0]).stdout; // TODO this copies
   }
 
 } // ns proc

@@ -4,9 +4,15 @@
 #include <cpy/common.hpp>
 #include <cpy/exceptions.hpp>
 
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
 #include <print>
+#include <pwd.h>
+#include <string>
 #include <string_view>
 #include <type_traits>
+#include <unistd.h>
 #include <variant>
 
 
@@ -55,6 +61,98 @@ VarValue exit(const RuntimeContext&, const std::span<const VarValue> args)
     throw RuntimeError{"Exit status must be in range [0,255]"};
   }
   throw ScriptExit {status};
+}
+
+VarValue home(const RuntimeContext&, const std::span<const VarValue>)
+{
+  if (const char* home = std::getenv("HOME"); home && *home) {
+    return std::string{home};
+  }
+  else
+  {
+    passwd pwd;
+    passwd * result{};
+
+    std::string buffer;
+    buffer.resize(sysconf(_SC_GETPW_R_SIZE_MAX));
+
+    if (const int error = getpwuid_r(getuid(), &pwd, buffer.data(), buffer.size(), &result); error != 0) {
+      throw RuntimeError{std::format("getpwuid_r() failed: {}", std::strerror(error))};
+    }
+
+    return CpyString{result->pw_dir};
+  }
+}
+
+VarValue env(const RuntimeContext&, const std::span<const VarValue> args)
+{
+  const auto * value = std::getenv(std::get<CpyString>(args[0]).data());
+  return value ? CpyString{value} : CpyString{""};
+}
+
+// conversion //
+template<typename T> requires IsCpySimpleType<std::remove_cvref_t<T>>
+VarValue value_cast(const VarValue& from)
+{
+  auto convert = [](const auto& v) -> VarValue
+  {
+    using From = std::remove_cvref_t<decltype(v)>;
+    using To = std::remove_cvref_t<T>;
+
+    if constexpr (std::is_same_v<To, From>) {
+      return v;
+    }
+    else if constexpr (IsCpyString<To> && IsCpyArithmetic<From>) {
+      return std::to_string(v);
+    }
+    else if constexpr (IsCpyString<To> && IsCpyBoolean<From>) {
+      return v ? "true" : "false";
+    }
+    else if constexpr (IsCpyArithmetic<To> && IsCpyArithmetic<From>) {
+      return static_cast<To>(v);
+    }
+    else if constexpr (IsCpyBoolean<To> && IsCpyInteger<From>) {
+      return v != 0;
+    }
+    else if constexpr (IsCpyBoolean<To> && IsCpyString<From>) {
+      return v == "true" || v == "1";
+    }
+    else if constexpr (IsCpyInteger<To> && IsCpyString<From>)
+    {
+      const std::string_view trimmed = trim_ws(v);
+      return static_cast<CpyInt>(std::strtoll(trimmed.data(), nullptr, 10));
+    }
+    else if constexpr (IsCpyDecimal<To> && IsCpyString<From>)
+    {
+      const std::string_view trimmed = trim_ws(v);
+      return std::strtod(trimmed.data(), nullptr);
+    }
+    else {
+      throw RuntimeError{"Invalid value conversion"};
+    }
+  };
+
+  return std::visit(convert, from);
+}
+
+VarValue to_int(const RuntimeContext&, const std::span<const VarValue> args)
+{
+  return value_cast<CpyInt>(args[0]);
+}
+
+VarValue to_dec(const RuntimeContext&, const std::span<const VarValue> args)
+{
+  return value_cast<CpyDec>(args[0]);
+}
+
+VarValue to_bool(const RuntimeContext&, const std::span<const VarValue> args)
+{
+  return value_cast<CpyBool>(args[0]);
+}
+
+VarValue to_str(const RuntimeContext&, const std::span<const VarValue> args)
+{
+  return value_cast<CpyString>(args[0]);
 }
 
 // argv //

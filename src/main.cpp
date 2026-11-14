@@ -9,9 +9,12 @@
 #include <exception>
 #include <filesystem>
 #include <iostream>
-#include <string_view>
-
 #include <unistd.h>
+
+
+static const constexpr int STATUS_OK = 0;
+static const constexpr int STATUS_INTERNAL_ERR = 1;
+static const constexpr int STATUS_USER_ERR = 2;
 
 static Parser parser;
 static Script script;
@@ -45,23 +48,17 @@ static bool startup_valid(const int argc, char **& argv)
 }
 
 
-static std::vector<std::string> get_args (const std::span<char *> argv)
+static std::vector<std::string> get_script_args (const std::span<char *> argv)
 {
   std::vector<std::string> args;
 
-  if (argv.size() > 2)
-  {
-    for (const std::string_view arg : argv.subspan(2)){
-      args.emplace_back(arg);
-    }
+  // skip exec name and script path
+  if (argv.size() > 2) {
+    rg::copy(argv.subspan(2), std::back_inserter(args));
   }
 
   return args;
 }
-
-static const constexpr int STATUS_OK = 0;
-static const constexpr int STATUS_INTERNAL_ERR = 1;
-static const constexpr int STATUS_USER_ERR = 2;
 
 // TODO
 //  - separate into libcpy and cpy executable
@@ -107,7 +104,7 @@ static int execute (std::span<char *> argv)
 {
   int exit_status{STATUS_OK};
 
-  RuntimeContext rt_context {.argv = get_args(argv)};
+  RuntimeContext rt_context {.argv = get_script_args(argv)};
 
   Executor exec {semantics.symbol_table(), rt_context};
 
