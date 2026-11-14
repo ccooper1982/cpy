@@ -1,9 +1,9 @@
 
 #include <gtest/gtest.h>
 
-#include <cpy/issues.hpp>
-#include <cpy/parser.hpp>
-#include <cpy/semantics.hpp>
+#include <shl/issues.hpp>
+#include <shl/parser.hpp>
+#include <shl/semantics.hpp>
 
 
 TEST(Semantics, Ok)

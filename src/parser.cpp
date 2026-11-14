@@ -1,9 +1,9 @@
-#include <cpy/ast/ast.hpp>
-#include <cpy/ast/expressions.hpp>
-#include <cpy/common.hpp>
-#include <cpy/issues.hpp>
-#include <cpy/modules.hpp>
-#include <cpy/parser.hpp>
+#include <shl/ast/ast.hpp>
+#include <shl/ast/expressions.hpp>
+#include <shl/common.hpp>
+#include <shl/issues.hpp>
+#include <shl/modules.hpp>
+#include <shl/parser.hpp>
 
 #include "tree_sitter/api.h"
 
@@ -17,7 +17,7 @@
 #include <utility>
 
 
-extern "C" const TSLanguage *tree_sitter_cpy();
+extern "C" const TSLanguage *tree_sitter_shl();
 
 
 template<typename NodeT, typename ...Args>
@@ -106,13 +106,13 @@ NodePtr<Expression> Parser::parse_expression(const TSNode& expr_node)
 
   if (expr_type == "integer")
   {
-    CpyInt i;
+    ShlInt i;
     number_from_source(value, i);
     expr = make_node<IntegerLiteral>(i);
   }
   else if (expr_type == "decimal")
   {
-    CpyDec d;
+    ShlDec d;
     number_from_source(value, d);
     expr = make_node<DecimalLiteral>(d);
   }
@@ -524,7 +524,7 @@ void Parser::parse()
 {
   m_parser.reset(ts_parser_new());
 
-  ts_parser_set_language(m_parser.get(), tree_sitter_cpy());
+  ts_parser_set_language(m_parser.get(), tree_sitter_shl());
 
   m_tree.reset(ts_parser_parse_string(m_parser.get(), nullptr, m_src->data(), m_src->length()));
 

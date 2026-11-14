@@ -1,15 +1,15 @@
 #pragma once
 
-#include "cpy/ast/ast_node.hpp"
-#include "cpy/ast/expressions.hpp"
+#include <shl/ast/ast_node.hpp>
+#include <shl/ast/expressions.hpp>
 #include <concepts>
 #include <functional>
 #include <ranges>
 
-#include <cpy/ast/ast.hpp>
-#include <cpy/common.hpp>
-#include <cpy/issues.hpp>
-#include <cpy/symbol_table.hpp>
+#include <shl/ast/ast.hpp>
+#include <shl/common.hpp>
+#include <shl/issues.hpp>
+#include <shl/symbol_table.hpp>
 
 
 ///

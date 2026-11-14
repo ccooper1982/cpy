@@ -1,15 +1,15 @@
-#! /home/callum/projects/cpy/build/cpy
+#! /home/callum/projects/shl/build/shl
 
 /#
-Use a cpy script to test cpy, marking its own homework.
+Use a shl script to test shl, marking its own homework.
 #/
 
-path := home()+"/projects/cpy/tests/scripts";
-cpy := home()+"/projects/cpy/build/cpy";
+path := home()+"/projects/shl/tests/scripts";
+shl := home()+"/projects/shl/build/shl";
 
-script := path + "/sequence.cpy";
+script := path + "/sequence.shl";
 
-pipeline := proc(cpy, script);
+pipeline := proc(shl, script);
 
 result := to_int(exec_stdout(exec(pipeline)));
 

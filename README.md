@@ -1,4 +1,4 @@
-# cpy
+# shl
 C++ Pythony, an alternative to shell script.
 
 Mostly experimenting with Tree-sitter and creating an AST.

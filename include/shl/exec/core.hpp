@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cpy/common.hpp>
-#include <cpy/functional.hpp>
+#include <shl/common.hpp>
+#include <shl/functional.hpp>
 
 
 namespace core

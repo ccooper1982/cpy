@@ -1,13 +1,13 @@
 
-#include "cpy/exceptions.hpp"
-#include <cpy/functional.hpp>
+#include "shl/exceptions.hpp"
+#include <shl/functional.hpp>
 #include <cstdio>
 #include <cstring>
 #include <exception>
 #include <print>
 #include <stdexcept>
 #include <sys/types.h>
-#include <cpy/exec/proc.hpp>
+#include <shl/exec/proc.hpp>
 #include <unistd.h>
 
 
@@ -159,7 +159,7 @@ namespace proc {
 
   VarValue create_proc (const RuntimeContext&, const std::span<const VarValue> args)
   {
-    Process proc {.executable = std::get<CpyString>(args[0])};
+    Process proc {.executable = std::get<ShlString>(args[0])};
 
     if (proc.executable.empty()) {
       throw RuntimeError{"Cannot have empty executable in proc()"};
@@ -189,7 +189,7 @@ namespace proc {
 
   VarValue exit_status (const RuntimeContext&, const std::span<const VarValue> args)
   {
-    return static_cast<CpyInt>(std::get<ExecResult>(args[0]).exit_status);
+    return static_cast<ShlInt>(std::get<ExecResult>(args[0]).exit_status);
   }
 
   VarValue exec_stdout (const RuntimeContext&, const std::span<const VarValue> args)

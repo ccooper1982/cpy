@@ -2,15 +2,15 @@
   "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
   "grammars": [
     {
-      "name": "cpy",
-      "camelcase": "cpy",
-      "title": "cpy",
-      "scope": "source.cpy",
+      "name": "shl",
+      "camelcase": "shl",
+      "title": "shl",
+      "scope": "source.shl",
       "file-types": [
-        "cpy"
+        "shl"
       ],
-      "injection-regex": "^cpy$",
-      "class-name": "TreeSitterCpy"
+      "injection-regex": "^shl$",
+      "class-name": "TreeSitterShl"
     }
   ],
   "metadata": {
@@ -24,7 +24,7 @@
       }
     ],
     "links": {
-      "repository": "https://github.com/tree-sitter/tree-sitter-cpy",
+      "repository": "https://github.com/ccooper1982/shl",
       "funding": ""
     }
   },

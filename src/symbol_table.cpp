@@ -1,4 +1,4 @@
-#include <cpy/symbol_table.hpp>
+#include <shl/symbol_table.hpp>
 #include <stdexcept>
 
 

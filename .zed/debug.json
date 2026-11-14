@@ -4,33 +4,33 @@
 // see: https://zed.dev/docs/debugger
 [
   // {
-  //   "label": "cpy",
+  //   "label": "shl",
   //   "build": {
   //     "command": "meson",
   //     "args": ["compile", "-C", "build"],
   //     "cwd": "$ZED_WORKTREE_ROOT"
   //   },
-  //   "program": "$ZED_WORKTREE_ROOT/build/cpy",
+  //   "program": "$ZED_WORKTREE_ROOT/build/shl",
   //   "request": "launch",
   //   "adapter": "CodeLLDB"
   // },
   {
-    "label": "cpy file",
+    "label": "shl file",
     "build": {
       "command": "meson",
       "args": ["compile", "-C", "build"],
       "cwd": "$ZED_WORKTREE_ROOT"
     },
-    "program": "$ZED_WORKTREE_ROOT/build/cpy",
-    "args": ["example.cpy", "1", "2", "3.5", "some/file/path"],
+    "program": "$ZED_WORKTREE_ROOT/build/shl",
+    "args": ["example.shl", "1", "2", "3.5", "some/file/path"],
     "request": "launch",
     "adapter": "CodeLLDB"
   },
   // {
-  //   "label": "Debug cpy test",
+  //   "label": "Debug shl test",
   //   "adapter": "CodeLLDB",
   //   "request": "launch",
-  //   "program": "$ZED_WORKTREE_ROOT/build/cpy_tests",
+  //   "program": "$ZED_WORKTREE_ROOT/build/shl_tests",
   //   "args": ["--gtest_filter=ExecExitStatus.Add"],
   //   "cwd": "$ZED_WORKTREE_ROOT",
   //   "build": {

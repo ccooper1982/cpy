@@ -1,10 +1,10 @@
-#include <cpy/ast/ast_node.hpp>
-#include <cpy/common.hpp>
-#include <cpy/exceptions.hpp>
-#include <cpy/exec/executor.hpp>
-#include <cpy/parser.hpp>
-#include <cpy/modules.hpp>
-#include <cpy/semantics.hpp>
+#include <shl/ast/ast_node.hpp>
+#include <shl/common.hpp>
+#include <shl/exceptions.hpp>
+#include <shl/exec/executor.hpp>
+#include <shl/parser.hpp>
+#include <shl/modules.hpp>
+#include <shl/semantics.hpp>
 
 #include <exception>
 #include <filesystem>
@@ -61,7 +61,7 @@ static std::vector<std::string> get_script_args (const std::span<char *> argv)
 }
 
 // TODO
-//  - separate into libcpy and cpy executable
+//  - separate into libshl and shl executable
 int main (int argc, char ** argv)
 {
   if (!startup_valid(argc, argv)) {

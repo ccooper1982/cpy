@@ -1,4 +1,4 @@
-#! /home/callum/projects/cpy/build/cpy
+#! /home/callum/projects/shl/build/shl
 
 pipeline := proc("seq", "1", "100")
           | proc("grep", "5")

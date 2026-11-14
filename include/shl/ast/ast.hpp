@@ -10,9 +10,9 @@
 #include <string_view>
 #include <vector>
 
-#include <cpy/functional.hpp>
-#include <cpy/ast/expressions.hpp>
-#include <cpy/ast/ast_node.hpp>
+#include <shl/functional.hpp>
+#include <shl/ast/expressions.hpp>
+#include <shl/ast/ast_node.hpp>
 
 
 struct NodeBlock : public AstNode

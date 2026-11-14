@@ -2,10 +2,10 @@
 #include <memory>
 #include <string_view>
 
-#include <cpy/ast/ast.hpp>
+#include <shl/ast/ast.hpp>
 
-#include <cpy/common.hpp>
-#include <cpy/issues.hpp>
+#include <shl/common.hpp>
+#include <shl/issues.hpp>
 
 #include <tree_sitter/api.h>
 

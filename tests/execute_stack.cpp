@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <cpy/common.hpp>
-#include <cpy/exceptions.hpp>
-#include <cpy/exec/executor.hpp>
-#include <cpy/parser.hpp>
-#include <cpy/semantics.hpp>
-#include <cpy/symbol_table.hpp>
+#include <shl/common.hpp>
+#include <shl/exceptions.hpp>
+#include <shl/exec/executor.hpp>
+#include <shl/parser.hpp>
+#include <shl/semantics.hpp>
+#include <shl/symbol_table.hpp>
 #include <string_view>
 
 
@@ -274,7 +274,7 @@ TEST(ExecStack, FuncCall_AssignParent)
   const std::string_view src = R"(
     a := "hello";
     foo();
-    a = "cpy";
+    a = "shl";
 
     fn foo()
     {
@@ -300,7 +300,7 @@ TEST(ExecStack, FuncCall_AssignParent)
     else if (stack.size() == 1)
     {
       ASSERT_EQ(stack[0].size(), 1);
-      ASSERT_EQ(stack[0].at("a").value(), make_value("cpy"));
+      ASSERT_EQ(stack[0].at("a").value(), make_value("shl"));
     }
   };
 
@@ -1134,7 +1134,7 @@ TEST(ExecStack, UnaryExpressions)
   auto script = parser.parse(src);
   sem.process(script);
 
-  // note: CpyInt is signed, hence `~2 == ~(00000010) == (11111101)`
+  // note: ShlInt is signed, hence `~2 == ~(00000010) == (11111101)`
   auto on_pop = [&](const std::vector<std::map<VarName, Variable>> stack)
   {
     if (stack.size() == 1) // end of script

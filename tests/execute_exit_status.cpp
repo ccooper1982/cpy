@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <cpy/parser.hpp>
-#include <cpy/semantics.hpp>
+#include <shl/parser.hpp>
+#include <shl/semantics.hpp>
 
 #include "test_common.hpp"
 
@@ -9,7 +9,7 @@
 template<typename ...Args>
 int run_script (const fs::path script, Args... args)
 {
-  auto cmd = std::format ("{} {}", CpyBinary.string(), script.string());
+  auto cmd = std::format ("{} {}", ShlBinary.string(), script.string());
   ((cmd += std::format(" {}", std::forward<Args>(args))), ...);
 
   const int status = std::system(cmd.c_str());
@@ -25,23 +25,23 @@ int run_script (const fs::path script, Args... args)
 
 TEST(ExecExitStatus, Add)
 {
-  EXPECT_EQ(run_script(TestScriptsDir / "add.cpy 1 2"), 3);
-  EXPECT_EQ(run_script(TestScriptsDir / "add.cpy", 10, -2), 8);
+  EXPECT_EQ(run_script(TestScriptsDir / "add.shl 1 2"), 3);
+  EXPECT_EQ(run_script(TestScriptsDir / "add.shl", 10, -2), 8);
 }
 
 TEST(ExecExitStatus, Count)
 {
   // this test isn't about counting, it was to test the stack is correct with
   // recursive function calls , a loop and if
-  EXPECT_EQ(run_script(TestScriptsDir / "count.cpy"), 42);
+  EXPECT_EQ(run_script(TestScriptsDir / "count.shl"), 42);
 }
 
 TEST(ExecExitStatus, Fib_Recursive)
 {
-  EXPECT_EQ(run_script(TestScriptsDir / "fib_recursive.cpy", 13), 233);
+  EXPECT_EQ(run_script(TestScriptsDir / "fib_recursive.shl", 13), 233);
 }
 
 TEST(ExecExitStatus, Fib_Iterative)
 {
-  EXPECT_EQ(run_script(TestScriptsDir / "fib_iterative.cpy", 13), 233);
+  EXPECT_EQ(run_script(TestScriptsDir / "fib_iterative.shl", 13), 233);
 }

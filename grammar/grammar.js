@@ -1,5 +1,5 @@
 export default grammar({
-  name: "cpy",
+  name: "shl",
 
   extras: $ => [
     /\s/,

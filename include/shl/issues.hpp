@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include <cpy/ast/ast_node.hpp>
+#include <shl/ast/ast_node.hpp>
 
 #include "tree_sitter/api.h"
 

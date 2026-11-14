@@ -1,8 +1,8 @@
-#include "cpy/functional.hpp"
-#include <cpy/exec/core.hpp>
+#include "shl/functional.hpp"
+#include <shl/exec/core.hpp>
 
-#include <cpy/common.hpp>
-#include <cpy/exceptions.hpp>
+#include <shl/common.hpp>
+#include <shl/exceptions.hpp>
 
 #include <cstdlib>
 #include <cstring>
@@ -55,7 +55,7 @@ VarValue println(const RuntimeContext& ctx, const std::span<const VarValue> args
 
 VarValue exit(const RuntimeContext&, const std::span<const VarValue> args)
 {
-  const int status = args.empty() ? 0 : static_cast<int>(std::get<CpyInt>(args[0]));
+  const int status = args.empty() ? 0 : static_cast<int>(std::get<ShlInt>(args[0]));
 
   if (status < 0 || status > 255) {
     throw RuntimeError{"Exit status must be in range [0,255]"};
@@ -80,18 +80,18 @@ VarValue home(const RuntimeContext&, const std::span<const VarValue>)
       throw RuntimeError{std::format("getpwuid_r() failed: {}", std::strerror(error))};
     }
 
-    return CpyString{result->pw_dir};
+    return ShlString{result->pw_dir};
   }
 }
 
 VarValue env(const RuntimeContext&, const std::span<const VarValue> args)
 {
-  const auto * value = std::getenv(std::get<CpyString>(args[0]).data());
-  return value ? CpyString{value} : CpyString{""};
+  const auto * value = std::getenv(std::get<ShlString>(args[0]).data());
+  return value ? ShlString{value} : ShlString{""};
 }
 
 // conversion //
-template<typename T> requires IsCpySimpleType<std::remove_cvref_t<T>>
+template<typename T> requires IsShlSimpleType<std::remove_cvref_t<T>>
 VarValue value_cast(const VarValue& from)
 {
   auto convert = [](const auto& v) -> VarValue
@@ -102,27 +102,27 @@ VarValue value_cast(const VarValue& from)
     if constexpr (std::is_same_v<To, From>) {
       return v;
     }
-    else if constexpr (IsCpyString<To> && IsCpyArithmetic<From>) {
+    else if constexpr (IsShlString<To> && IsShlArithmetic<From>) {
       return std::to_string(v);
     }
-    else if constexpr (IsCpyString<To> && IsCpyBoolean<From>) {
+    else if constexpr (IsShlString<To> && IsShlBoolean<From>) {
       return v ? "true" : "false";
     }
-    else if constexpr (IsCpyArithmetic<To> && IsCpyArithmetic<From>) {
+    else if constexpr (IsShlArithmetic<To> && IsShlArithmetic<From>) {
       return static_cast<To>(v);
     }
-    else if constexpr (IsCpyBoolean<To> && IsCpyInteger<From>) {
+    else if constexpr (IsShlBoolean<To> && IsShlInteger<From>) {
       return v != 0;
     }
-    else if constexpr (IsCpyBoolean<To> && IsCpyString<From>) {
+    else if constexpr (IsShlBoolean<To> && IsShlString<From>) {
       return v == "true" || v == "1";
     }
-    else if constexpr (IsCpyInteger<To> && IsCpyString<From>)
+    else if constexpr (IsShlInteger<To> && IsShlString<From>)
     {
       const std::string_view trimmed = trim_ws(v);
-      return static_cast<CpyInt>(std::strtoll(trimmed.data(), nullptr, 10));
+      return static_cast<ShlInt>(std::strtoll(trimmed.data(), nullptr, 10));
     }
-    else if constexpr (IsCpyDecimal<To> && IsCpyString<From>)
+    else if constexpr (IsShlDecimal<To> && IsShlString<From>)
     {
       const std::string_view trimmed = trim_ws(v);
       return std::strtod(trimmed.data(), nullptr);
@@ -137,22 +137,22 @@ VarValue value_cast(const VarValue& from)
 
 VarValue to_int(const RuntimeContext&, const std::span<const VarValue> args)
 {
-  return value_cast<CpyInt>(args[0]);
+  return value_cast<ShlInt>(args[0]);
 }
 
 VarValue to_dec(const RuntimeContext&, const std::span<const VarValue> args)
 {
-  return value_cast<CpyDec>(args[0]);
+  return value_cast<ShlDec>(args[0]);
 }
 
 VarValue to_bool(const RuntimeContext&, const std::span<const VarValue> args)
 {
-  return value_cast<CpyBool>(args[0]);
+  return value_cast<ShlBool>(args[0]);
 }
 
 VarValue to_str(const RuntimeContext&, const std::span<const VarValue> args)
 {
-  return value_cast<CpyString>(args[0]);
+  return value_cast<ShlString>(args[0]);
 }
 
 // argv //
@@ -165,7 +165,7 @@ bool to_var_value (const std::string_view arg, auto& val)
 
 size_t get_argv_index(const RuntimeContext& ctx, const std::span<const VarValue> args)
 {
-  const auto index = std::get<CpyInt>(args[0]);
+  const auto index = std::get<ShlInt>(args[0]);
 
   if (index < 0 || static_cast<size_t>(index) >= ctx.argv.size()) {
     throw RuntimeError{std::format("argv index out of range: {}", index)};
@@ -182,7 +182,7 @@ VarValue get_argv_str(const RuntimeContext& ctx, const std::span<const VarValue>
 VarValue get_argv_int(const RuntimeContext& ctx, const std::span<const VarValue> args)
 {
   const auto index = get_argv_index(ctx, args);
-  if (CpyInt val; to_var_value(ctx.argv[index], val))  {
+  if (ShlInt val; to_var_value(ctx.argv[index], val))  {
     return val;
   }
 
@@ -192,7 +192,7 @@ VarValue get_argv_int(const RuntimeContext& ctx, const std::span<const VarValue>
 VarValue get_argv_dec(const RuntimeContext& ctx, const std::span<const VarValue> args)
 {
   const auto index = get_argv_index(ctx, args);
-  if (CpyDec val; to_var_value(ctx.argv[index], val))  {
+  if (ShlDec val; to_var_value(ctx.argv[index], val))  {
     return val;
   }
 
@@ -217,7 +217,7 @@ VarValue get_argv_bool(const RuntimeContext& ctx, const std::span<const VarValue
 
 VarValue get_argc(const RuntimeContext& ctx, const std::span<const VarValue>)
 {
-  return static_cast<CpyInt>(ctx.argv.size());
+  return static_cast<ShlInt>(ctx.argv.size());
 }
 
 } // ns core

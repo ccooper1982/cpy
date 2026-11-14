@@ -1,5 +1,5 @@
 project(
-  'cpy',
+  'shl',
   ['c', 'cpp'],
   version: '0.1.0',
   default_options: [
@@ -17,7 +17,7 @@ tree_sitter = dependency('tree-sitter')
 gtest = dependency('gtest')
 gtest_main = dependency('gtest_main')
 
-cpy_sources = files(
+shl_sources = files(
   'src/exec/core.cpp',
   'src/exec/proc.cpp',
   'src/exec/executor.cpp',
@@ -30,14 +30,14 @@ cpy_sources = files(
 
 include_dirs = include_directories('grammar/src','include')
 
-executable('cpy', cpy_sources,
+executable('shl', shl_sources,
   include_directories: include_dirs,
   dependencies: [tree_sitter],
   install: false
 )
 
-cpy_tests = executable(
-  'cpy_tests',
+shl_tests = executable(
+  'shl_tests',
   files('tests/ast.cpp',
         'tests/parser.cpp',
         'tests/semantics.cpp',
@@ -57,4 +57,4 @@ cpy_tests = executable(
   cpp_args: ['-DCPY_UNIT_TESTS'],
 )
 
-test('cpy tests', cpy_tests, workdir: meson.project_source_root())
+test('shl tests', shl_tests, workdir: meson.project_source_root())

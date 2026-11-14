@@ -1,7 +1,7 @@
 
 fn test1()
 {
-    pipeline := proc("find", home()+"/projects/cpy", "-type", "f", "-name", "*.cpp")
+    pipeline := proc("find", home()+"/projects/shl", "-type", "f", "-name", "*.cpp")
               | proc("wc", "-l");
 
     result := exec(pipeline);

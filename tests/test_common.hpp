@@ -1,8 +1,8 @@
 #pragma  once
 
-#include <cpy/common.hpp>
+#include <shl/common.hpp>
 
 
 static inline const auto TestScriptsDir = fs::path{"tests/scripts"};
 
-static inline const auto CpyBinary = fs::path{"build/cpy"};
+static inline const auto ShlBinary = fs::path{"build/shl"};
